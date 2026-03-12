@@ -174,7 +174,7 @@
   }
   .sidebar-link.planner { background: var(--accent-light); color: var(--accent); }
   .sidebar-link.planner:hover { background: var(--accent); color: white; }
-  .sidebar-link.daily { background: var(--gold-light); color: var(--gold); display: block; margin: 8px 12px 0; text-decoration: none; }
+  .sidebar-link.daily { background: #f0d078; color: #7a5800; display: block; margin: 8px 12px 0; text-decoration: none; }
   .sidebar-link.daily:hover { background: var(--gold); color: white; }
 
   /* MAIN PANEL */
@@ -669,7 +669,7 @@ function WeeklyPlanner({ onGoToHabit, calHeaderColor, setCalHeaderColor }) {
         <a className="sidebar-link daily" href="https://penzu.com">✍️ Daily Pages</a>
 
         <div className="sidebar-section">
-          <div className="sidebar-section-title">Proverb of the Week</div>
+          <div className="sidebar-section-title"><style>.add-margin {marginTop = 100px} Proverb of the Week</style></div>
           <textarea className="sidebar-textarea" placeholder="Write a quote to meditate on…"
             value={wd.proverb||''} onChange={e=>setWD(w=>({...w,proverb:e.target.value}))} rows={3} />
         </div>
