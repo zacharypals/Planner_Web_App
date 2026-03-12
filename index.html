@@ -721,11 +721,50 @@ function requestToken(onSuccess, onError) {
   }, 1000);
 }
 
-// Silent re-auth: use stored email hint, no UI prompt
+// Silent re-auth: hidden popup with login_hint — no UI if session still valid
 function requestTokenSilent(onSuccess, onError) {
   const hint = getSavedEmail();
   if (!hint) { onError('no_hint'); return; }
-  buildTokenClient(hint, '', onSuccess, onError);
+  const redirectUri = 'https://zacharypals.github.io/Planner_Web_App/oauth.html';
+  const params = new URLSearchParams({
+    client_id: CLIENT_ID,
+    redirect_uri: redirectUri,
+    response_type: 'token',
+    scope: SCOPES,
+    prompt: '',
+    login_hint: hint,
+    include_granted_scopes: 'true',
+  });
+  const authUrl = 'https://accounts.google.com/o/oauth2/v2/auth?' + params.toString();
+  const popup = window.open(authUrl, 'googleSilentAuth', 'width=1,height=1,top=-2000,left=-2000');
+  if (!popup) { onError('blocked'); return; }
+  let done = false;
+  function onMessage(e) {
+    if (e.origin !== 'https://zacharypals.github.io') return;
+    if (!e.data?.access_token) return;
+    done = true;
+    window.removeEventListener('message', onMessage);
+    clearInterval(check);
+    _accessToken = e.data.access_token;
+    _tokenExpiry = Date.now() + ((e.data.expires_in || 3600) - 60) * 1000;
+    onSuccess(e.data);
+  }
+  window.addEventListener('message', onMessage);
+  const check = setInterval(() => {
+    if (popup.closed) {
+      clearInterval(check);
+      window.removeEventListener('message', onMessage);
+      if (!done) onError('closed');
+    }
+  }, 500);
+  setTimeout(() => {
+    if (!done) {
+      clearInterval(check);
+      window.removeEventListener('message', onMessage);
+      try { popup.close(); } catch {}
+      onError('timeout');
+    }
+  }, 15000);
 }
 
 // ── DRIVE HELPERS ──
@@ -1841,8 +1880,12 @@ function MonthlyCalendar({ weekData, setWeekData }) {
               }
               return updated;
             });
+          } else {
+            console.warn('Calendar push returned no ID — event may not have synced');
           }
-        });
+        }).catch(e => console.error('Calendar push error:', e));
+      } else {
+        console.log('Not signed in — skipping calendar push');
       }
     }
     setShowEventModal(false);
@@ -2168,15 +2211,17 @@ function App() {
     setSyncing(true);
     try {
       const result = await pullNewFromCalendar(weekData);
-      if (result && result.added > 0) {
+      if (!result) {
+        alert('Calendar sync failed: could not reach Google Calendar.\n\nMake sure:\n1. Google Calendar API is enabled in Cloud Console\n2. You signed in and approved Calendar access on the consent screen\n3. Try signing out and back in');
+      } else if (result.added > 0) {
         setWeekData(result.newWeekData);
-        alert(`Synced ${result.added} new event${result.added === 1 ? '' : 's'} from Google Calendar.`);
+        alert(`✓ Synced ${result.added} new event${result.added === 1 ? '' : 's'} from Google Calendar.`);
       } else {
-        alert('No new events to sync — your app is up to date.');
+        alert('✓ All caught up — no new events to import from Google Calendar.');
       }
     } catch (e) {
       const msg = e?.message || 'Unknown error';
-      alert(`Calendar sync failed: ${msg}\n\nThis usually means the Google Calendar API isn't enabled, or Calendar permission wasn't granted. Try signing out and back in, and make sure you approve Calendar access on the consent screen.`);
+      alert(`Calendar sync failed: ${msg}\n\nMake sure:\n1. Google Calendar API is enabled in Cloud Console\n2. You signed in and approved Calendar access\n3. Try signing out and back in`);
     }
     setSyncing(false);
   }
