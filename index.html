@@ -963,6 +963,26 @@ function HabitTracker({ onGoToPlanner }) {
     return dates.filter(dk=>isCompleted(goalId,dk)).length;
   }
 
+  function calcStreak(goalId) {
+    const todayDate = new Date(); todayDate.setHours(0,0,0,0);
+    const todayKey = fmt(todayDate);
+    // If today is completed, start counting from today, else start from yesterday
+    let cursor = isCompleted(goalId, todayKey)
+      ? new Date(todayDate)
+      : addDays(todayDate, -1);
+    let streak = 0;
+    while (true) {
+      const dk = fmt(cursor);
+      if (isCompleted(goalId, dk)) {
+        streak++;
+        cursor = addDays(cursor, -1);
+      } else {
+        break;
+      }
+    }
+    return streak;
+  }
+
   const selectedDayKey = fmt(selectedDate);
   const displayGoals = filterGoal ? goals.filter(g=>g.id===filterGoal) : goals;
 
@@ -998,7 +1018,11 @@ function HabitTracker({ onGoToPlanner }) {
             <input className="goal-name-input" value={goal.name}
               onChange={e=>updateGoal(goal.id,{name:e.target.value})}
               onClick={e=>e.stopPropagation()} />
-            <span className="goal-count">({countInView(goal.id)})</span>
+            <span className="goal-count">
+              {countInView(goal.id)}
+              <span style={{margin:'0 3px',opacity:0.4}}>·</span>
+              <span title="Current streak" style={{color:'var(--gold)'}}>🔥{calcStreak(goal.id)}</span>
+            </span>
             <button className="delete-item-btn" style={{opacity:0}} onClick={e=>{e.stopPropagation();deleteGoal(goal.id);}}
               onMouseEnter={e=>e.target.style.opacity=1} onMouseLeave={e=>e.target.style.opacity=0}>✕</button>
           </div>
