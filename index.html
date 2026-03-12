@@ -2035,7 +2035,10 @@ function App() {
       setSaveStatus('saved');
       setTimeout(() => setSaveStatus(''), 2000);
     } catch (e) {
-      setSaveStatus('error');
+      const msg = e?.message || 'Unknown error';
+      console.error('Drive load failed:', msg);
+      setSaveStatus('ERR:' + msg);
+      setTimeout(() => setSaveStatus(''), 8000);
     }
   }
 
@@ -2053,8 +2056,10 @@ function App() {
         await saveToDrive(fid, allData);
         setSaveStatus('saved');
         setTimeout(() => setSaveStatus(''), 2000);
-      } catch {
-        setSaveStatus('error');
+      } catch (e) {
+        const msg = e?.message || 'Save failed';
+        setSaveStatus('ERR:' + msg);
+        setTimeout(() => setSaveStatus(''), 8000);
       }
     }, 1500);
   }, []);
@@ -2131,10 +2136,13 @@ function App() {
     setSyncing(false);
   }
 
+  const isErr = saveStatus.startsWith('ERR:');
+  const errDetail = isErr ? saveStatus.slice(4) : '';
   const saveLabel = saveStatus === 'saving' ? '↑ Saving…'
     : saveStatus === 'saved' ? '✓ Saved'
-    : saveStatus === 'error' ? '✗ Error'
+    : isErr ? `✗ ${errDetail}`
     : '';
+  const saveClass = isErr ? 'error' : saveStatus;
 
   return (
     <div className="app">
@@ -2149,7 +2157,7 @@ function App() {
           <button className={`nav-tab ${page==='habit'?'active':''}`} onClick={()=>setPage('habit')}>Habit Tracker</button>
         </div>
         <div className="auth-area">
-          {saveLabel && <span className={`save-status ${saveStatus}`}>{saveLabel}</span>}
+          {saveLabel && <span className={`save-status ${saveClass || saveStatus}`}>{saveLabel}</span>}
           {authUser ? (
             <>
               <button className="auth-btn sync" onClick={handleSyncCalendar} disabled={syncing} title="Pull new events from Google Calendar">
