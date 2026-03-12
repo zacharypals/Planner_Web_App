@@ -1,0 +1,1191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Weekly Planner & Habit Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --cream: #f5f0e8;
+    --paper: #faf7f2;
+    --ink: #1a1510;
+    --ink-light: #6b6055;
+    --ink-faint: #c8bfb0;
+    --accent: #2d5a3d;
+    --accent-light: #e8f0eb;
+    --gold: #b8860b;
+    --gold-light: #fdf6e3;
+    --border: #ddd5c8;
+    --shadow: rgba(26,21,16,0.08);
+    --red: #c0392b; --red-light: #fdecea;
+    --blue: #2471a3; --blue-light: #eaf4fb;
+    --purple: #7d3c98; --purple-light: #f5eef8;
+    --orange: #d35400; --orange-light: #fdf2e9;
+    --teal: #148f77; --teal-light: #e8f8f5;
+    --pink: #c0392b;
+  }
+  html, body { height: 100%; font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--ink); }
+  #root { height: 100%; }
+
+  /* LAYOUT */
+  .app { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+  .nav-bar {
+    background: #1e3d29; color: var(--paper);
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 24px; height: 48px; flex-shrink: 0;
+    border-bottom: 2px solid var(--gold);
+  }
+  .nav-brand { font-family: 'Playfair Display', serif; font-size: 18px; letter-spacing: 0.03em; color: var(--cream); }
+  .nav-tabs { display: flex; gap: 4px; }
+  .nav-tab {
+    padding: 6px 18px; border-radius: 4px; border: none; cursor: pointer;
+    font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500;
+    background: transparent; color: var(--ink-faint); letter-spacing: 0.05em; text-transform: uppercase;
+    transition: all 0.15s;
+  }
+  .nav-tab:hover { color: var(--cream); }
+  .nav-tab.active { background: var(--gold); color: var(--ink); }
+  .main-content { flex: 1; display: flex; overflow: hidden; }
+
+  /* SIDEBAR */
+  .sidebar {
+    width: 280px; flex-shrink: 0; background: var(--paper);
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; overflow-y: auto;
+    padding: 16px;
+  }
+  .sidebar::-webkit-scrollbar { width: 4px; }
+  .sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* WEEK NAV */
+  .week-nav {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 16px; padding: 8px 4px;
+    border-bottom: 1px solid var(--border);
+  }
+  .week-nav-label { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--ink-light); font-weight: 500; }
+  .nav-arrow {
+    background: none; border: 1px solid var(--border); border-radius: 4px;
+    width: 26px; height: 26px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    color: var(--ink-light); transition: all 0.15s; font-size: 12px;
+  }
+  .nav-arrow:hover { background: var(--accent); color: white; border-color: var(--accent); }
+
+  /* SIDEBAR SECTIONS */
+  .sidebar-section { margin-bottom: 16px; }
+  .sidebar-section-title {
+    font-family: 'Playfair Display', serif; font-size: 13px; font-weight: 600;
+    color: var(--ink); margin-bottom: 6px; letter-spacing: 0.02em;
+  }
+  .sidebar-textarea {
+    width: 100%; border: 1px solid var(--border); border-radius: 6px;
+    background: var(--cream); padding: 8px 10px; font-size: 12.5px;
+    font-family: 'DM Sans', sans-serif; color: var(--ink); resize: vertical;
+    min-height: 64px; line-height: 1.5; transition: border 0.15s;
+  }
+  .sidebar-textarea:focus { outline: none; border-color: var(--accent); }
+
+  /* CHECKLIST */
+  .checklist-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+  .add-btn {
+    width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--accent);
+    background: none; color: var(--accent); cursor: pointer; font-size: 16px;
+    display: flex; align-items: center; justify-content: center; line-height: 1;
+    transition: all 0.15s;
+  }
+  .add-btn:hover { background: var(--accent); color: white; }
+  .checklist-item {
+    display: flex; align-items: center; gap: 8px; padding: 5px 4px;
+    border-radius: 4px; transition: background 0.1s;
+  }
+  .checklist-item:hover { background: var(--cream); }
+  .checklist-item.checked .checklist-label { text-decoration: line-through; color: var(--ink-faint); }
+  .check-box {
+    width: 16px; height: 16px; border: 1.5px solid var(--border); border-radius: 3px;
+    cursor: pointer; flex-shrink: 0; background: white; display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+  }
+  .check-box.checked { background: var(--accent); border-color: var(--accent); }
+  .check-box.checked::after { content: '✓'; color: white; font-size: 10px; }
+  .checklist-input {
+    flex: 1; border: none; background: transparent; font-size: 12.5px;
+    font-family: 'DM Sans', sans-serif; color: var(--ink); outline: none;
+  }
+  .checklist-input::placeholder { color: var(--ink-faint); }
+  .delete-item-btn {
+    opacity: 0; background: none; border: none; cursor: pointer; color: var(--ink-faint);
+    font-size: 14px; padding: 0 2px; transition: opacity 0.15s;
+  }
+  .checklist-item:hover .delete-item-btn { opacity: 1; }
+
+  /* SIDEBAR LINKS */
+  .sidebar-links { margin-top: auto; padding-top: 12px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 6px; }
+  .sidebar-link {
+    display: block; padding: 8px 12px; border-radius: 6px; text-decoration: none;
+    font-size: 12.5px; font-weight: 600; font-family: 'Playfair Display', serif;
+    letter-spacing: 0.03em; transition: all 0.15s; cursor: pointer; border: none;
+    text-align: left;
+  }
+  .sidebar-link.planner { background: var(--accent-light); color: var(--accent); }
+  .sidebar-link.planner:hover { background: var(--accent); color: white; }
+  .sidebar-link.daily { background: var(--gold-light); color: var(--gold); }
+  .sidebar-link.daily:hover { background: var(--gold); color: white; }
+
+  /* MAIN PANEL */
+  .main-panel { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+  /* WEEKLY CALENDAR */
+  .weekly-calendar { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .cal-scroll-wrapper {
+    flex: 1; overflow: auto;
+  }
+  .cal-scroll-wrapper::-webkit-scrollbar { width: 5px; height: 5px; }
+  .cal-scroll-wrapper::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  .cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(220px, 1fr));
+    min-width: 900px;
+    min-height: 100%;
+  }
+  .cal-header-cell {
+    padding: 10px 8px; text-align: center;
+    border-right: 1px solid rgba(255,255,255,0.1);
+    font-size: 11px; font-weight: 500; letter-spacing: 0.08em;
+    text-transform: uppercase;
+    background: #2d5a3d;
+    position: sticky; top: 0; z-index: 10;
+    align-self: start;
+  }
+  .cal-header-cell .day-name { color: var(--ink-faint); }
+  .cal-header-cell .day-date { color: var(--paper); font-family: 'Playfair Display', serif; font-size: 18px; margin-top: 2px; }
+  .cal-header-cell.today .day-date { color: var(--gold); }
+  .cal-day {
+    border-right: 1px solid var(--border);
+    border-top: 2px solid var(--border);
+    padding: 8px; position: relative; background: var(--paper);
+    transition: background 0.1s; min-height: 200px;
+  }
+  .cal-day:hover { background: #f8f4ee; }
+  .cal-day.today { background: var(--gold-light); }
+  .add-task-btn {
+    width: 100%; border: 1.5px dashed var(--border); border-radius: 6px;
+    background: transparent; color: var(--ink-faint); padding: 6px;
+    cursor: pointer; font-size: 18px; transition: all 0.15s; display: block;
+    margin-top: 6px;
+  }
+  .add-task-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-light); }
+
+  /* TASK CARDS */
+  .task-card {
+    border-radius: 6px; margin-bottom: 6px;
+    box-shadow: 0 1px 3px var(--shadow); position: relative;
+    cursor: pointer; transition: box-shadow 0.15s;
+  }
+  .task-card:hover { box-shadow: 0 2px 8px var(--shadow); }
+  .task-card-header {
+    display: flex; align-items: center; gap: 6px; padding: 7px 8px;
+    font-size: 12px; font-weight: 500;
+  }
+  .task-check {
+    width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid currentColor;
+    flex-shrink: 0; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+  }
+  .task-check.done::after { content: '✓'; font-size: 9px; }
+  .task-title-input {
+    flex: 1; background: transparent; border: none; outline: none;
+    font-size: 12px; font-weight: 500; font-family: 'DM Sans', sans-serif;
+    cursor: text;
+  }
+  .task-expand-btn {
+    background: none; border: none; cursor: pointer; font-size: 10px;
+    opacity: 0.5; flex-shrink: 0; padding: 0 2px;
+    color: var(--ink); line-height: 1;
+  }
+  .task-expand-btn:hover { opacity: 1; }
+  .task-delete-btn {
+    position: absolute; bottom: 6px; right: 6px;
+    background: #e74c3c; border: none; cursor: pointer;
+    color: white; border-radius: 4px;
+    width: 22px; height: 22px; font-size: 14px; font-weight: 700; line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+    z-index: 10;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s 0s, visibility 0s 0s;
+  }
+  .task-card:hover .task-delete-btn {
+    opacity: 1;
+    visibility: visible;
+    transition: opacity 0.2s 1s, visibility 0s 1s;
+  }
+  .task-delete-btn:hover { background: #c0392b; }
+  .task-delete-btn.confirming {
+    width: auto; padding: 0 8px; font-size: 11px; font-weight: 700;
+    background: #c0392b; white-space: nowrap; border-radius: 4px;
+    visibility: visible; opacity: 1; transition: none;
+  }
+  .task-delete-btn.confirming:hover { background: #96281b; }
+  .task-details {
+    padding: 0 8px 8px 28px; border-top: 1px solid rgba(0,0,0,0.08);
+  }
+  .task-details-input {
+    width: 100%; border: none; background: transparent; font-size: 11.5px;
+    font-family: 'DM Sans', sans-serif; color: var(--ink-light); resize: none;
+    outline: none; min-height: 40px; line-height: 1.4; padding-top: 6px;
+    overflow: hidden;
+  }
+  .task-card.done .task-title-input { text-decoration: line-through; opacity: 0.5; }
+
+  /* TASK COLOR PICKER */
+  .task-color-toggle {
+    background: none; border: none; cursor: pointer; font-size: 11px;
+    color: var(--ink-light); padding: 2px 6px; border-radius: 4px;
+    display: flex; align-items: center; transition: background 0.15s;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .task-color-toggle:hover { background: rgba(0,0,0,0.07); color: var(--ink); }
+  .task-color-picker {
+    display: flex; flex-wrap: wrap; gap: 5px;
+    padding-top: 8px; margin-top: 6px;
+    border-top: 1px solid rgba(0,0,0,0.07);
+  }
+  .task-color-swatch {
+    width: 18px; height: 18px; border-radius: 50%; cursor: pointer;
+    border: 2px solid transparent; transition: transform 0.1s, border-color 0.1s;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+  }
+  .task-color-swatch:hover { transform: scale(1.25); }
+  .task-color-swatch.active { border-color: var(--ink); transform: scale(1.15); }
+
+  /* DRAG HANDLE */
+  .drag-handle { cursor: grab; opacity: 0.3; font-size: 11px; padding: 0 2px; }
+  .task-card:hover .drag-handle { opacity: 0.6; }
+  .task-card.drag-over { outline: 2px dashed var(--accent); outline-offset: -2px; }
+  .task-card[draggable]:active { cursor: grabbing; }
+
+  /* WEEK REVIEW */
+  .week-review {
+    flex-shrink: 0; background: var(--cream);
+    border-top: 2px solid var(--border); padding: 16px 20px;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+  }
+  .review-section {}
+  .review-label {
+    font-family: 'Playfair Display', serif; font-size: 13px; font-weight: 600;
+    color: var(--ink); margin-bottom: 6px;
+  }
+  .review-textarea {
+    width: 100%; border: 1px solid var(--border); border-radius: 6px;
+    background: var(--paper); padding: 10px 12px; font-size: 12.5px;
+    font-family: 'DM Sans', sans-serif; color: var(--ink); resize: vertical;
+    min-height: 72px; line-height: 1.5; transition: border 0.15s;
+  }
+  .review-textarea:focus { outline: none; border-color: var(--accent); }
+
+  /* ===================== HABIT TRACKER ===================== */
+  .habit-sidebar {}
+  .date-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+  .date-nav-label { font-family: 'Playfair Display', serif; font-size: 15px; font-weight: 600; }
+
+  .goal-item {
+    display: flex; align-items: center; gap: 8px; padding: 6px 8px;
+    border-radius: 6px; margin-bottom: 4px; transition: background 0.1s;
+    cursor: pointer; border: 1.5px solid transparent;
+  }
+  .goal-item:hover { background: var(--cream); }
+  .goal-item.selected { background: var(--cream); border-color: var(--border); }
+  .goal-item.selected .goal-name-input { font-weight: 600; }
+  .goal-color-dot {
+    width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0;
+  }
+  .goal-check {
+    width: 18px; height: 18px; border-radius: 4px; border: 1.5px solid var(--border);
+    cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s; background: white;
+  }
+  .goal-check.checked { border-color: currentColor; }
+  .goal-check.checked::after { content: '✓'; font-size: 11px; }
+  .goal-name-input {
+    flex: 1; border: none; background: transparent; font-size: 12.5px;
+    font-family: 'DM Sans', sans-serif; outline: none; color: var(--ink);
+    min-width: 0;
+  }
+  .goal-count {
+    font-family: 'DM Mono', monospace; font-size: 11px; color: var(--ink-faint);
+    background: var(--cream); padding: 2px 6px; border-radius: 10px; flex-shrink: 0;
+  }
+
+  /* HABIT CALENDAR */
+  .habit-main { flex: 1; display: flex; flex-direction: column; overflow: hidden; padding: 16px 20px; background: var(--paper); }
+  .habit-header { display: flex; align-items: center; justify-between: space-between; margin-bottom: 16px; gap: 16px; }
+  .view-tabs { display: flex; gap: 4px; }
+  .view-tab {
+    padding: 5px 14px; border-radius: 20px; border: 1px solid var(--border);
+    background: white; font-size: 12px; cursor: pointer; transition: all 0.15s;
+    font-family: 'DM Mono', monospace; letter-spacing: 0.05em;
+  }
+  .view-tab.active { background: var(--ink); color: white; border-color: var(--ink); }
+  .view-tab:hover:not(.active) { border-color: var(--ink); }
+
+  .habit-cal-title {
+    font-family: 'Playfair Display', serif; font-size: 22px; font-weight: 700; color: var(--ink);
+    flex: 1; text-align: center;
+  }
+
+  /* MONTHLY HABIT CALENDAR */
+  .month-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; flex: 1; }
+  .month-day-header {
+    text-align: center; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--ink-faint); padding: 4px 0; font-weight: 500;
+  }
+  .month-day-cell {
+    border: 1px solid var(--border); border-radius: 6px; background: white;
+    min-height: 80px; padding: 4px; position: relative; overflow: hidden;
+    display: flex; flex-direction: column;
+  }
+  .month-day-cell.other-month { opacity: 0.35; background: var(--cream); }
+  .month-day-cell.selected-day { border-color: var(--accent); border-width: 2px; background: var(--accent-light); }
+  .month-day-num { font-size: 11px; font-weight: 500; color: var(--ink-light); margin-bottom: 4px; }
+  .month-day-cell.today-cell .month-day-num {
+    background: var(--gold); color: white; border-radius: 50%;
+    width: 18px; height: 18px; display: flex; align-items: center; justify-content: center;
+    font-size: 10px;
+  }
+
+  /* HABIT DOTS / BARS */
+  .habit-dots-row { display: flex; flex-direction: column; gap: 2px; width: 100%; flex: 1; justify-content: flex-end; }
+  .habit-dot-wrapper { height: 8px; display: flex; align-items: center; width: 100%; }
+  .habit-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    transition: all 0.2s;
+  }
+  .habit-bar {
+    height: 7px; border-radius: 3px; width: 100%;
+    transition: all 0.2s;
+  }
+
+  /* YEARLY/WEEKLY views */
+  .yearly-grid { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; flex: 1; }
+  .year-month-label { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--ink-light); margin-bottom: 4px; }
+  .year-week-row { display: flex; gap: 2px; flex-wrap: wrap; }
+  .year-day-dot {
+    width: 14px; height: 14px; border-radius: 3px; background: var(--cream);
+    position: relative; cursor: pointer; transition: transform 0.1s;
+  }
+  .year-day-dot:hover { transform: scale(1.3); }
+
+  .weekly-bars { flex: 1; display: flex; gap: 2px; align-items: flex-end; padding-bottom: 20px; }
+  .weekly-bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .weekly-bar-col-label { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--ink-light); margin-top: 4px; }
+  .weekly-bar-seg {
+    width: 80%; border-radius: 4px; min-height: 10px; transition: height 0.3s;
+  }
+
+  /* DAILY VIEW */
+  .daily-view { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .daily-date-display { font-family: 'Playfair Display', serif; font-size: 48px; font-weight: 700; color: var(--ink); }
+  .daily-goals-grid { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 24px; justify-content: center; }
+  .daily-goal-card {
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+    padding: 16px 20px; border-radius: 12px; border: 2px solid var(--border);
+    background: white; cursor: pointer; transition: all 0.2s; min-width: 100px;
+  }
+  .daily-goal-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px var(--shadow); }
+  .daily-goal-card.checked-today { box-shadow: 0 4px 12px var(--shadow); }
+  .daily-goal-icon { width: 32px; height: 32px; border-radius: 50%; }
+  .daily-goal-name { font-size: 12px; font-weight: 500; text-align: center; }
+  .daily-goal-check-big {
+    width: 24px; height: 24px; border-radius: 50%; border: 2px solid currentColor;
+    display: flex; align-items: center; justify-content: center; font-size: 13px;
+  }
+
+  /* COLOR PICKER */
+  .color-picker-popup {
+    position: absolute; background: white; border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px; z-index: 100; display: flex; gap: 6px;
+    box-shadow: 0 4px 12px var(--shadow); flex-wrap: wrap; width: 130px;
+    left: 0; top: 100%; margin-top: 4px;
+  }
+  .color-swatch {
+    width: 20px; height: 20px; border-radius: 50%; cursor: pointer; border: 2px solid transparent;
+    transition: transform 0.1s;
+  }
+  .color-swatch:hover { transform: scale(1.2); }
+  .color-swatch.selected { border-color: var(--ink); }
+
+  /* MODAL */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 200;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .modal {
+    background: var(--paper); border-radius: 12px; padding: 24px; width: 340px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+  }
+  .modal-title { font-family: 'Playfair Display', serif; font-size: 18px; margin-bottom: 16px; }
+  .modal-input {
+    width: 100%; border: 1px solid var(--border); border-radius: 6px;
+    padding: 10px 12px; font-size: 14px; font-family: 'DM Sans', sans-serif;
+    outline: none; margin-bottom: 12px; background: white;
+  }
+  .modal-input:focus { border-color: var(--accent); }
+  .modal-btns { display: flex; gap: 8px; justify-content: flex-end; }
+  .btn { padding: 8px 18px; border-radius: 6px; border: none; cursor: pointer; font-size: 13px; font-family: 'DM Sans', sans-serif; font-weight: 500; transition: all 0.15s; }
+  .btn-primary { background: var(--accent); color: white; }
+  .btn-primary:hover { background: #1e3d29; }
+  .btn-secondary { background: var(--cream); color: var(--ink-light); border: 1px solid var(--border); }
+  .btn-secondary:hover { background: var(--border); }
+
+  .goal-filter-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+  .goal-filter-chip {
+    padding: 3px 10px; border-radius: 12px; border: 1.5px solid var(--border);
+    font-size: 11px; cursor: pointer; transition: all 0.15s; background: white;
+    display: flex; align-items: center; gap: 4px;
+  }
+  .goal-filter-chip.active { border-color: var(--ink); background: var(--ink); color: white; }
+  .habit-header-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+
+  /* TOOLTIP */
+  [data-tooltip] { position: relative; }
+  [data-tooltip]:hover::after {
+    content: attr(data-tooltip);
+    position: absolute; bottom: 125%; left: 50%; transform: translateX(-50%);
+    background: var(--ink); color: white; padding: 4px 8px; border-radius: 4px;
+    font-size: 11px; white-space: nowrap; z-index: 999; pointer-events: none;
+  }
+
+  /* SCROLLBAR STYLE */
+  .cal-body::-webkit-scrollbar { width: 5px; }
+  .cal-body::-webkit-scrollbar-track { background: var(--cream); }
+  .cal-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  @media (max-width: 900px) {
+    .sidebar { width: 220px; }
+    .week-review { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+
+// ── CONSTANTS ──
+const GOAL_COLORS = ['#2d5a3d','#c0392b','#e0a800','#2471a3','#7d3c98','#d35400','#148f77','#e91e8c'];
+const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+// ── HELPERS ──
+function getWeekStart(date) {
+  const d = new Date(date);
+  d.setHours(0,0,0,0);
+  d.setDate(d.getDate() - d.getDay());
+  return d;
+}
+function addDays(date, n) {
+  const d = new Date(date);
+  d.setDate(d.getDate() + n);
+  return d;
+}
+function fmt(date) { return date.toISOString().slice(0,10); }
+function fmtDisplay(d) {
+  return `${MONTHS[d.getMonth()].slice(0,3)} ${d.getDate()}`;
+}
+function isSameDay(a,b) { return fmt(a)===fmt(b); }
+
+function useStorage(key, init) {
+  const [val, setVal] = useState(() => {
+    try { const s = localStorage.getItem(key); return s ? JSON.parse(s) : init; } catch { return init; }
+  });
+  const set = useCallback(v => {
+    setVal(prev => {
+      const next = typeof v === 'function' ? v(prev) : v;
+      try { localStorage.setItem(key, JSON.stringify(next)); } catch {}
+      return next;
+    });
+  }, [key]);
+  return [val, set];
+}
+
+// ── COLOR PICKER ──
+function ColorPicker({ value, onChange }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef();
+  useEffect(() => {
+    const h = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, []);
+  return (
+    <div ref={ref} style={{position:'relative', display:'inline-block'}}>
+      <div className="goal-color-dot" style={{background: value, cursor:'pointer', border:'2px solid rgba(0,0,0,0.1)'}}
+        onClick={()=>setOpen(o=>!o)} />
+      {open && (
+        <div className="color-picker-popup">
+          {GOAL_COLORS.map(c=>(
+            <div key={c} className={`color-swatch ${value===c?'selected':''}`}
+              style={{background:c}} onClick={()=>{onChange(c);setOpen(false);}} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// WEEKLY PLANNER
+// ─────────────────────────────────────────────
+function WeeklyPlanner({ onGoToHabit }) {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const [weekStart, setWeekStart] = useState(getWeekStart(today));
+  const weekKey = fmt(weekStart);
+
+  // Per-week data
+  const [weekData, setWeekData] = useStorage('weekData', {});
+
+  function getWD() { return weekData[weekKey] || { proverb:'', toCreate:'', people:[], beWord:'', proud:'', story:'', tasks:{} }; }
+  function setWD(fn) {
+    setWeekData(wd => {
+      const cur = wd[weekKey] || { proverb:'', toCreate:'', people:[], beWord:'', proud:'', story:'', tasks:{} };
+      return { ...wd, [weekKey]: typeof fn === 'function' ? fn(cur) : fn };
+    });
+  }
+
+  const wd = getWD();
+
+  // Tasks: { [dayKey]: [{id, title, details, done, color, expanded, order}] }
+  function getTasks(dayKey) { return (wd.tasks||{})[dayKey] || []; }
+  function setTasks(dayKey, fn) {
+    setWD(w => {
+      const current = (w.tasks||{})[dayKey] || [];
+      return { ...w, tasks: { ...(w.tasks||{}), [dayKey]: typeof fn==='function' ? fn(current) : fn } };
+    });
+  }
+
+  function addTask(dayKey) {
+    const id = Date.now().toString();
+    setTasks(dayKey, t => [...t, {id, title:'', details:'', done:false, expanded:false, colorIndex: t.length}]);
+  }
+  function updateTask(dayKey, id, patch) {
+    setTasks(dayKey, t => t.map(x => x.id===id ? {...x,...patch} : x));
+  }
+  function deleteTask(dayKey, id) {
+    setTasks(dayKey, t => t.filter(x=>x.id!==id));
+  }
+
+  const weekDays = Array.from({length:7}, (_,i)=>addDays(weekStart,i));
+  const weekLabel = `${fmtDisplay(weekDays[0])} – ${fmtDisplay(weekDays[6])}`;
+
+  // People checklist
+  function addPerson() { setWD(w=>({...w, people:[...(w.people||[]),{id:Date.now().toString(),name:'',done:false}]})); }
+  function updatePerson(id,patch) { setWD(w=>({...w, people:(w.people||[]).map(p=>p.id===id?{...p,...patch}:p)})); }
+  function deletePerson(id) { setWD(w=>({...w, people:(w.people||[]).filter(p=>p.id!==id)})); }
+
+  const [dragging, setDragging] = useState(null); // {dayKey, id}
+  const [dragOver, setDragOver] = useState(null);  // {dayKey, id}
+
+  function reorderTasks(dayKey, fromId, toId) {
+    if (fromId === toId) return;
+    setTasks(dayKey, tasks => {
+      const from = tasks.findIndex(t => t.id === fromId);
+      const to = tasks.findIndex(t => t.id === toId);
+      if (from === -1 || to === -1) return tasks;
+      const next = [...tasks];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
+  }
+
+  return (
+    <div className="main-content">
+      {/* SIDEBAR */}
+      <div className="sidebar">
+        <div className="week-nav">
+          <button className="nav-arrow" onClick={()=>setWeekStart(ws=>addDays(ws,-7))}>‹</button>
+          <span className="week-nav-label">{weekLabel}</span>
+          <button className="nav-arrow" onClick={()=>setWeekStart(ws=>addDays(ws,7))}>›</button>
+        </div>
+
+        <div className="sidebar-section">
+          <div className="sidebar-section-title">Proverb of the Week</div>
+          <textarea className="sidebar-textarea" placeholder="Write a quote to meditate on…"
+            value={wd.proverb||''} onChange={e=>setWD(w=>({...w,proverb:e.target.value}))} rows={3} />
+        </div>
+
+        <div className="sidebar-section">
+          <div className="sidebar-section-title">To Create This Week</div>
+          <textarea className="sidebar-textarea" placeholder="What do you want to create?"
+            value={wd.toCreate||''} onChange={e=>setWD(w=>({...w,toCreate:e.target.value}))} rows={3} />
+        </div>
+
+        <div className="sidebar-section">
+          <div className="checklist-header">
+            <div className="sidebar-section-title">People to Connect With</div>
+            <button className="add-btn" onClick={addPerson}>+</button>
+          </div>
+          {(wd.people||[]).map(p=>(
+            <div key={p.id} className={`checklist-item ${p.done?'checked':''}`}>
+              <div className={`check-box ${p.done?'checked':''}`} onClick={()=>updatePerson(p.id,{done:!p.done})} />
+              <input className="checklist-input" placeholder="Name…" value={p.name}
+                onChange={e=>updatePerson(p.id,{name:e.target.value})} />
+              <button className="delete-item-btn" onClick={()=>deletePerson(p.id)}>✕</button>
+            </div>
+          ))}
+        </div>
+
+        <div className="sidebar-section">
+          <div className="sidebar-section-title">Be-Word of the Week</div>
+          <textarea className="sidebar-textarea" placeholder="Your be-word and how to apply it…"
+            value={wd.beWord||''} onChange={e=>setWD(w=>({...w,beWord:e.target.value}))} rows={3} />
+        </div>
+
+        <div className="sidebar-links">
+          <button className="sidebar-link planner" onClick={onGoToHabit}>📊 Habit Tracker</button>
+          <a className="sidebar-link daily" href="https://penzu.com" target="_blank" rel="noreferrer">✍️ Daily Pages</a>
+        </div>
+      </div>
+
+      {/* MAIN */}
+      <div className="main-panel">
+        <div className="weekly-calendar">
+          <div className="cal-scroll-wrapper">
+            <div className="cal-grid">
+              {weekDays.map((d,i)=>(
+                <div key={'h'+i} className={`cal-header-cell ${isSameDay(d,today)?'today':''}`}>
+                  <div className="day-name">{DAYS[d.getDay()]}</div>
+                  <div className="day-date">{d.getDate()}</div>
+                </div>
+              ))}
+              {weekDays.map((d,i)=>{
+                const dk = fmt(d);
+                const tasks = getTasks(dk);
+                return (
+                  <div key={'b'+i} className={`cal-day ${isSameDay(d,today)?'today':''}`}
+                    onDragOver={e=>e.preventDefault()}
+                    onDrop={e=>{
+                      e.preventDefault();
+                      if(dragging && dragging.dayKey===dk && !dragOver) {
+                        // dropped on column but not on a card — move to end
+                        reorderTasks(dk, dragging.id, tasks[tasks.length-1]?.id);
+                      }
+                      setDragging(null); setDragOver(null);
+                    }}>
+                    {tasks.map(task=>(
+                      <TaskCard key={task.id} task={task}
+                        onUpdate={p=>updateTask(dk,task.id,p)}
+                        onDelete={()=>deleteTask(dk,task.id)}
+                        isDragOver={dragOver?.dayKey===dk && dragOver?.id===task.id}
+                        onDragStart={()=>setDragging({dayKey:dk, id:task.id})}
+                        onDragOver={()=>setDragOver({dayKey:dk, id:task.id})}
+                        onDrop={()=>{
+                          if(dragging && dragging.dayKey===dk) reorderTasks(dk, dragging.id, task.id);
+                          setDragging(null); setDragOver(null);
+                        }} />
+                    ))}
+                    <button className="add-task-btn" onClick={()=>addTask(dk)}>+</button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        <div className="week-review">
+          <div className="review-section">
+            <div className="review-label">This week, I was proud that I:</div>
+            <textarea className="review-textarea" placeholder="Write about your proudest moment…"
+              value={wd.proud||''} onChange={e=>setWD(w=>({...w,proud:e.target.value}))} />
+          </div>
+          <div className="review-section">
+            <div className="review-label">Best Story This Week</div>
+            <textarea className="review-textarea" placeholder="What's the best story from this week?"
+              value={wd.story||''} onChange={e=>setWD(w=>({...w,story:e.target.value}))} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const TASK_COLORS = [
+  '#d4edda', // sage green
+  '#f8d7da', // blush pink
+  '#fff3cd', // warm yellow
+  '#cce5ff', // sky blue
+  '#e2d9f3', // soft lavender
+  '#fde8d0', // peach
+  '#c9f0f7', // mint
+  '#fce4ec', // rose
+  '#dbeafe', // periwinkle
+  '#fef9c3', // lemon
+  '#ffe4cc', // apricot
+  '#e0f2fe', // powder blue
+];
+function TaskCard({ task, onUpdate, onDelete, onDragStart, onDragOver, onDrop, isDragOver }) {
+  const titleRef = useRef();
+  const textareaRef = useRef();
+  const [confirming, setConfirming] = useState(false);
+  const [showColors, setShowColors] = useState(false);
+
+  // Auto-grow textarea
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
+    }
+  }, [task.details, task.expanded]);
+
+  // Cancel confirm if mouse leaves card
+  function handleMouseLeave() { setConfirming(false); }
+
+  function handleDeleteClick(e) {
+    e.stopPropagation();
+    if (confirming) {
+      onDelete();
+    } else {
+      setConfirming(true);
+    }
+  }
+
+  return (
+    <div className={`task-card ${task.done?'done':''} ${isDragOver?'drag-over':''}`}
+      style={{background: TASK_COLORS[(task.colorIndex ?? 0) % TASK_COLORS.length], opacity: isDragOver ? 0.5 : 1}}
+      draggable
+      onDragStart={onDragStart}
+      onDragOver={e=>{e.preventDefault();onDragOver();}}
+      onDrop={e=>{e.preventDefault();onDrop();}}
+      onMouseLeave={handleMouseLeave}>
+      <button
+        className={`task-delete-btn ${confirming?'confirming':''}`}
+        title={confirming ? 'Click again to confirm delete' : 'Delete task'}
+        onClick={handleDeleteClick}>
+        {confirming ? 'Delete?' : '✕'}
+      </button>
+      <div className="task-card-header">
+        <span className="drag-handle" title="Drag to reorder">⠿</span>
+        <div className={`task-check ${task.done?'done':''}`}
+          style={{borderColor: task.done ? '#2d5a3d' : undefined, color: task.done ? '#2d5a3d' : undefined, background: task.done ? '#e8f0eb' : undefined}}
+          onClick={()=>onUpdate({done:!task.done})} />
+        <input ref={titleRef} className="task-title-input" placeholder="Task…"
+          value={task.title} onChange={e=>onUpdate({title:e.target.value})}
+          onClick={e=>e.stopPropagation()} />
+        <button className="task-expand-btn" onClick={()=>onUpdate({expanded:!task.expanded})}>
+          {task.expanded ? '▲' : '▼'}
+        </button>
+      </div>
+      {task.expanded && (
+        <div className="task-details">
+          <textarea ref={textareaRef} className="task-details-input" placeholder="Details…"
+            value={task.details||''} onChange={e=>onUpdate({details:e.target.value})}
+            rows={2} />
+          <div style={{display:'flex',alignItems:'center',gap:6,paddingTop:6}}>
+            <button className="task-color-toggle" onClick={e=>{e.stopPropagation();setShowColors(s=>!s);}}>
+              <span style={{
+                display:'inline-block',width:10,height:10,borderRadius:'50%',
+                background:TASK_COLORS[task.colorIndex??0],
+                border:'1.5px solid rgba(0,0,0,0.2)',marginRight:4,verticalAlign:'middle'
+              }}/>
+              Color {showColors ? '▲' : '▼'}
+            </button>
+          </div>
+          {showColors && (
+            <div className="task-color-picker">
+              {TASK_COLORS.map((c,i)=>(
+                <div key={i} className={`task-color-swatch ${(task.colorIndex??0)===i?'active':''}`}
+                  style={{background:c}}
+                  onClick={e=>{e.stopPropagation();onUpdate({colorIndex:i});setShowColors(false);}}
+                  title={`Color ${i+1}`} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// HABIT TRACKER
+// ─────────────────────────────────────────────
+function HabitTracker({ onGoToPlanner }) {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const [selectedDate, setSelectedDate] = useState(today);
+  const [view, setView] = useState('monthly'); // daily, weekly, monthly, yearly
+  const [filterGoal, setFilterGoal] = useState(null); // null = all
+
+  const [goals, setGoals] = useStorage('habitGoals', [
+    {id:'g1', name:'Daily Pages', color:'#2d5a3d'},
+    {id:'g2', name:'Run', color:'#c0392b'},
+    {id:'g3', name:'Vocal Exercises', color:'#e0a800'},
+  ]);
+  const [completions, setCompletions] = useStorage('habitCompletions', {}); // {dateKey: [goalId,...]}
+
+  function isCompleted(goalId, dateKey) {
+    return (completions[dateKey]||[]).includes(goalId);
+  }
+  function toggleCompletion(goalId, dateKey) {
+    setCompletions(c => {
+      const arr = c[dateKey]||[];
+      const has = arr.includes(goalId);
+      return { ...c, [dateKey]: has ? arr.filter(x=>x!==goalId) : [...arr, goalId] };
+    });
+  }
+
+  function addGoal() {
+    const id = 'g'+Date.now();
+    setGoals(g=>[...g, {id, name:'New Goal', color: GOAL_COLORS[g.length % GOAL_COLORS.length]}]);
+  }
+  function updateGoal(id, patch) { setGoals(g=>g.map(x=>x.id===id?{...x,...patch}:x)); }
+  function deleteGoal(id) { setGoals(g=>g.filter(x=>x.id!==id)); }
+
+  // Count completions for a goal in current view window
+  function countInView(goalId) {
+    let dates = [];
+    if (view==='daily') { dates=[fmt(selectedDate)]; }
+    else if (view==='weekly') {
+      const ws=getWeekStart(selectedDate);
+      dates=Array.from({length:7},(_,i)=>fmt(addDays(ws,i)));
+    }
+    else if (view==='monthly') {
+      const d=new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+      const m=d.getMonth();
+      while(d.getMonth()===m) { dates.push(fmt(d)); d.setDate(d.getDate()+1); }
+    }
+    else { // yearly
+      const d=new Date(selectedDate.getFullYear(),0,1);
+      while(d.getFullYear()===selectedDate.getFullYear()) { dates.push(fmt(d)); d.setDate(d.getDate()+1); }
+    }
+    return dates.filter(dk=>isCompleted(goalId,dk)).length;
+  }
+
+  const selectedDayKey = fmt(selectedDate);
+  const displayGoals = filterGoal ? goals.filter(g=>g.id===filterGoal) : goals;
+
+  return (
+    <div className="main-content">
+      {/* SIDEBAR */}
+      <div className="sidebar habit-sidebar">
+        <div className="date-nav">
+          <button className="nav-arrow" onClick={()=>setSelectedDate(d=>addDays(d,-1))}>‹</button>
+          <span className="date-nav-label">
+            {MONTHS[selectedDate.getMonth()].slice(0,3)} {selectedDate.getDate()}, {selectedDate.getFullYear()}
+          </span>
+          <button className="nav-arrow" onClick={()=>setSelectedDate(d=>addDays(d,1))}>›</button>
+        </div>
+
+        <div className="checklist-header" style={{marginBottom:8}}>
+          <div>
+            <div className="sidebar-section-title">Goals</div>
+            <div style={{fontSize:10,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace",marginTop:1}}>click row to filter</div>
+          </div>
+          <button className="add-btn" onClick={addGoal}>+</button>
+        </div>
+
+        {goals.map(goal=>(
+          <div key={goal.id} className={`goal-item ${filterGoal===goal.id?'selected':''}`}
+            onClick={()=>setFilterGoal(filterGoal===goal.id?null:goal.id)}
+            style={filterGoal===goal.id?{borderColor:goal.color,background:goal.color+'15'}:{}}
+            title={filterGoal===goal.id?'Click to show all goals':'Click to filter by this goal'}>
+            <ColorPicker value={goal.color} onChange={c=>{updateGoal(goal.id,{color:c});}} />
+            <div className={`goal-check ${isCompleted(goal.id,selectedDayKey)?'checked':''}`}
+              style={{color:goal.color}}
+              onClick={e=>{e.stopPropagation();toggleCompletion(goal.id,selectedDayKey);}} />
+            <input className="goal-name-input" value={goal.name}
+              onChange={e=>updateGoal(goal.id,{name:e.target.value})}
+              onClick={e=>e.stopPropagation()} />
+            <span className="goal-count">({countInView(goal.id)})</span>
+            <button className="delete-item-btn" style={{opacity:0}} onClick={e=>{e.stopPropagation();deleteGoal(goal.id);}}
+              onMouseEnter={e=>e.target.style.opacity=1} onMouseLeave={e=>e.target.style.opacity=0}>✕</button>
+          </div>
+        ))}
+
+        <div style={{flex:1}}/>
+        <div className="sidebar-links">
+          <button className="sidebar-link planner" onClick={onGoToPlanner}>📅 Weekly Planner</button>
+        </div>
+      </div>
+
+      {/* MAIN */}
+      <div className="habit-main">
+        <div className="habit-header-row">
+          <div className="view-tabs">
+            {['daily','weekly','monthly','yearly'].map(v=>(
+              <button key={v} className={`view-tab ${view===v?'active':''}`}
+                onClick={()=>setView(v)}>
+                {v.charAt(0).toUpperCase()+v.slice(1)}
+              </button>
+            ))}
+          </div>
+          <div style={{flex:1}}/>
+          <HabitNavArrows view={view} date={selectedDate} onChange={setSelectedDate}/>
+        </div>
+
+        {/* GOAL FILTER CHIPS */}
+        <div className="goal-filter-row">
+          <div className={`goal-filter-chip ${!filterGoal?'active':''}`} onClick={()=>setFilterGoal(null)}>
+            All
+          </div>
+          {goals.map(g=>(
+            <div key={g.id} className={`goal-filter-chip ${filterGoal===g.id?'active':''}`}
+              onClick={()=>setFilterGoal(filterGoal===g.id?null:g.id)}
+              style={filterGoal===g.id?{}:{borderColor:g.color, color:g.color}}>
+              <span style={{width:8,height:8,borderRadius:'50%',background:g.color,display:'inline-block'}}/>
+              {g.name}
+            </div>
+          ))}
+        </div>
+
+        {view==='monthly' && <MonthlyView date={selectedDate} selected={selectedDate} goals={displayGoals} completions={completions}
+          onDayClick={setSelectedDate} today={today} />}
+        {view==='weekly' && <WeeklyHabitView date={selectedDate} selected={selectedDate} goals={displayGoals} completions={completions} today={today} onDayClick={setSelectedDate} />}
+        {view==='yearly' && <YearlyView date={selectedDate} selected={selectedDate} goals={displayGoals} completions={completions} today={today} onDayClick={setSelectedDate} />}
+        {view==='daily' && <DailyView date={selectedDate} goals={displayGoals} completions={completions}
+          onToggle={(gid)=>toggleCompletion(gid,fmt(selectedDate))} />}
+      </div>
+    </div>
+  );
+}
+
+function HabitNavArrows({view, date, onChange}) {
+  const label = view==='yearly' ? date.getFullYear().toString()
+    : view==='monthly' ? `${MONTHS[date.getMonth()]} ${date.getFullYear()}`
+    : view==='weekly' ? (() => {
+        const ws=getWeekStart(date);
+        return `${fmtDisplay(ws)} – ${fmtDisplay(addDays(ws,6))}`;
+      })()
+    : `${MONTHS[date.getMonth()].slice(0,3)} ${date.getDate()}, ${date.getFullYear()}`;
+
+  function prev() {
+    if(view==='daily') onChange(d=>addDays(d,-1));
+    else if(view==='weekly') onChange(d=>addDays(d,-7));
+    else if(view==='monthly') onChange(d=>new Date(d.getFullYear(),d.getMonth()-1,1));
+    else onChange(d=>new Date(d.getFullYear()-1,d.getMonth(),d.getDate()));
+  }
+  function next() {
+    if(view==='daily') onChange(d=>addDays(d,1));
+    else if(view==='weekly') onChange(d=>addDays(d,7));
+    else if(view==='monthly') onChange(d=>new Date(d.getFullYear(),d.getMonth()+1,1));
+    else onChange(d=>new Date(d.getFullYear()+1,d.getMonth(),d.getDate()));
+  }
+  return (
+    <div style={{display:'flex',alignItems:'center',gap:8}}>
+      <button className="nav-arrow" onClick={prev}>‹</button>
+      <span style={{fontFamily:"'DM Mono',monospace",fontSize:13,color:'var(--ink-light)',minWidth:160,textAlign:'center'}}>{label}</span>
+      <button className="nav-arrow" onClick={next}>›</button>
+    </div>
+  );
+}
+
+// Renders habit bars in a day cell (full-width solid bars)
+function HabitDotsForDay({dayKey, goals, completions}) {
+  if(!goals.length) return null;
+  return (
+    <div className="habit-dots-row">
+      {goals.map(g=>{
+        const done=(completions[dayKey]||[]).includes(g.id);
+        return (
+          <div key={g.id} className="habit-dot-wrapper" style={{width:'100%'}}>
+            <div className="habit-bar" style={{
+              background: done ? g.color : 'transparent',
+              border: done ? 'none' : '1px solid var(--border)',
+              width:'100%',
+              opacity: done ? 0.85 : 0.35
+            }} />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function MonthlyView({date, selected, goals, completions, onDayClick, today}) {
+  const year=date.getFullYear(), month=date.getMonth();
+  const firstDay=new Date(year,month,1);
+  const startPad=firstDay.getDay();
+  const daysInMonth=new Date(year,month+1,0).getDate();
+
+  const cells = [];
+  for(let i=0;i<startPad;i++) cells.push({day:null,date:addDays(firstDay,i-startPad)});
+  for(let d=1;d<=daysInMonth;d++) cells.push({day:d,date:new Date(year,month,d)});
+  while(cells.length%7!==0) cells.push({day:null,date:null});
+
+  return (
+    <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
+      <div style={{flex:1,display:'grid',gridTemplateColumns:'repeat(7,1fr)',gridTemplateRows:'auto',gap:2,overflow:'auto',alignContent:'start'}}>
+        {DAYS.map(d=><div key={d} className="month-day-header">{d}</div>)}
+        {cells.map((c,i)=>{
+          if(!c.date) return <div key={i} style={{background:'var(--cream)',borderRadius:6,minHeight:70}}/>;
+          const dk=fmt(c.date);
+          const isToday=isSameDay(c.date,today);
+          const otherMonth=c.date.getMonth()!==month;
+          return (
+            <div key={i} className={`month-day-cell ${otherMonth?'other-month':''} ${isToday?'today-cell':''} ${isSameDay(c.date,selected)?'selected-day':''}`}
+              onClick={()=>onDayClick(new Date(c.date))} style={{cursor:'pointer'}}>
+              <div className="month-day-num">{isToday?c.date.getDate():c.date.getDate()}</div>
+              <HabitDotsForDay dayKey={dk} goals={goals} completions={completions} />
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function WeeklyHabitView({date, selected, goals, completions, today, onDayClick}) {
+  const ws=getWeekStart(date);
+  const days=Array.from({length:7},(_,i)=>addDays(ws,i));
+  const maxCount=Math.max(1,...days.map(d=>((completions[fmt(d)]||[]).length)));
+
+  return (
+    <div style={{flex:1,display:'flex',flexDirection:'column',gap:8}}>
+      <div style={{flex:1,display:'flex',gap:4,alignItems:'stretch'}}>
+        {days.map((d,i)=>{
+          const dk=fmt(d);
+          const isToday=isSameDay(d,today);
+          const isSelected=isSameDay(d,selected);
+          return (
+            <div key={i} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',cursor:'pointer',gap:6}}
+              onClick={()=>onDayClick(new Date(d))}>
+              <div style={{textAlign:'center',fontFamily:"'DM Mono',monospace",fontSize:11,color:isToday?'var(--gold)':isSelected?'var(--accent)':'var(--ink-light)',fontWeight:(isToday||isSelected)?700:400,lineHeight:1.4}}>
+                {DAYS[d.getDay()]}<br/>
+                <span style={{fontSize:13,fontFamily:"'Playfair Display',serif"}}>{d.getDate()}</span>
+              </div>
+              <div style={{flex:1,width:'100%',display:'flex',flexDirection:'column',gap:2,background:'var(--cream)',borderRadius:8,padding:4,border:isToday?'2px solid var(--gold)':isSelected?'2px solid var(--accent)':'1px solid var(--border)'}}>
+                {goals.map(g=>{
+                  const done=(completions[dk]||[]).includes(g.id);
+                  return (
+                    <div key={g.id} style={{height:24,borderRadius:4,background:done?g.color:'transparent',border:done?'none':'1px solid var(--border)',opacity:done?0.85:0.4,minHeight:14,flexShrink:0}} />
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function YearlyView({date, selected, goals, completions, today, onDayClick}) {
+  const year=date.getFullYear();
+  const months=Array.from({length:12},(_,m)=>m);
+  return (
+    <div style={{flex:1,overflowY:'auto'}}>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:16}}>
+        {months.map(m=>{
+          const firstDay=new Date(year,m,1);
+          const startPad=firstDay.getDay();
+          const daysInMonth=new Date(year,m+1,0).getDate();
+          const cells=[];
+          for(let i=0;i<startPad;i++) cells.push(null);
+          for(let d=1;d<=daysInMonth;d++) cells.push(new Date(year,m,d));
+          while(cells.length%7!==0) cells.push(null);
+          return (
+            <div key={m}>
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:13,marginBottom:6,color:'var(--ink)'}}>{MONTHS[m]}</div>
+              <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:2}}>
+                {DAYS.map(d=><div key={d} style={{fontSize:8,textAlign:'center',color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace"}}>{d[0]}</div>)}
+                {cells.map((d,i)=>{
+                  if(!d) return <div key={i} />;
+                  const dk=fmt(d);
+                  const done=goals.filter(g=>(completions[dk]||[]).includes(g.id));
+                  const isToday=isSameDay(d,today);
+                  const isSelected=isSameDay(d,selected);
+                  const bgColor = done.length===0 ? '#d8d0c4' : done.length===1 ? done[0].color : 'var(--ink)';
+                  const tileOpacity = done.length>0 ? 0.85 : 1;
+                  const numColor = done.length>0 ? 'rgba(255,255,255,0.9)' : 'rgba(60,50,40,0.7)';
+                  return (
+                    <div key={i} style={{
+                      width:'100%',paddingTop:'100%',borderRadius:2,background:bgColor,
+                      opacity: tileOpacity,
+                      outline:isToday?'2px solid var(--gold)':isSelected?'2px solid var(--accent)':'none',
+                      cursor:'pointer',position:'relative'
+                    }} onClick={()=>onDayClick(new Date(d))}
+                      title={`${MONTHS[m].slice(0,3)} ${d.getDate()}`}>
+                      <span style={{
+                        position:'absolute',bottom:1,right:2,
+                        fontSize:6,lineHeight:1,
+                        color: numColor,
+                        fontFamily:"'DM Mono',monospace",
+                        pointerEvents:'none',userSelect:'none'
+                      }}>{d.getDate()}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function DailyView({date, goals, completions, onToggle}) {
+  const dk=fmt(date);
+  return (
+    <div className="daily-view">
+      <div className="daily-date-display">
+        {MONTHS[date.getMonth()].slice(0,3)} {date.getDate()}
+      </div>
+      <div style={{fontFamily:"'DM Mono',monospace",fontSize:12,color:'var(--ink-light)',marginTop:4}}>
+        {date.getFullYear()} · {DAYS[date.getDay()]}
+      </div>
+      <div className="daily-goals-grid">
+        {goals.map(g=>{
+          const done=(completions[dk]||[]).includes(g.id);
+          return (
+            <div key={g.id} className={`daily-goal-card ${done?'checked-today':''}`}
+              style={{borderColor: done ? g.color : undefined, background: done ? g.color+'18' : undefined}}
+              onClick={()=>onToggle(g.id)}>
+              <div className="daily-goal-icon" style={{background:g.color+'33',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                <span style={{fontSize:16}}>{done?'✓':'○'}</span>
+              </div>
+              <div className="daily-goal-name" style={{color:g.color}}>{g.name}</div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// APP ROOT
+// ─────────────────────────────────────────────
+function App() {
+  const [page, setPage] = useState('planner');
+  return (
+    <div className="app">
+      <div className="nav-bar">
+        <span className="nav-brand">✦ My Planner</span>
+        <div className="nav-tabs">
+          <button className={`nav-tab ${page==='planner'?'active':''}`} onClick={()=>setPage('planner')}>
+            Weekly Planner
+          </button>
+          <button className={`nav-tab ${page==='habit'?'active':''}`} onClick={()=>setPage('habit')}>
+            Habit Tracker
+          </button>
+        </div>
+        <span style={{width:120}}/>
+      </div>
+      {page==='planner'
+        ? <WeeklyPlanner onGoToHabit={()=>setPage('habit')} />
+        : <HabitTracker onGoToPlanner={()=>setPage('planner')} />
+      }
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
