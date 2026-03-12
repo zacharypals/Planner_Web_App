@@ -57,7 +57,7 @@
   }
   .cal-header-cell:last-child { position: relative; }
   .hdr-color-popover {
-    position: absolute; top: calc(100% + 6px); left: 0; z-index: 100;
+    position: absolute; top: calc(100% + 6px); right: 0; left: auto; z-index: 100;
     background: white; border-radius: 8px; padding: 10px;
     box-shadow: 0 4px 20px rgba(0,0,0,0.18);
     min-width: 170px;
@@ -178,10 +178,10 @@
   .sidebar-link.daily:hover { background: var(--gold); color: white; }
 
   /* MAIN PANEL */
-  .main-panel { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .main-panel { flex: 1; display: flex; flex-direction: column; overflow-y: auto; overflow-x: hidden; }
 
   /* WEEKLY CALENDAR */
-  .weekly-calendar { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .weekly-calendar { height: calc(100vh - 148px); flex-shrink: 0; display: flex; flex-direction: column; overflow: hidden; }
   .cal-scroll-wrapper {
     flex: 1; overflow: auto;
   }
@@ -590,10 +590,10 @@ function WeeklyPlanner({ onGoToHabit, calHeaderColor, setCalHeaderColor }) {
   // Per-week data
   const [weekData, setWeekData] = useStorage('weekData', {});
 
-  function getWD() { return weekData[weekKey] || { proverb:'', toCreate:'', people:[], beWord:'', proud:'', story:'', tasks:{} }; }
+  function getWD() { return weekData[weekKey] || { proverb:'', toCreate:[], people:[], beWord:'', proud:'', story:'', tasks:{} }; }
   function setWD(fn) {
     setWeekData(wd => {
-      const cur = wd[weekKey] || { proverb:'', toCreate:'', people:[], beWord:'', proud:'', story:'', tasks:{} };
+      const cur = wd[weekKey] || { proverb:'', toCreate:[], people:[], beWord:'', proud:'', story:'', tasks:{} };
       return { ...wd, [weekKey]: typeof fn === 'function' ? fn(cur) : fn };
     });
   }
@@ -627,6 +627,10 @@ function WeeklyPlanner({ onGoToHabit, calHeaderColor, setCalHeaderColor }) {
   function addPerson() { setWD(w=>({...w, people:[...(w.people||[]),{id:Date.now().toString(),name:'',done:false}]})); }
   function updatePerson(id,patch) { setWD(w=>({...w, people:(w.people||[]).map(p=>p.id===id?{...p,...patch}:p)})); }
   function deletePerson(id) { setWD(w=>({...w, people:(w.people||[]).filter(p=>p.id!==id)})); }
+
+  function addCreate() { setWD(w=>({...w, toCreate:[...(Array.isArray(w.toCreate)?w.toCreate:[]),{id:Date.now().toString(),name:'',done:false}]})); }
+  function updateCreate(id,patch) { setWD(w=>({...w, toCreate:(Array.isArray(w.toCreate)?w.toCreate:[]).map(c=>c.id===id?{...c,...patch}:c)})); }
+  function deleteCreate(id) { setWD(w=>({...w, toCreate:(Array.isArray(w.toCreate)?w.toCreate:[]).filter(c=>c.id!==id)})); }
 
   const [dragging, setDragging] = useState(null); // {dayKey, id}
   const [dragOver, setDragOver] = useState(null);  // {dayKey, id}
@@ -675,9 +679,18 @@ function WeeklyPlanner({ onGoToHabit, calHeaderColor, setCalHeaderColor }) {
         </div>
 
         <div className="sidebar-section">
-          <div className="sidebar-section-title">To Create This Week</div>
-          <textarea className="sidebar-textarea" placeholder="What do you want to create?"
-            value={wd.toCreate||''} onChange={e=>setWD(w=>({...w,toCreate:e.target.value}))} rows={3} />
+          <div className="checklist-header">
+            <div className="sidebar-section-title">To Create This Week</div>
+            <button className="add-btn" onClick={addCreate}>+</button>
+          </div>
+          {(Array.isArray(wd.toCreate)?wd.toCreate:[]).map(c=>(
+            <div key={c.id} className={`checklist-item ${c.done?'checked':''}`}>
+              <div className={`check-box ${c.done?'checked':''}`} onClick={()=>updateCreate(c.id,{done:!c.done})} />
+              <input className="checklist-input" placeholder="What to create…" value={c.name}
+                onChange={e=>updateCreate(c.id,{name:e.target.value})} />
+              <button className="delete-item-btn" onClick={()=>deleteCreate(c.id)}>✕</button>
+            </div>
+          ))}
         </div>
 
         <div className="sidebar-section">
@@ -764,12 +777,14 @@ function WeeklyPlanner({ onGoToHabit, calHeaderColor, setCalHeaderColor }) {
           <div className="review-section">
             <div className="review-label">This week, I was proud that I:</div>
             <textarea className="review-textarea" placeholder="Write about your proudest moment…"
-              value={wd.proud||''} onChange={e=>setWD(w=>({...w,proud:e.target.value}))} />
+              value={wd.proud||''} onChange={e=>{setWD(w=>({...w,proud:e.target.value}));e.target.style.height='auto';e.target.style.height=e.target.scrollHeight+'px';}}
+              onFocus={e=>{e.target.style.height='auto';e.target.style.height=e.target.scrollHeight+'px';}} />
           </div>
           <div className="review-section">
             <div className="review-label">Best Story This Week</div>
             <textarea className="review-textarea" placeholder="What's the best story from this week?"
-              value={wd.story||''} onChange={e=>setWD(w=>({...w,story:e.target.value}))} />
+              value={wd.story||''} onChange={e=>{setWD(w=>({...w,story:e.target.value}));e.target.style.height='auto';e.target.style.height=e.target.scrollHeight+'px';}}
+              onFocus={e=>{e.target.style.height='auto';e.target.style.height=e.target.scrollHeight+'px';}} />
           </div>
         </div>
       </div>
