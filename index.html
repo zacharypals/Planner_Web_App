@@ -722,49 +722,26 @@ function requestToken(onSuccess, onError) {
 }
 
 // Silent re-auth: hidden popup with login_hint — no UI if session still valid
+// Silent re-auth using GSI — no popup, no user gesture needed
+// GSI handles this via a hidden iframe when the user has an active Google session
 function requestTokenSilent(onSuccess, onError) {
   const hint = getSavedEmail();
   if (!hint) { onError('no_hint'); return; }
-  const redirectUri = 'https://zacharypals.github.io/Planner_Web_App/oauth.html';
-  const params = new URLSearchParams({
+  if (!window.google?.accounts?.oauth2) { onError('gsi_not_loaded'); return; }
+  const client = window.google.accounts.oauth2.initTokenClient({
     client_id: CLIENT_ID,
-    redirect_uri: redirectUri,
-    response_type: 'token',
     scope: SCOPES,
+    hint: hint,
     prompt: '',
-    login_hint: hint,
-    include_granted_scopes: 'true',
+    callback: (resp) => {
+      if (resp.error) { onError(resp.error); return; }
+      _accessToken = resp.access_token;
+      _tokenExpiry = Date.now() + ((resp.expires_in || 3600) - 60) * 1000;
+      onSuccess(resp);
+    },
+    error_callback: (err) => { onError(err?.type || 'unknown'); },
   });
-  const authUrl = 'https://accounts.google.com/o/oauth2/v2/auth?' + params.toString();
-  const popup = window.open(authUrl, 'googleSilentAuth', 'width=1,height=1,top=-2000,left=-2000');
-  if (!popup) { onError('blocked'); return; }
-  let done = false;
-  function onMessage(e) {
-    if (e.origin !== 'https://zacharypals.github.io') return;
-    if (!e.data?.access_token) return;
-    done = true;
-    window.removeEventListener('message', onMessage);
-    clearInterval(check);
-    _accessToken = e.data.access_token;
-    _tokenExpiry = Date.now() + ((e.data.expires_in || 3600) - 60) * 1000;
-    onSuccess(e.data);
-  }
-  window.addEventListener('message', onMessage);
-  const check = setInterval(() => {
-    if (popup.closed) {
-      clearInterval(check);
-      window.removeEventListener('message', onMessage);
-      if (!done) onError('closed');
-    }
-  }, 500);
-  setTimeout(() => {
-    if (!done) {
-      clearInterval(check);
-      window.removeEventListener('message', onMessage);
-      try { popup.close(); } catch {}
-      onError('timeout');
-    }
-  }, 15000);
+  client.requestAccessToken({ prompt: '' });
 }
 
 // ── DRIVE HELPERS ──
@@ -2150,8 +2127,12 @@ function App() {
     const hint = getSavedEmail();
     if (!hint) return;
     // Wait for Google GSI to load
-    const tryAuth = () => {
-      if (!window.google) { setTimeout(tryAuth, 500); return; }
+    const tryAuth = (attempts = 0) => {
+      if (!window.google?.accounts?.oauth2) {
+        // GSI not loaded yet — retry up to 10 times (5 seconds total)
+        if (attempts < 10) setTimeout(() => tryAuth(attempts + 1), 500);
+        return;
+      }
       requestTokenSilent(
         async (resp) => {
           try {
@@ -2163,10 +2144,13 @@ function App() {
           } catch {}
           await loadAllFromDrive();
         },
-        () => {} // silent failure — just stay signed out, user can click manually
+        (err) => {
+          console.log('Silent re-auth failed:', err);
+          // Silent failure — user stays signed out and can click manually
+        }
       );
     };
-    setTimeout(tryAuth, 800);
+    setTimeout(() => tryAuth(0), 1000);
   }, []);
 
   function handleSignIn() {
