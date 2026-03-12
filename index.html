@@ -42,6 +42,45 @@
     border-bottom: 2px solid var(--gold);
   }
   .nav-brand { font-family: 'Playfair Display', serif; font-size: 18px; letter-spacing: 0.03em; color: var(--cream); }
+  .hdr-color-area { display: flex; align-items: center; gap: 6px; position: relative; }
+  .hdr-color-btn {
+    background: none; border: none; cursor: pointer; font-size: 14px;
+    opacity: 0; transition: opacity 0.2s; padding: 2px 4px; border-radius: 4px;
+    line-height: 1;
+  }
+  .hdr-color-area:hover .hdr-color-btn,
+  .cal-hdr-color-wrap:hover .hdr-color-btn { opacity: 0.8; }
+  .hdr-color-btn:hover { opacity: 1 !important; background: rgba(255,255,255,0.15); }
+  .hdr-color-wrap { position: relative; }
+  .cal-hdr-color-wrap {
+    position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+  }
+  .cal-header-cell:last-child { position: relative; }
+  .hdr-color-popover {
+    position: absolute; top: calc(100% + 6px); left: 0; z-index: 100;
+    background: white; border-radius: 8px; padding: 10px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.18);
+    min-width: 170px;
+  }
+  .hdr-color-presets {
+    display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px; margin-bottom: 8px;
+  }
+  .hdr-preset-swatch {
+    width: 20px; height: 20px; border-radius: 4px; cursor: pointer;
+    border: 2px solid transparent; transition: transform 0.1s, border-color 0.1s;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  }
+  .hdr-preset-swatch:hover { transform: scale(1.2); }
+  .hdr-preset-swatch.active { border-color: var(--gold); transform: scale(1.15); }
+  .hdr-color-custom {
+    display: flex; align-items: center; justify-content: space-between;
+    border-top: 1px solid var(--border); padding-top: 8px;
+    font-size: 11px; color: var(--ink-light); font-family: 'DM Sans', sans-serif;
+  }
+  .hdr-color-custom input[type=color] {
+    width: 32px; height: 22px; border: none; border-radius: 4px;
+    cursor: pointer; padding: 0; background: none;
+  }
   .nav-tabs { display: flex; gap: 4px; }
   .nav-tab {
     padding: 6px 18px; border-radius: 4px; border: none; cursor: pointer;
@@ -126,6 +165,7 @@
 
   /* SIDEBAR LINKS */
   .sidebar-links { margin-top: auto; padding-top: 12px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 6px; }
+  .sidebar-link.daily { display: block; margin: 8px 12px 0; }
   .sidebar-link {
     display: block; padding: 8px 12px; border-radius: 6px; text-decoration: none;
     font-size: 12.5px; font-weight: 600; font-family: 'Playfair Display', serif;
@@ -134,7 +174,7 @@
   }
   .sidebar-link.planner { background: var(--accent-light); color: var(--accent); }
   .sidebar-link.planner:hover { background: var(--accent); color: white; }
-  .sidebar-link.daily { background: var(--gold-light); color: var(--gold); }
+  .sidebar-link.daily { background: var(--gold-light); color: var(--gold); display: block; margin: 8px 12px 0; text-decoration: none; }
   .sidebar-link.daily:hover { background: var(--gold); color: white; }
 
   /* MAIN PANEL */
@@ -150,6 +190,7 @@
   .cal-grid {
     display: grid;
     grid-template-columns: repeat(7, minmax(220px, 1fr));
+    grid-template-rows: auto 1fr;
     min-width: 900px;
     min-height: 100%;
   }
@@ -158,9 +199,8 @@
     border-right: 1px solid rgba(255,255,255,0.1);
     font-size: 11px; font-weight: 500; letter-spacing: 0.08em;
     text-transform: uppercase;
-    background: #2d5a3d;
+    background: var(--accent);
     position: sticky; top: 0; z-index: 10;
-    align-self: start;
   }
   .cal-header-cell .day-name { color: var(--ink-faint); }
   .cal-header-cell .day-date { color: var(--paper); font-family: 'Playfair Display', serif; font-size: 18px; margin-top: 2px; }
@@ -542,7 +582,7 @@ function ColorPicker({ value, onChange }) {
 // ─────────────────────────────────────────────
 // WEEKLY PLANNER
 // ─────────────────────────────────────────────
-function WeeklyPlanner({ onGoToHabit }) {
+function WeeklyPlanner({ onGoToHabit, calHeaderColor, setCalHeaderColor }) {
   const today = new Date(); today.setHours(0,0,0,0);
   const [weekStart, setWeekStart] = useState(getWeekStart(today));
   const weekKey = fmt(weekStart);
@@ -604,6 +644,19 @@ function WeeklyPlanner({ onGoToHabit }) {
     });
   }
 
+  function moveTaskBetweenDays(fromDayKey, toDayKey, taskId, targetId) {
+    const task = getTasks(fromDayKey).find(t => t.id === taskId);
+    if (!task) return;
+    setWD(w => {
+      const allTasks = w.tasks || {};
+      const srcTasks = (allTasks[fromDayKey] || []).filter(t => t.id !== taskId);
+      const dstTasks = [...(allTasks[toDayKey] || [])];
+      const insertAt = targetId ? dstTasks.findIndex(t => t.id === targetId) : dstTasks.length;
+      dstTasks.splice(insertAt === -1 ? dstTasks.length : insertAt, 0, task);
+      return { ...w, tasks: { ...allTasks, [fromDayKey]: srcTasks, [toDayKey]: dstTasks } };
+    });
+  }
+
   return (
     <div className="main-content">
       {/* SIDEBAR */}
@@ -613,6 +666,7 @@ function WeeklyPlanner({ onGoToHabit }) {
           <span className="week-nav-label">{weekLabel}</span>
           <button className="nav-arrow" onClick={()=>setWeekStart(ws=>addDays(ws,7))}>›</button>
         </div>
+        <a className="sidebar-link daily" href="https://penzu.com">✍️ Daily Pages</a>
 
         <div className="sidebar-section">
           <div className="sidebar-section-title">Proverb of the Week</div>
@@ -647,10 +701,7 @@ function WeeklyPlanner({ onGoToHabit }) {
             value={wd.beWord||''} onChange={e=>setWD(w=>({...w,beWord:e.target.value}))} rows={3} />
         </div>
 
-        <div className="sidebar-links">
-          <button className="sidebar-link planner" onClick={onGoToHabit}>📊 Habit Tracker</button>
-          <a className="sidebar-link daily" href="https://penzu.com" target="_blank" rel="noreferrer">✍️ Daily Pages</a>
-        </div>
+
       </div>
 
       {/* MAIN */}
@@ -659,9 +710,15 @@ function WeeklyPlanner({ onGoToHabit }) {
           <div className="cal-scroll-wrapper">
             <div className="cal-grid">
               {weekDays.map((d,i)=>(
-                <div key={'h'+i} className={`cal-header-cell ${isSameDay(d,today)?'today':''}`}>
+                <div key={'h'+i} className={`cal-header-cell ${isSameDay(d,today)?'today':''}`}
+                  style={{background: calHeaderColor}}>
                   <div className="day-name">{DAYS[d.getDay()]}</div>
                   <div className="day-date">{d.getDate()}</div>
+                  {i===6 && (
+                    <div className="cal-hdr-color-wrap">
+                      <ColorPickerPopover color={calHeaderColor} onChange={setCalHeaderColor} />
+                    </div>
+                  )}
                 </div>
               ))}
               {weekDays.map((d,i)=>{
@@ -672,9 +729,11 @@ function WeeklyPlanner({ onGoToHabit }) {
                     onDragOver={e=>e.preventDefault()}
                     onDrop={e=>{
                       e.preventDefault();
-                      if(dragging && dragging.dayKey===dk && !dragOver) {
-                        // dropped on column but not on a card — move to end
-                        reorderTasks(dk, dragging.id, tasks[tasks.length-1]?.id);
+                      if(!dragging) return;
+                      if(dragging.dayKey === dk) {
+                        if(!dragOver || dragOver.dayKey !== dk) reorderTasks(dk, dragging.id, null);
+                      } else {
+                        moveTaskBetweenDays(dragging.dayKey, dk, dragging.id, null);
                       }
                       setDragging(null); setDragOver(null);
                     }}>
@@ -686,7 +745,10 @@ function WeeklyPlanner({ onGoToHabit }) {
                         onDragStart={()=>setDragging({dayKey:dk, id:task.id})}
                         onDragOver={()=>setDragOver({dayKey:dk, id:task.id})}
                         onDrop={()=>{
-                          if(dragging && dragging.dayKey===dk) reorderTasks(dk, dragging.id, task.id);
+                          if(dragging) {
+                            if(dragging.dayKey === dk) reorderTasks(dk, dragging.id, task.id);
+                            else moveTaskBetweenDays(dragging.dayKey, dk, dragging.id, task.id);
+                          }
                           setDragging(null); setDragOver(null);
                         }} />
                     ))}
@@ -1159,14 +1221,62 @@ function DailyView({date, goals, completions, onToggle}) {
 }
 
 // ─────────────────────────────────────────────
+// COLOR PICKER POPOVER
+// ─────────────────────────────────────────────
+const HEADER_PRESETS = [
+  '#1e3d29','#2d5a3d','#1a3a4a','#3b2a4a',
+  '#4a2a2a','#4a3a1a','#2a2a4a','#1a4a3a',
+  '#000000','#2c2c2c','#5a4a3a','#3a3a5a',
+];
+
+function ColorPickerPopover({ color, onChange }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef();
+
+  useEffect(() => {
+    function handleClick(e) { if(ref.current && !ref.current.contains(e.target)) setOpen(false); }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  return (
+    <div ref={ref} className="hdr-color-wrap">
+      <button className="hdr-color-btn" title="Change header color" onClick={()=>setOpen(o=>!o)}>
+        🎨
+      </button>
+      {open && (
+        <div className="hdr-color-popover">
+          <div className="hdr-color-presets">
+            {HEADER_PRESETS.map(c=>(
+              <div key={c} className={`hdr-preset-swatch ${color===c?'active':''}`}
+                style={{background:c}}
+                onClick={()=>{onChange(c); setOpen(false);}} />
+            ))}
+          </div>
+          <div className="hdr-color-custom">
+            <label>Custom</label>
+            <input type="color" value={color} onChange={e=>onChange(e.target.value)} />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
 // APP ROOT
 // ─────────────────────────────────────────────
 function App() {
   const [page, setPage] = useState('planner');
+  const [navColor, setNavColor] = useStorage('navColor', '#1e3d29');
+  const [calHeaderColor, setCalHeaderColor] = useStorage('calHeaderColor', '#2d5a3d');
   return (
     <div className="app">
-      <div className="nav-bar">
-        <span className="nav-brand">✦ My Planner</span>
+      <div className="nav-bar" style={{background: navColor}}>
+        <div className="hdr-color-area">
+          <span className="nav-brand">✦ My Planner</span>
+          <ColorPickerPopover color={navColor} onChange={setNavColor} />
+        </div>
         <div className="nav-tabs">
           <button className={`nav-tab ${page==='planner'?'active':''}`} onClick={()=>setPage('planner')}>
             Weekly Planner
@@ -1178,7 +1288,7 @@ function App() {
         <span style={{width:120}}/>
       </div>
       {page==='planner'
-        ? <WeeklyPlanner onGoToHabit={()=>setPage('habit')} />
+        ? <WeeklyPlanner onGoToHabit={()=>setPage('habit')} calHeaderColor={calHeaderColor} setCalHeaderColor={setCalHeaderColor} />
         : <HabitTracker onGoToPlanner={()=>setPage('planner')} />
       }
     </div>
