@@ -571,6 +571,9 @@
   .monthly-cell.empty { background: var(--cream); cursor: default; min-height: 110px; }
   .monthly-cell.today { background: var(--gold-light); }
   .monthly-cell.today .monthly-cell-date { color: var(--gold); font-weight: 700; }
+  .monthly-cell.drag-over { border-color: var(--accent) !important; background: var(--accent-light) !important; box-shadow: inset 0 0 0 2px var(--accent); }
+  .monthly-event-chip { user-select: none; }
+  .monthly-event-chip:active { cursor: grabbing; }
   .monthly-cell-date {
     font-family: 'Playfair Display', serif; font-size: 14px; color: var(--ink);
     margin-bottom: 4px;
@@ -721,27 +724,49 @@ function requestToken(onSuccess, onError) {
   }, 1000);
 }
 
-// Silent re-auth: hidden popup with login_hint — no UI if session still valid
-// Silent re-auth using GSI — no popup, no user gesture needed
-// GSI handles this via a hidden iframe when the user has an active Google session
+// Silent re-auth via hidden iframe — browsers don't block iframe creation
 function requestTokenSilent(onSuccess, onError) {
   const hint = getSavedEmail();
   if (!hint) { onError('no_hint'); return; }
-  if (!window.google?.accounts?.oauth2) { onError('gsi_not_loaded'); return; }
-  const client = window.google.accounts.oauth2.initTokenClient({
+  const redirectUri = 'https://zacharypals.github.io/Planner_Web_App/oauth.html';
+  const params = new URLSearchParams({
     client_id: CLIENT_ID,
+    redirect_uri: redirectUri,
+    response_type: 'token',
     scope: SCOPES,
-    hint: hint,
-    prompt: '',
-    callback: (resp) => {
-      if (resp.error) { onError(resp.error); return; }
-      _accessToken = resp.access_token;
-      _tokenExpiry = Date.now() + ((resp.expires_in || 3600) - 60) * 1000;
-      onSuccess(resp);
-    },
-    error_callback: (err) => { onError(err?.type || 'unknown'); },
+    prompt: 'none',
+    login_hint: hint,
+    include_granted_scopes: 'true',
   });
-  client.requestAccessToken({ prompt: '' });
+  const authUrl = 'https://accounts.google.com/o/oauth2/v2/auth?' + params.toString();
+  const iframe = document.createElement('iframe');
+  iframe.style.cssText = 'position:fixed;top:-1000px;left:-1000px;width:1px;height:1px;opacity:0;pointer-events:none;';
+  iframe.src = authUrl;
+  let done = false;
+  const cleanup = () => { try { document.body.removeChild(iframe); } catch {} };
+  function onMessage(e) {
+    if (e.origin !== 'https://zacharypals.github.io') return;
+    if (!e.data?.access_token && !e.data?.error) return;
+    if (done) return;
+    done = true;
+    window.removeEventListener('message', onMessage);
+    cleanup();
+    if (e.data.error) { onError(e.data.error); return; }
+    _accessToken = e.data.access_token;
+    _tokenExpiry = Date.now() + ((e.data.expires_in || 3600) - 60) * 1000;
+    onSuccess(e.data);
+  }
+  window.addEventListener('message', onMessage);
+  document.body.appendChild(iframe);
+  // Timeout after 8s — if Google needs interaction, silent auth can't complete
+  setTimeout(() => {
+    if (!done) {
+      done = true;
+      window.removeEventListener('message', onMessage);
+      cleanup();
+      onError('timeout');
+    }
+  }, 8000);
 }
 
 // ── DRIVE HELPERS ──
@@ -1727,14 +1752,82 @@ function DailyView({date, goals, completions, onToggle}) {
 // ─────────────────────────────────────────────
 // MONTHLY CALENDAR
 // ─────────────────────────────────────────────
+function TimeSelect({ value, onChange }) {
+  const hours = Array.from({length:24},(_,i)=>String(i).padStart(2,'0'));
+  const mins = ['00','05','10','15','20','25','30','35','40','45','50','55'];
+  const [h, m] = value ? value.split(':') : ['',''];
+  function setH(newH) { onChange(newH ? `${newH}:${m||'00'}` : ''); }
+  function setM(newM) { onChange(h ? `${h}:${newM}` : ''); }
+  return (
+    <div style={{display:'flex',gap:2,alignItems:'center'}}>
+      <select className="task-time-input" style={{padding:'3px 2px',width:52}}
+        value={h||''} onChange={e=>setH(e.target.value)}>
+        <option value="">--</option>
+        {hours.map(hh=><option key={hh} value={hh}>{hh}</option>)}
+      </select>
+      <span style={{color:'var(--ink-faint)',fontWeight:'bold'}}>:</span>
+      <select className="task-time-input" style={{padding:'3px 2px',width:48}}
+        value={m||''} onChange={e=>setM(e.target.value)}>
+        {mins.map(mm=><option key={mm} value={mm}>{mm}</option>)}
+      </select>
+      {value && <button onClick={()=>onChange('')} style={{background:'none',border:'none',cursor:'pointer',color:'var(--ink-faint)',fontSize:11,padding:'0 2px'}}>✕</button>}
+    </div>
+  );
+}
+
 function MonthlyCalendar({ weekData, setWeekData }) {
   const today = new Date(); today.setHours(0,0,0,0);
   const [viewDate, setViewDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
   const [selectedDate, setSelectedDate] = useState(null);
   const [showEventModal, setShowEventModal] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null); // {dayKey, taskId} or null
-  const [eventForm, setEventForm] = useState({title:'', time:'', details:''});
+  const [eventForm, setEventForm] = useState({title:'', time:'', date:'', details:''});
   const [monthlyGoals, setMonthlyGoals] = useStorage('monthlyGoals', {}); // {yearMonth: [{id,name,done}]}
+  const [dragInfo, setDragInfo] = useState(null); // {eventId, fromDayKey}
+  const [dragOverDay, setDragOverDay] = useState(null);
+
+  function handleDragStart(ev, eventId, fromDayKey) {
+    setDragInfo({eventId, fromDayKey});
+    ev.dataTransfer.effectAllowed = 'move';
+  }
+  function handleDragOver(ev, toDayKey) {
+    ev.preventDefault();
+    ev.dataTransfer.dropEffect = 'move';
+    setDragOverDay(toDayKey);
+  }
+  function handleDrop(ev, toDayKey) {
+    ev.preventDefault();
+    setDragOverDay(null);
+    if (!dragInfo || dragInfo.fromDayKey === toDayKey) { setDragInfo(null); return; }
+    const {eventId, fromDayKey} = dragInfo;
+    setDragInfo(null);
+    setWeekData(wd => {
+      const updated = JSON.parse(JSON.stringify(wd));
+      let movedTask = null;
+      // Remove from old day
+      Object.keys(updated).forEach(wk => {
+        const tasks = (updated[wk].tasks||{})[fromDayKey];
+        if (tasks) {
+          const idx = tasks.findIndex(t => t.id === eventId);
+          if (idx !== -1) {
+            movedTask = {...tasks[idx]};
+            updated[wk].tasks[fromDayKey] = tasks.filter(t => t.id !== eventId);
+          }
+        }
+      });
+      if (!movedTask) return wd;
+      // Add to new day
+      const newDateObj = new Date(toDayKey + 'T00:00:00');
+      const newWeekKey = fmt(getWeekStart(newDateObj));
+      if (!updated[newWeekKey]) updated[newWeekKey] = {proverb:'',toCreate:[],weekGoals:[],people:[],beWord:'',proud:'',story:'',tasks:{}};
+      if (!updated[newWeekKey].tasks) updated[newWeekKey].tasks = {};
+      if (!updated[newWeekKey].tasks[toDayKey]) updated[newWeekKey].tasks[toDayKey] = [];
+      updated[newWeekKey].tasks[toDayKey].push(movedTask);
+      // Update Google Calendar if signed in
+      if (movedTask.gcalId && getToken()) updateEventInCalendar(movedTask.gcalId, movedTask, toDayKey);
+      return updated;
+    });
+  }
 
   const yearMonthKey = `${viewDate.getFullYear()}-${String(viewDate.getMonth()+1).padStart(2,'0')}`;
 
@@ -1781,33 +1874,45 @@ function MonthlyCalendar({ weekData, setWeekData }) {
   function openAddEvent(dateKey) {
     setSelectedDate(dateKey);
     setEditingEvent(null);
-    setEventForm({title:'', time:'', details:''});
+    setEventForm({title:'', time:'', date:dateKey, details:''});
     setShowEventModal(true);
   }
 
   function openEditEvent(ev) {
     setEditingEvent({dayKey: ev.dayKey, taskId: ev.id});
-    setEventForm({title: ev.title||'', time: ev.eventTime||'', details: ev.details||''});
+    setEventForm({title: ev.title||'', time: ev.eventTime||'', date: ev.dayKey||'', details: ev.details||''});
     setShowEventModal(true);
   }
 
   function saveEvent() {
     if (!eventForm.title.trim()) return;
     if (editingEvent) {
-      // Update existing event in weekData
+      const newDayKey = eventForm.date || editingEvent.dayKey;
+      const dateChanged = newDayKey !== editingEvent.dayKey;
       setWeekData(wd => {
-        const updated = {...wd};
+        const updated = JSON.parse(JSON.stringify(wd)); // deep clone
+        // Remove from old day
         Object.keys(updated).forEach(wk => {
           const tasks = (updated[wk].tasks || {})[editingEvent.dayKey];
           if (tasks) {
-            const updatedTasks = tasks.map(t => t.id===editingEvent.taskId
-              ? {...t, title:eventForm.title, eventTime:eventForm.time, details:eventForm.details}
-              : t);
-            updated[wk] = {...updated[wk], tasks: {...updated[wk].tasks, [editingEvent.dayKey]: updatedTasks}};
-            // Push update to Google Calendar if we have a gcalId
-            const updatedTask = updatedTasks.find(t => t.id === editingEvent.taskId);
-            if (updatedTask?.gcalId && getToken()) {
-              updateEventInCalendar(updatedTask.gcalId, updatedTask, editingEvent.dayKey);
+            const idx = tasks.findIndex(t => t.id === editingEvent.taskId);
+            if (idx !== -1) {
+              const updatedTask = {...tasks[idx], title:eventForm.title, eventTime:eventForm.time, details:eventForm.details};
+              if (dateChanged) {
+                // Remove from old day
+                updated[wk].tasks[editingEvent.dayKey] = tasks.filter(t => t.id !== editingEvent.taskId);
+                // Add to new day/week
+                const newDateObj = new Date(newDayKey + 'T00:00:00');
+                const newWeekKey = fmt(getWeekStart(newDateObj));
+                if (!updated[newWeekKey]) updated[newWeekKey] = {proverb:'',toCreate:[],weekGoals:[],people:[],beWord:'',proud:'',story:'',tasks:{}};
+                if (!updated[newWeekKey].tasks[newDayKey]) updated[newWeekKey].tasks[newDayKey] = [];
+                updated[newWeekKey].tasks[newDayKey].push(updatedTask);
+              } else {
+                updated[wk].tasks[editingEvent.dayKey][idx] = updatedTask;
+              }
+              if (updatedTask.gcalId && getToken()) {
+                updateEventInCalendar(updatedTask.gcalId, updatedTask, newDayKey);
+              }
             }
           }
         });
@@ -1815,7 +1920,8 @@ function MonthlyCalendar({ weekData, setWeekData }) {
       });
     } else {
       // Add new event to the correct week in weekData
-      const dateObj = new Date(selectedDate + 'T00:00:00');
+      const targetDate = eventForm.date || selectedDate;
+      const dateObj = new Date(targetDate + 'T00:00:00');
       const weekKey = fmt(getWeekStart(dateObj));
       const newTask = {
         id: Date.now().toString(), title: eventForm.title, details: eventForm.details,
@@ -1825,18 +1931,18 @@ function MonthlyCalendar({ weekData, setWeekData }) {
       setWeekData(wd => {
         const cur = wd[weekKey] || {proverb:'',toCreate:[],weekGoals:[],people:[],beWord:'',proud:'',story:'',tasks:{}};
         const dayTasks = (cur.tasks||{})[selectedDate] || [];
-        return {...wd, [weekKey]: {...cur, tasks: {...(cur.tasks||{}), [selectedDate]: [...dayTasks, newTask]}}};
+        return {...wd, [weekKey]: {...cur, tasks: {...(cur.tasks||{}), [targetDate]: [...dayTasks, newTask]}}};
       });
       // Push to Google Calendar and store gcalId back
       if (getToken()) {
-        pushEventToCalendar(newTask, selectedDate).then(gcalId => {
+        pushEventToCalendar(newTask, targetDate).then(gcalId => {
           if (gcalId) {
             setWeekData(wd => {
               const updated = {...wd};
-              const tasks = (updated[weekKey]?.tasks || {})[selectedDate];
+              const tasks = (updated[weekKey]?.tasks || {})[targetDate];
               if (tasks) {
                 updated[weekKey] = {...updated[weekKey], tasks: {...updated[weekKey].tasks,
-                  [selectedDate]: tasks.map(t => t.id===newTask.id ? {...t, gcalId} : t)
+                  [targetDate]: tasks.map(t => t.id===newTask.id ? {...t, gcalId} : t)
                 }};
               }
               return updated;
@@ -1951,15 +2057,23 @@ function MonthlyCalendar({ weekData, setWeekData }) {
               const dk = fmt(d);
               const isToday = isSameDay(d, today);
               const dayEvents = getEventsForDay(dk);
+              const isDragOver = dragOverDay === dk;
               return (
-                <div key={dk} className={`monthly-cell ${isToday?'today':''}`}
-                  onClick={()=>openAddEvent(dk)}>
+                <div key={dk}
+                  className={`monthly-cell ${isToday?'today':''} ${isDragOver?'drag-over':''}`}
+                  onClick={()=>openAddEvent(dk)}
+                  onDragOver={e=>handleDragOver(e,dk)}
+                  onDragLeave={()=>setDragOverDay(null)}
+                  onDrop={e=>handleDrop(e,dk)}>
                   <div className="monthly-cell-date">{d.getDate()}</div>
                   <div className="monthly-cell-events">
                     {dayEvents.slice(0,3).map(ev=>(
                       <div key={ev.id} className="monthly-event-chip"
-                        style={{background: TASK_COLORS[(ev.colorIndex??3) % TASK_COLORS.length]}}
-                        onClick={e=>{e.stopPropagation();openEditEvent(ev);}}>
+                        style={{background: TASK_COLORS[(ev.colorIndex??3) % TASK_COLORS.length], cursor:'grab', opacity: dragInfo?.eventId===ev.id ? 0.4 : 1}}
+                        draggable
+                        onDragStart={e=>{e.stopPropagation();handleDragStart(e,ev.id,dk);}}
+                        onDragEnd={()=>{setDragInfo(null);setDragOverDay(null);}}
+                        onClick={e=>{e.stopPropagation();if(!dragInfo)openEditEvent(ev);}}>
                         {ev.eventTime && <span className="chip-time">{ev.eventTime}</span>}
                         {ev.title||'…'}
                       </div>
@@ -1984,9 +2098,12 @@ function MonthlyCalendar({ weekData, setWeekData }) {
               value={eventForm.title} onChange={e=>setEventForm(f=>({...f,title:e.target.value}))}
               autoFocus />
             <div style={{display:'flex',alignItems:'center',gap:8,marginTop:8}}>
+              <label style={{fontSize:12,color:'var(--ink-faint)'}}>Date:</label>
+              <input type="date" className="task-time-input"
+                value={eventForm.date||''}
+                onChange={e=>setEventForm(f=>({...f,date:e.target.value}))} />
               <label style={{fontSize:12,color:'var(--ink-faint)'}}>Time:</label>
-              <input type="time" className="task-time-input" step="300"
-                value={eventForm.time} onChange={e=>setEventForm(f=>({...f,time:e.target.value}))} />
+              <TimeSelect value={eventForm.time} onChange={v=>setEventForm(f=>({...f,time:v}))} />
             </div>
             <textarea className="modal-textarea" placeholder="Details (optional)…"
               value={eventForm.details} onChange={e=>setEventForm(f=>({...f,details:e.target.value}))} rows={3} />
