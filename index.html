@@ -654,7 +654,6 @@ const SCOPES = 'https://www.googleapis.com/auth/drive.file https://www.googleapi
 const DRIVE_FILE_NAME = 'planner-data.json';
 
 // Token stored in memory; email hint persisted for silent re-auth
-let _loadingFromDrive = false; // prevents spurious save during initial load
 let _accessToken = null;
 let _tokenExpiry = 0;
 
@@ -722,48 +721,11 @@ function requestToken(onSuccess, onError) {
   }, 1000);
 }
 
-// Silent re-auth: open a hidden popup with login_hint so user sees no interaction
+// Silent re-auth: use stored email hint, no UI prompt
 function requestTokenSilent(onSuccess, onError) {
   const hint = getSavedEmail();
   if (!hint) { onError('no_hint'); return; }
-  const redirectUri = 'https://zacharypals.github.io/Planner_Web_App/oauth.html';
-  const params = new URLSearchParams({
-    client_id: CLIENT_ID,
-    redirect_uri: redirectUri,
-    response_type: 'token',
-    scope: SCOPES,
-    prompt: '',
-    login_hint: hint,
-    include_granted_scopes: 'true',
-  });
-  const authUrl = 'https://accounts.google.com/o/oauth2/v2/auth?' + params.toString();
-  // Use a tiny hidden popup — if Google needs interaction it will just fail silently
-  const popup = window.open(authUrl, 'googleSilentAuth', 'width=1,height=1,top=-1000,left=-1000');
-  if (!popup) { onError('popup_blocked'); return; }
-  function onMessage(e) {
-    if (e.origin !== 'https://zacharypals.github.io') return;
-    if (!e.data?.access_token) return;
-    window.removeEventListener('message', onMessage);
-    clearInterval(check);
-    _accessToken = e.data.access_token;
-    _tokenExpiry = Date.now() + ((e.data.expires_in || 3600) - 60) * 1000;
-    onSuccess(e.data);
-  }
-  window.addEventListener('message', onMessage);
-  const check = setInterval(() => {
-    if (popup.closed) {
-      clearInterval(check);
-      window.removeEventListener('message', onMessage);
-      onError('popup_closed');
-    }
-  }, 500);
-  // Timeout after 10s
-  setTimeout(() => {
-    clearInterval(check);
-    window.removeEventListener('message', onMessage);
-    try { popup.close(); } catch {}
-    onError('timeout');
-  }, 10000);
+  buildTokenClient(hint, '', onSuccess, onError);
 }
 
 // ── DRIVE HELPERS ──
@@ -774,7 +736,12 @@ async function driveRequest(url, opts = {}) {
     ...opts,
     headers: { 'Authorization': `Bearer ${token}`, ...(opts.headers || {}) },
   });
-  if (!res.ok) throw new Error(`Drive error ${res.status}`);
+  if (!res.ok) {
+    let detail = '';
+    try { const j = await res.clone().json(); detail = j?.error?.message || j?.error?.status || ''; } catch {}
+    console.error('Drive API error', res.status, detail, url);
+    throw new Error(`Drive error ${res.status}${detail ? ': ' + detail : ''}`);
+  }
   return res;
 }
 
@@ -1817,8 +1784,7 @@ function MonthlyCalendar({ weekData, setWeekData }) {
         return {...wd, [weekKey]: {...cur, tasks: {...(cur.tasks||{}), [selectedDate]: [...dayTasks, newTask]}}};
       });
       // Push to Google Calendar and store gcalId back
-      const tokenNow = getToken();
-      if (tokenNow) {
+      if (getToken()) {
         pushEventToCalendar(newTask, selectedDate).then(gcalId => {
           if (gcalId) {
             setWeekData(wd => {
@@ -2055,32 +2021,27 @@ function App() {
     setSaveStatus('saving');
     try {
       const { data, fileId } = await loadFromDrive();
-      // Write to localStorage first so scheduleSave reads correct values
+      setDriveFileId(fileId);
+      // Merge Drive data into local state — Drive wins for each key present
       ALL_STORAGE_KEYS.forEach(k => {
         if (data[k] !== undefined) {
           try { localStorage.setItem(k, JSON.stringify(data[k])); } catch {}
         }
       });
-      // Suspend the save-trigger effect by setting a flag before updating state
-      _loadingFromDrive = true;
+      // Reload page state from fresh localStorage
       if (data.weekData) setWeekData(data.weekData);
       if (data.navColor) setNavColor(data.navColor);
       if (data.calHeaderColor) setCalHeaderColor(data.calHeaderColor);
-      // Set driveFileId last — this is what arms the save effect
-      setDriveFileId(fileId);
-      _loadingFromDrive = false;
       setSaveStatus('saved');
-      setTimeout(() => setSaveStatus(''), 2500);
+      setTimeout(() => setSaveStatus(''), 2000);
     } catch (e) {
-      console.error('Drive load error:', e);
-      setSaveStatus('error:Could not load from Drive');
-      setTimeout(() => setSaveStatus(''), 4000);
+      setSaveStatus('error');
     }
   }
 
   // Debounced save to Drive whenever data changes
   const scheduleSave = useCallback((fid) => {
-    if (!fid || _loadingFromDrive) return;
+    if (!fid) return;
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     setSaveStatus('saving');
     saveTimerRef.current = setTimeout(async () => {
@@ -2141,7 +2102,7 @@ function App() {
         } catch {}
         await loadAllFromDrive();
       },
-      (err) => { console.error('Auth error:', err); }
+      (err) => { console.error('Auth error:', err); setSaveStatus('error'); }
     );
   }
 
@@ -2170,13 +2131,10 @@ function App() {
     setSyncing(false);
   }
 
-  const isError = saveStatus.startsWith('error:');
-  const errMsg = isError ? saveStatus.slice(6) : '';
   const saveLabel = saveStatus === 'saving' ? '↑ Saving…'
     : saveStatus === 'saved' ? '✓ Saved'
-    : isError ? `✗ ${errMsg}`
+    : saveStatus === 'error' ? '✗ Error'
     : '';
-  const saveClass = isError ? 'error' : saveStatus;
 
   return (
     <div className="app">
@@ -2191,7 +2149,7 @@ function App() {
           <button className={`nav-tab ${page==='habit'?'active':''}`} onClick={()=>setPage('habit')}>Habit Tracker</button>
         </div>
         <div className="auth-area">
-          {saveLabel && <span className={`save-status ${saveClass}`}>{saveLabel}</span>}
+          {saveLabel && <span className={`save-status ${saveStatus}`}>{saveLabel}</span>}
           {authUser ? (
             <>
               <button className="auth-btn sync" onClick={handleSyncCalendar} disabled={syncing} title="Pull new events from Google Calendar">
