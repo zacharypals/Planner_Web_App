@@ -9,6 +9,7 @@
 <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -42,6 +43,30 @@
     border-bottom: 2px solid var(--gold);
   }
   .nav-brand { font-family: 'Playfair Display', serif; font-size: 18px; letter-spacing: 0.03em; color: var(--cream); }
+  /* AUTH BAR */
+  .auth-area { display: flex; align-items: center; gap: 8px; min-width: 200px; justify-content: flex-end; }
+  .auth-btn {
+    padding: 5px 12px; border-radius: 5px; border: 1.5px solid rgba(255,255,255,0.3);
+    background: rgba(255,255,255,0.1); color: var(--cream); cursor: pointer;
+    font-size: 12px; font-family: 'DM Sans', sans-serif; font-weight: 500;
+    transition: all 0.15s; white-space: nowrap;
+  }
+  .auth-btn:hover { background: rgba(255,255,255,0.2); border-color: rgba(255,255,255,0.5); }
+  .auth-btn.danger:hover { background: #c0392b; border-color: #c0392b; }
+  .auth-btn.sync { background: rgba(184,134,11,0.25); border-color: var(--gold); color: var(--gold); }
+  .auth-btn.sync:hover { background: var(--gold); color: var(--ink); }
+  .auth-btn:disabled { opacity: 0.5; cursor: default; }
+  .save-status {
+    font-size: 11px; font-family: 'DM Mono', monospace;
+    color: rgba(255,255,255,0.5); white-space: nowrap;
+  }
+  .save-status.saving { color: var(--gold); }
+  .save-status.saved { color: #6ee7b7; }
+  .save-status.error { color: #f87171; }
+  .user-avatar {
+    width: 26px; height: 26px; border-radius: 50%; border: 1.5px solid rgba(255,255,255,0.4);
+    object-fit: cover;
+  }
   .hdr-color-area { display: flex; align-items: center; gap: 6px; position: relative; }
   .hdr-color-btn {
     background: none; border: none; cursor: pointer; font-size: 14px;
@@ -231,7 +256,7 @@
   .task-card:hover { box-shadow: 0 2px 8px var(--shadow); }
   .task-card-header {
     display: flex; align-items: center; gap: 6px; padding: 7px 8px;
-    font-size: 12px; font-weight: 500; overflow: hidden;
+    font-size: 12px; font-weight: 500;
   }
   .task-check {
     width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid currentColor;
@@ -240,7 +265,7 @@
   }
   .task-check.done::after { content: '✓'; font-size: 9px; }
   .task-title-input {
-    flex: 1; min-width: 0; background: transparent; border: none; outline: none;
+    flex: 1; background: transparent; border: none; outline: none;
     font-size: 12px; font-weight: 500; font-family: 'DM Sans', sans-serif;
     cursor: text;
   }
@@ -621,6 +646,269 @@ function fmtDisplay(d) {
 }
 function isSameDay(a,b) { return fmt(a)===fmt(b); }
 
+// ─────────────────────────────────────────────
+// GOOGLE AUTH + DRIVE + CALENDAR ENGINE
+// ─────────────────────────────────────────────
+const CLIENT_ID = '1050376914317-haudi6cagd8c3s3bmooc85pb5mlj309b.apps.googleusercontent.com';
+const SCOPES = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/calendar';
+const DRIVE_FILE_NAME = 'planner-data.json';
+
+// Token stored in memory; email hint persisted for silent re-auth
+let _accessToken = null;
+let _tokenExpiry = 0;
+
+function getToken() {
+  if (_accessToken && Date.now() < _tokenExpiry) return _accessToken;
+  return null;
+}
+
+function getSavedEmail() {
+  try { return localStorage.getItem('plannerAuthEmail') || ''; } catch { return ''; }
+}
+function saveEmail(email) {
+  try { localStorage.setItem('plannerAuthEmail', email); } catch {}
+}
+function clearEmail() {
+  try { localStorage.removeItem('plannerAuthEmail'); } catch {}
+}
+
+let _tokenClient = null;
+
+function buildTokenClient(hint, prompt, onSuccess, onError) {
+  if (!window.google) { onError('Google API not loaded'); return; }
+  _tokenClient = window.google.accounts.oauth2.initTokenClient({
+    client_id: CLIENT_ID,
+    scope: SCOPES,
+    hint: hint || undefined,
+    prompt: prompt,
+    callback: (resp) => {
+      if (resp.error) { onError(resp.error); return; }
+      _accessToken = resp.access_token;
+      _tokenExpiry = Date.now() + (resp.expires_in - 60) * 1000;
+      onSuccess(resp);
+    },
+  });
+  _tokenClient.requestAccessToken();
+}
+
+// Manual sign-in: open a real OAuth popup that always shows account chooser
+function requestToken(onSuccess, onError) {
+  const redirectUri = 'https://zacharypals.github.io/Planner_Web_App/oauth.html';
+  const params = new URLSearchParams({
+    client_id: CLIENT_ID,
+    redirect_uri: redirectUri,
+    response_type: 'token',
+    scope: SCOPES,
+    prompt: 'select_account consent',
+    include_granted_scopes: 'true',
+  });
+  const authUrl = 'https://accounts.google.com/o/oauth2/v2/auth?' + params.toString();
+  const popup = window.open(authUrl, 'googleAuth', 'width=500,height=620,top=100,left=200');
+  if (!popup) { onError('Popup blocked'); return; }
+  // Listen for the token posted back from the redirect page
+  function onMessage(e) {
+    if (e.origin !== 'https://zacharypals.github.io') return;
+    if (!e.data?.access_token) return;
+    window.removeEventListener('message', onMessage);
+    _accessToken = e.data.access_token;
+    _tokenExpiry = Date.now() + ((e.data.expires_in || 3600) - 60) * 1000;
+    onSuccess(e.data);
+  }
+  window.addEventListener('message', onMessage);
+  // Clean up if popup closed without completing
+  const check = setInterval(() => {
+    if (popup.closed) { clearInterval(check); window.removeEventListener('message', onMessage); }
+  }, 1000);
+}
+
+// Silent re-auth: use stored email hint, no UI prompt
+function requestTokenSilent(onSuccess, onError) {
+  const hint = getSavedEmail();
+  if (!hint) { onError('no_hint'); return; }
+  buildTokenClient(hint, '', onSuccess, onError);
+}
+
+// ── DRIVE HELPERS ──
+async function driveRequest(url, opts = {}) {
+  const token = getToken();
+  if (!token) throw new Error('Not authenticated');
+  const res = await fetch(url, {
+    ...opts,
+    headers: { 'Authorization': `Bearer ${token}`, ...(opts.headers || {}) },
+  });
+  if (!res.ok) throw new Error(`Drive error ${res.status}`);
+  return res;
+}
+
+async function findOrCreateDriveFile() {
+  // Search for existing file
+  const search = await driveRequest(
+    `https://www.googleapis.com/drive/v3/files?q=name='${DRIVE_FILE_NAME}'+and+trashed=false&spaces=drive&fields=files(id,name)`
+  );
+  const data = await search.json();
+  if (data.files && data.files.length > 0) return data.files[0].id;
+  // Create new file with empty data
+  const meta = { name: DRIVE_FILE_NAME, mimeType: 'application/json' };
+  const form = new FormData();
+  form.append('metadata', new Blob([JSON.stringify(meta)], { type: 'application/json' }));
+  form.append('file', new Blob([JSON.stringify({})], { type: 'application/json' }));
+  const create = await driveRequest(
+    'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',
+    { method: 'POST', body: form }
+  );
+  const created = await create.json();
+  return created.id;
+}
+
+async function loadFromDrive() {
+  const fileId = await findOrCreateDriveFile();
+  const res = await driveRequest(
+    `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`
+  );
+  const text = await res.text();
+  try { return { data: JSON.parse(text), fileId }; }
+  catch { return { data: {}, fileId }; }
+}
+
+async function saveToDrive(fileId, allData) {
+  await driveRequest(
+    `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(allData),
+    }
+  );
+}
+
+// ── CALENDAR HELPERS ──
+async function pushEventToCalendar(event, dateKey) {
+  const token = getToken();
+  if (!token) return null;
+  const dateObj = new Date(dateKey + 'T00:00:00');
+  const dateStr = dateKey; // YYYY-MM-DD
+  let start, end;
+  if (event.eventTime) {
+    const [h, m] = event.eventTime.split(':');
+    start = { dateTime: `${dateStr}T${event.eventTime}:00`, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone };
+    const endH = String(parseInt(h) + 1).padStart(2, '0');
+    end = { dateTime: `${dateStr}T${endH}:${m}:00`, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone };
+  } else {
+    const nextDay = new Date(dateObj); nextDay.setDate(nextDay.getDate() + 1);
+    const nextStr = fmt(nextDay);
+    start = { date: dateStr };
+    end = { date: nextStr };
+  }
+  const body = {
+    summary: event.title || 'Untitled Event',
+    description: event.details || '',
+    start, end,
+    extendedProperties: { private: { plannerId: event.id } },
+  };
+  const res = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) return null;
+  const created = await res.json();
+  return created.id; // Google Calendar event ID
+}
+
+async function deleteEventFromCalendar(gcalId) {
+  const token = getToken();
+  if (!token || !gcalId) return;
+  await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${gcalId}`, {
+    method: 'DELETE',
+    headers: { 'Authorization': `Bearer ${token}` },
+  });
+}
+
+async function updateEventInCalendar(gcalId, event, dateKey) {
+  const token = getToken();
+  if (!token || !gcalId) return;
+  const dateStr = dateKey;
+  let start, end;
+  if (event.eventTime) {
+    const [h, m] = event.eventTime.split(':');
+    start = { dateTime: `${dateStr}T${event.eventTime}:00`, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone };
+    const endH = String(parseInt(h) + 1).padStart(2, '0');
+    end = { dateTime: `${dateStr}T${endH}:${m}:00`, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone };
+  } else {
+    const nextDay = new Date(dateStr + 'T00:00:00'); nextDay.setDate(nextDay.getDate() + 1);
+    start = { date: dateStr }; end = { date: fmt(nextDay) };
+  }
+  await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${gcalId}`, {
+    method: 'PATCH',
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      summary: event.title || 'Untitled Event',
+      description: event.details || '',
+      start, end,
+    }),
+  });
+}
+
+// Pull events from Google Calendar that don't exist in local data (constructive only)
+async function pullNewFromCalendar(weekData) {
+  const token = getToken();
+  if (!token) return null;
+  const now = new Date();
+  const oneYearAgo = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+  const oneYearFwd = new Date(now.getFullYear() + 1, now.getMonth(), now.getDate());
+  const res = await fetch(
+    `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${oneYearAgo.toISOString()}&timeMax=${oneYearFwd.toISOString()}&singleEvents=true&maxResults=500`,
+    { headers: { 'Authorization': `Bearer ${token}` } }
+  );
+  if (!res.ok) return null;
+  const data = await res.json();
+  const gcalEvents = data.items || [];
+
+  // Collect all existing planner event IDs and gcalIds
+  const existingPlannerIds = new Set();
+  const existingGcalIds = new Set();
+  Object.values(weekData).forEach(wd => {
+    Object.values(wd.tasks || {}).forEach(tasks => {
+      tasks.filter(t => t.isEvent).forEach(t => {
+        existingPlannerIds.add(t.id);
+        if (t.gcalId) existingGcalIds.add(t.gcalId);
+      });
+    });
+  });
+
+  // Only add events not already in the app
+  const toAdd = gcalEvents.filter(ev => {
+    if (existingGcalIds.has(ev.id)) return false;
+    const plannerId = ev.extendedProperties?.private?.plannerId;
+    if (plannerId && existingPlannerIds.has(plannerId)) return false;
+    return true;
+  });
+
+  if (toAdd.length === 0) return { added: 0, newWeekData: weekData };
+
+  const newWeekData = JSON.parse(JSON.stringify(weekData)); // deep clone
+  toAdd.forEach(ev => {
+    const dateStr = ev.start?.date || ev.start?.dateTime?.slice(0, 10);
+    if (!dateStr) return;
+    const dateObj = new Date(dateStr + 'T00:00:00');
+    const weekKey = fmt(getWeekStart(dateObj));
+    const cur = newWeekData[weekKey] || { proverb:'', toCreate:[], weekGoals:[], people:[], beWord:'', proud:'', story:'', tasks:{} };
+    const dayTasks = (cur.tasks || {})[dateStr] || [];
+    const timeStr = ev.start?.dateTime ? ev.start.dateTime.slice(11, 16) : '';
+    dayTasks.push({
+      id: 'gcal_' + ev.id,
+      gcalId: ev.id,
+      title: ev.summary || '',
+      details: ev.description || '',
+      done: false, expanded: false, colorIndex: 3,
+      isEvent: true, eventTime: timeStr,
+    });
+    newWeekData[weekKey] = { ...cur, tasks: { ...(cur.tasks || {}), [dateStr]: dayTasks } };
+  });
+
+  return { added: toAdd.length, newWeekData };
+}
+
 function useStorage(key, init) {
   const [val, setVal] = useState(() => {
     try { const s = localStorage.getItem(key); return s ? JSON.parse(s) : init; } catch { return init; }
@@ -906,18 +1194,18 @@ const TASK_COLORS = [
   '#e0f2fe', // powder blue
 ];
 const EVENT_COLORS = [
-  '#f9a8d4', // hot pink
-  '#c4b5fd', // violet
-  '#93c5fd', // bright blue
-  '#6ee7b7', // emerald
-  '#fcd34d', // amber
-  '#fb923c', // orange
-  '#86efac', // green
-  '#f472b6', // rose
-  '#67e8f9', // cyan
-  '#fbbf24', // golden
-  '#a78bfa', // purple
-  '#34d399', // teal
+  '#fce7f3', // soft pink
+  '#ede9fe', // lilac
+  '#dbeafe', // cornflower
+  '#d1fae5', // seafoam
+  '#fef3c7', // champagne
+  '#ffedd5', // cantaloupe
+  '#f0fdf4', // pale mint
+  '#fdf4ff', // whisper purple
+  '#e0f2fe', // ice blue
+  '#fefce8', // cream yellow
+  '#ffe4e6', // blush
+  '#ecfdf5', // aqua mist
 ];
 function TaskCard({ task, onUpdate, onDelete, onDragStart, onDragOver, onDrop, isDragOver }) {
   const titleRef = useRef();
@@ -1463,11 +1751,15 @@ function MonthlyCalendar({ weekData, setWeekData }) {
         Object.keys(updated).forEach(wk => {
           const tasks = (updated[wk].tasks || {})[editingEvent.dayKey];
           if (tasks) {
-            updated[wk] = {...updated[wk], tasks: {...updated[wk].tasks,
-              [editingEvent.dayKey]: tasks.map(t => t.id===editingEvent.taskId
-                ? {...t, title:eventForm.title, eventTime:eventForm.time, details:eventForm.details}
-                : t)
-            }};
+            const updatedTasks = tasks.map(t => t.id===editingEvent.taskId
+              ? {...t, title:eventForm.title, eventTime:eventForm.time, details:eventForm.details}
+              : t);
+            updated[wk] = {...updated[wk], tasks: {...updated[wk].tasks, [editingEvent.dayKey]: updatedTasks}};
+            // Push update to Google Calendar if we have a gcalId
+            const updatedTask = updatedTasks.find(t => t.id === editingEvent.taskId);
+            if (updatedTask?.gcalId && getToken()) {
+              updateEventInCalendar(updatedTask.gcalId, updatedTask, editingEvent.dayKey);
+            }
           }
         });
         return updated;
@@ -1478,19 +1770,39 @@ function MonthlyCalendar({ weekData, setWeekData }) {
       const weekKey = fmt(getWeekStart(dateObj));
       const newTask = {
         id: Date.now().toString(), title: eventForm.title, details: eventForm.details,
-        done: false, expanded: false, colorIndex: 3, isEvent: true, eventTime: eventForm.time
+        done: false, expanded: false, colorIndex: 3, isEvent: true, eventTime: eventForm.time,
+        gcalId: null,
       };
       setWeekData(wd => {
         const cur = wd[weekKey] || {proverb:'',toCreate:[],weekGoals:[],people:[],beWord:'',proud:'',story:'',tasks:{}};
         const dayTasks = (cur.tasks||{})[selectedDate] || [];
         return {...wd, [weekKey]: {...cur, tasks: {...(cur.tasks||{}), [selectedDate]: [...dayTasks, newTask]}}};
       });
+      // Push to Google Calendar and store gcalId back
+      if (getToken()) {
+        pushEventToCalendar(newTask, selectedDate).then(gcalId => {
+          if (gcalId) {
+            setWeekData(wd => {
+              const updated = {...wd};
+              const tasks = (updated[weekKey]?.tasks || {})[selectedDate];
+              if (tasks) {
+                updated[weekKey] = {...updated[weekKey], tasks: {...updated[weekKey].tasks,
+                  [selectedDate]: tasks.map(t => t.id===newTask.id ? {...t, gcalId} : t)
+                }};
+              }
+              return updated;
+            });
+          }
+        });
+      }
     }
     setShowEventModal(false);
     setEditingEvent(null);
   }
 
   function deleteEvent(ev) {
+    // Remove from Google Calendar if signed in and has gcalId
+    if (ev.gcalId && getToken()) deleteEventFromCalendar(ev.gcalId);
     setWeekData(wd => {
       const updated = {...wd};
       Object.keys(updated).forEach(wk => {
@@ -1684,11 +1996,141 @@ function ColorPickerPopover({ color, onChange }) {
 // ─────────────────────────────────────────────
 // APP ROOT
 // ─────────────────────────────────────────────
+const ALL_STORAGE_KEYS = ['weekData','habitGoals','habitCompletions','monthlyGoals','navColor','calHeaderColor'];
+
 function App() {
   const [page, setPage] = useState('planner');
   const [navColor, setNavColor] = useStorage('navColor', '#1e3d29');
   const [calHeaderColor, setCalHeaderColor] = useStorage('calHeaderColor', '#2d5a3d');
   const [weekData, setWeekData] = useStorage('weekData', {});
+
+  // Auth state
+  const [authUser, setAuthUser] = useState(null); // {name, email, picture}
+  const [driveFileId, setDriveFileId] = useState(null);
+  const [saveStatus, setSaveStatus] = useState(''); // '', 'saving', 'saved', 'error'
+  const [syncing, setSyncing] = useState(false);
+  const saveTimerRef = useRef(null);
+
+  // Load all data from Drive after sign-in
+  async function loadAllFromDrive() {
+    setSaveStatus('saving');
+    try {
+      const { data, fileId } = await loadFromDrive();
+      setDriveFileId(fileId);
+      // Merge Drive data into local state — Drive wins for each key present
+      ALL_STORAGE_KEYS.forEach(k => {
+        if (data[k] !== undefined) {
+          try { localStorage.setItem(k, JSON.stringify(data[k])); } catch {}
+        }
+      });
+      // Reload page state from fresh localStorage
+      if (data.weekData) setWeekData(data.weekData);
+      if (data.navColor) setNavColor(data.navColor);
+      if (data.calHeaderColor) setCalHeaderColor(data.calHeaderColor);
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus(''), 2000);
+    } catch (e) {
+      setSaveStatus('error');
+    }
+  }
+
+  // Debounced save to Drive whenever data changes
+  const scheduleSave = useCallback((fid) => {
+    if (!fid) return;
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    setSaveStatus('saving');
+    saveTimerRef.current = setTimeout(async () => {
+      const allData = {};
+      ALL_STORAGE_KEYS.forEach(k => {
+        try { const s = localStorage.getItem(k); if (s) allData[k] = JSON.parse(s); } catch {}
+      });
+      try {
+        await saveToDrive(fid, allData);
+        setSaveStatus('saved');
+        setTimeout(() => setSaveStatus(''), 2000);
+      } catch {
+        setSaveStatus('error');
+      }
+    }, 1500);
+  }, []);
+
+  // Watch for localStorage changes and trigger Drive save
+  useEffect(() => {
+    if (!driveFileId) return;
+    scheduleSave(driveFileId);
+  }, [weekData, navColor, calHeaderColor, driveFileId]);
+
+  // Silent re-auth on mount if we have a stored email hint
+  useEffect(() => {
+    const hint = getSavedEmail();
+    if (!hint) return;
+    // Wait for Google GSI to load
+    const tryAuth = () => {
+      if (!window.google) { setTimeout(tryAuth, 500); return; }
+      requestTokenSilent(
+        async (resp) => {
+          try {
+            const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+              headers: { Authorization: `Bearer ${resp.access_token}` }
+            });
+            const user = await res.json();
+            setAuthUser({ name: user.name, email: user.email, picture: user.picture });
+          } catch {}
+          await loadAllFromDrive();
+        },
+        () => {} // silent failure — just stay signed out, user can click manually
+      );
+    };
+    setTimeout(tryAuth, 800);
+  }, []);
+
+  function handleSignIn() {
+    requestToken(
+      async (resp) => {
+        try {
+          const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+            headers: { Authorization: `Bearer ${resp.access_token}` }
+          });
+          const user = await res.json();
+          setAuthUser({ name: user.name, email: user.email, picture: user.picture });
+          saveEmail(user.email); // persist for silent re-auth next visit
+        } catch {}
+        await loadAllFromDrive();
+      },
+      (err) => { console.error('Auth error:', err); setSaveStatus('error'); }
+    );
+  }
+
+  function handleSignOut() {
+    const token = _accessToken;
+    _accessToken = null; _tokenExpiry = 0;
+    clearEmail();
+    setAuthUser(null); setDriveFileId(null); setSaveStatus('');
+    if (window.google && token) window.google.accounts.oauth2.revoke(token, () => {});
+  }
+
+  async function handleSyncCalendar() {
+    if (!getToken()) { alert('Please sign in first.'); return; }
+    setSyncing(true);
+    try {
+      const result = await pullNewFromCalendar(weekData);
+      if (result && result.added > 0) {
+        setWeekData(result.newWeekData);
+        alert(`Synced ${result.added} new event${result.added === 1 ? '' : 's'} from Google Calendar.`);
+      } else {
+        alert('No new events to sync — your app is up to date.');
+      }
+    } catch (e) {
+      alert('Calendar sync failed. Please try again.');
+    }
+    setSyncing(false);
+  }
+
+  const saveLabel = saveStatus === 'saving' ? '↑ Saving…'
+    : saveStatus === 'saved' ? '✓ Saved'
+    : saveStatus === 'error' ? '✗ Error'
+    : '';
+
   return (
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
@@ -1697,17 +2139,24 @@ function App() {
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
-          <button className={`nav-tab ${page==='planner'?'active':''}`} onClick={()=>setPage('planner')}>
-            Weekly Planner
-          </button>
-          <button className={`nav-tab ${page==='monthly'?'active':''}`} onClick={()=>setPage('monthly')}>
-            Monthly Calendar
-          </button>
-          <button className={`nav-tab ${page==='habit'?'active':''}`} onClick={()=>setPage('habit')}>
-            Habit Tracker
-          </button>
+          <button className={`nav-tab ${page==='planner'?'active':''}`} onClick={()=>setPage('planner')}>Weekly Planner</button>
+          <button className={`nav-tab ${page==='monthly'?'active':''}`} onClick={()=>setPage('monthly')}>Monthly Calendar</button>
+          <button className={`nav-tab ${page==='habit'?'active':''}`} onClick={()=>setPage('habit')}>Habit Tracker</button>
         </div>
-        <span style={{width:120}}/>
+        <div className="auth-area">
+          {saveLabel && <span className={`save-status ${saveStatus}`}>{saveLabel}</span>}
+          {authUser ? (
+            <>
+              <button className="auth-btn sync" onClick={handleSyncCalendar} disabled={syncing} title="Pull new events from Google Calendar">
+                {syncing ? '↓ Syncing…' : '↓ Sync Calendar'}
+              </button>
+              {authUser.picture && <img className="user-avatar" src={authUser.picture} alt={authUser.name} title={authUser.email} />}
+              <button className="auth-btn danger" onClick={handleSignOut} title="Sign out">Sign out</button>
+            </>
+          ) : (
+            <button className="auth-btn" onClick={handleSignIn}>☁ Sign in with Google</button>
+          )}
+        </div>
       </div>
       {page==='planner' && <WeeklyPlanner weekData={weekData} setWeekData={setWeekData} onGoToHabit={()=>setPage('habit')} calHeaderColor={calHeaderColor} setCalHeaderColor={setCalHeaderColor} />}
       {page==='monthly' && <MonthlyCalendar weekData={weekData} setWeekData={setWeekData} />}
