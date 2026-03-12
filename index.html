@@ -915,22 +915,6 @@ async function calendarRequest(url, opts = {}) {
   return res;
 }
 
-async function calendarRequest(url, opts = {}) {
-  const token = getToken();
-  if (!token) throw new Error('Not authenticated');
-  const res = await fetch(url, {
-    ...opts,
-    headers: { 'Authorization': `Bearer ${token}`, ...(opts.headers || {}) },
-  });
-  if (!res.ok) {
-    let detail = '';
-    try { const j = await res.clone().json(); detail = j?.error?.message || j?.error?.status || ''; } catch {}
-    console.error('Calendar API error', res.status, detail, url);
-    throw new Error(`Calendar error ${res.status}${detail ? ': ' + detail : ''}`);
-  }
-  return res;
-}
-
 // Pull events from Google Calendar that don't exist in local data (constructive only)
 async function pullNewFromCalendar(weekData) {
   const token = getToken();
