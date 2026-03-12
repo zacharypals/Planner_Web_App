@@ -815,9 +815,15 @@ async function pushEventToCalendar(event, dateKey) {
     headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
-  if (!res.ok) return null;
+  if (!res.ok) {
+    let detail = '';
+    try { const j = await res.clone().json(); detail = j?.error?.message || ''; } catch {}
+    console.error('Calendar push failed:', res.status, detail);
+    return null;
+  }
   const created = await res.json();
-  return created.id; // Google Calendar event ID
+  console.log('Calendar event created:', created.id);
+  return created.id;
 }
 
 async function deleteEventFromCalendar(gcalId) {
@@ -854,6 +860,38 @@ async function updateEventInCalendar(gcalId, event, dateKey) {
   });
 }
 
+async function calendarRequest(url, opts = {}) {
+  const token = getToken();
+  if (!token) throw new Error('Not authenticated');
+  const res = await fetch(url, {
+    ...opts,
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json', ...(opts.headers || {}) },
+  });
+  if (!res.ok) {
+    let detail = '';
+    try { const j = await res.clone().json(); detail = j?.error?.message || j?.error?.status || ''; } catch {}
+    console.error('Calendar API error', res.status, detail, url);
+    throw new Error(`Calendar error ${res.status}${detail ? ': ' + detail : ''}`);
+  }
+  return res;
+}
+
+async function calendarRequest(url, opts = {}) {
+  const token = getToken();
+  if (!token) throw new Error('Not authenticated');
+  const res = await fetch(url, {
+    ...opts,
+    headers: { 'Authorization': `Bearer ${token}`, ...(opts.headers || {}) },
+  });
+  if (!res.ok) {
+    let detail = '';
+    try { const j = await res.clone().json(); detail = j?.error?.message || j?.error?.status || ''; } catch {}
+    console.error('Calendar API error', res.status, detail, url);
+    throw new Error(`Calendar error ${res.status}${detail ? ': ' + detail : ''}`);
+  }
+  return res;
+}
+
 // Pull events from Google Calendar that don't exist in local data (constructive only)
 async function pullNewFromCalendar(weekData) {
   const token = getToken();
@@ -865,8 +903,14 @@ async function pullNewFromCalendar(weekData) {
     `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${oneYearAgo.toISOString()}&timeMax=${oneYearFwd.toISOString()}&singleEvents=true&maxResults=500`,
     { headers: { 'Authorization': `Bearer ${token}` } }
   );
-  if (!res.ok) return null;
+  if (!res.ok) {
+    let detail = '';
+    try { const j = await res.clone().json(); detail = j?.error?.message || ''; } catch {}
+    console.error('Calendar pull failed:', res.status, detail);
+    throw new Error(`Calendar error ${res.status}${detail ? ': ' + detail : ''}`);
+  }
   const data = await res.json();
+  console.log('Calendar pull: fetched', data.items?.length || 0, 'events');
   const gcalEvents = data.items || [];
 
   // Collect all existing planner event IDs and gcalIds
@@ -2131,7 +2175,8 @@ function App() {
         alert('No new events to sync — your app is up to date.');
       }
     } catch (e) {
-      alert('Calendar sync failed. Please try again.');
+      const msg = e?.message || 'Unknown error';
+      alert(`Calendar sync failed: ${msg}\n\nThis usually means the Google Calendar API isn't enabled, or Calendar permission wasn't granted. Try signing out and back in, and make sure you approve Calendar access on the consent screen.`);
     }
     setSyncing(false);
   }
