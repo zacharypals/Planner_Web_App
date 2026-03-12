@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head><title>Signing in…</title></head>
+<body>
+<p style="font-family:sans-serif;padding:20px;color:#555">Signing in, please wait…</p>
+<script>
+  // Parse access_token from the URL hash that Google redirects back with
+  const hash = window.location.hash.substring(1);
+  const params = {};
+  hash.split('&').forEach(p => {
+    const [k, v] = p.split('=');
+    if (k) params[decodeURIComponent(k)] = decodeURIComponent(v || '');
+  });
+  if (params.access_token && window.opener) {
+    window.opener.postMessage(params, 'https://zacharypals.github.io');
+    window.close();
+  } else {
+    document.body.innerHTML = '<p style="font-family:sans-serif;padding:20px;color:#c00">Sign-in failed. Please close this window and try again.</p>';
+  }
+</script>
+</body>
+</html>
