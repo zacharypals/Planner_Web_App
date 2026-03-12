@@ -231,7 +231,7 @@
   .task-card:hover { box-shadow: 0 2px 8px var(--shadow); }
   .task-card-header {
     display: flex; align-items: center; gap: 6px; padding: 7px 8px;
-    font-size: 12px; font-weight: 500;
+    font-size: 12px; font-weight: 500; overflow: hidden;
   }
   .task-check {
     width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid currentColor;
@@ -240,7 +240,7 @@
   }
   .task-check.done::after { content: '✓'; font-size: 9px; }
   .task-title-input {
-    flex: 1; background: transparent; border: none; outline: none;
+    flex: 1; min-width: 0; background: transparent; border: none; outline: none;
     font-size: 12px; font-weight: 500; font-family: 'DM Sans', sans-serif;
     cursor: text;
   }
@@ -285,6 +285,21 @@
   .task-card.done .task-title-input { text-decoration: line-through; opacity: 0.5; }
 
   /* TASK COLOR PICKER */
+  .task-type-btn {
+    background: none; border: none; cursor: pointer;
+    font-size: 14px; padding: 0 2px; flex-shrink: 0;
+    transition: all 0.15s; color: var(--ink-faint); line-height: 1;
+    opacity: 0.5;
+  }
+  .task-type-btn:hover { opacity: 1; transform: scale(1.15); }
+  .task-type-btn.event { opacity: 1; }
+  .task-time-input {
+    border: 1px solid var(--border); border-radius: 4px; font-size: 11px;
+    font-family: 'DM Mono', monospace; color: var(--ink); padding: 2px 6px;
+    background: var(--paper); cursor: pointer;
+  }
+  .task-time-input:focus { outline: none; border-color: var(--accent); }
+  .task-card.is-event { border-left: 3px solid var(--accent); }
   .task-color-toggle {
     background: none; border: none; cursor: pointer; font-size: 11px;
     color: var(--ink-light); padding: 2px 6px; border-radius: 4px;
@@ -507,6 +522,71 @@
   .cal-body::-webkit-scrollbar-track { background: var(--cream); }
   .cal-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 
+  /* ===================== MONTHLY CALENDAR ===================== */
+  .monthly-cal-wrap { padding: 16px 20px; min-width: 560px; }
+  .monthly-cal-header {
+    display: grid; grid-template-columns: repeat(7, 1fr);
+    margin-bottom: 4px;
+  }
+  .monthly-dow {
+    text-align: center; font-size: 11px; font-weight: 600; letter-spacing: 0.06em;
+    text-transform: uppercase; color: var(--ink-faint); padding: 4px 0;
+    font-family: 'DM Mono', monospace;
+  }
+  .monthly-cal-grid {
+    display: grid; grid-template-columns: repeat(7, 1fr);
+    border-left: 1px solid var(--border); border-top: 1px solid var(--border);
+  }
+  .monthly-cell {
+    border-right: 1px solid var(--border); border-bottom: 1px solid var(--border);
+    min-height: 110px; padding: 6px 6px 4px; cursor: pointer;
+    transition: background 0.1s; position: relative;
+  }
+  .monthly-cell:hover { background: #f8f4ee; }
+  .monthly-cell.empty { background: var(--cream); cursor: default; min-height: 110px; }
+  .monthly-cell.today { background: var(--gold-light); }
+  .monthly-cell.today .monthly-cell-date { color: var(--gold); font-weight: 700; }
+  .monthly-cell-date {
+    font-family: 'Playfair Display', serif; font-size: 14px; color: var(--ink);
+    margin-bottom: 4px;
+  }
+  .monthly-cell-events { display: flex; flex-direction: column; gap: 2px; }
+  .monthly-event-chip {
+    font-size: 10.5px; padding: 2px 5px; border-radius: 3px; cursor: pointer;
+    font-family: 'DM Sans', sans-serif; color: var(--ink);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    transition: filter 0.1s;
+  }
+  .monthly-event-chip:hover { filter: brightness(0.92); }
+  .chip-time {
+    font-family: 'DM Mono', monospace; font-size: 9px; opacity: 0.7; margin-right: 3px;
+  }
+  .monthly-event-more { font-size: 10px; color: var(--ink-faint); padding: 1px 4px; font-family: 'DM Mono', monospace; }
+  .month-event-item {
+    display: flex; align-items: baseline; gap: 6px; padding: 5px 4px;
+    border-radius: 5px; cursor: pointer; transition: background 0.1s;
+  }
+  .month-event-item:hover { background: var(--cream); }
+  .month-event-date { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--ink-faint); flex-shrink: 0; min-width: 64px; }
+  .month-event-time { color: var(--gold); }
+  .month-event-title { font-size: 12px; color: var(--ink); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* MODAL */
+  .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 1000; display: flex; align-items: center; justify-content: center; }
+  .modal-box { background: var(--paper); border-radius: 10px; padding: 24px; width: 360px; box-shadow: 0 8px 32px rgba(0,0,0,0.2); display: flex; flex-direction: column; }
+  .modal-title { font-family: 'Playfair Display', serif; font-size: 16px; font-weight: 600; color: var(--ink); margin-bottom: 14px; }
+  .modal-input { width: 100%; border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; font-size: 13px; font-family: 'DM Sans', sans-serif; color: var(--ink); background: var(--cream); box-sizing: border-box; }
+  .modal-input:focus { outline: none; border-color: var(--accent); }
+  .modal-textarea { width: 100%; border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; font-size: 12px; font-family: 'DM Sans', sans-serif; color: var(--ink); background: var(--cream); resize: vertical; margin-top: 8px; min-height: 72px; box-sizing: border-box; }
+  .modal-textarea:focus { outline: none; border-color: var(--accent); }
+  .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+  .modal-btn { padding: 7px 16px; border-radius: 6px; border: none; cursor: pointer; font-size: 13px; font-family: 'DM Sans', sans-serif; font-weight: 500; transition: all 0.15s; }
+  .modal-btn.primary { background: var(--accent); color: white; }
+  .modal-btn.primary:hover { background: #1e3d29; }
+  .modal-btn.secondary { background: var(--cream); color: var(--ink); border: 1px solid var(--border); }
+  .modal-btn.secondary:hover { background: var(--border); }
+  .modal-btn.danger { background: #fee2e2; color: #c0392b; margin-right: auto; }
+  .modal-btn.danger:hover { background: #c0392b; color: white; }
+
   @media (max-width: 900px) {
     .sidebar { width: 220px; }
     .week-review { grid-template-columns: 1fr; }
@@ -583,13 +663,12 @@ function ColorPicker({ value, onChange }) {
 // ─────────────────────────────────────────────
 // WEEKLY PLANNER
 // ─────────────────────────────────────────────
-function WeeklyPlanner({ onGoToHabit, calHeaderColor, setCalHeaderColor }) {
+function WeeklyPlanner({ weekData, setWeekData, onGoToHabit, calHeaderColor, setCalHeaderColor }) {
   const today = new Date(); today.setHours(0,0,0,0);
   const [weekStart, setWeekStart] = useState(getWeekStart(today));
   const weekKey = fmt(weekStart);
 
-  // Per-week data
-  const [weekData, setWeekData] = useStorage('weekData', {});
+  // Per-week data — now uses shared weekData prop
 
   function getWD() { return weekData[weekKey] || { proverb:'', toCreate:[], people:[], beWord:'', proud:'', story:'', tasks:{} }; }
   function setWD(fn) {
@@ -826,6 +905,20 @@ const TASK_COLORS = [
   '#ffe4cc', // apricot
   '#e0f2fe', // powder blue
 ];
+const EVENT_COLORS = [
+  '#f9a8d4', // hot pink
+  '#c4b5fd', // violet
+  '#93c5fd', // bright blue
+  '#6ee7b7', // emerald
+  '#fcd34d', // amber
+  '#fb923c', // orange
+  '#86efac', // green
+  '#f472b6', // rose
+  '#67e8f9', // cyan
+  '#fbbf24', // golden
+  '#a78bfa', // purple
+  '#34d399', // teal
+];
 function TaskCard({ task, onUpdate, onDelete, onDragStart, onDragOver, onDrop, isDragOver }) {
   const titleRef = useRef();
   const textareaRef = useRef();
@@ -853,8 +946,8 @@ function TaskCard({ task, onUpdate, onDelete, onDragStart, onDragOver, onDrop, i
   }
 
   return (
-    <div className={`task-card ${task.done?'done':''} ${isDragOver?'drag-over':''}`}
-      style={{background: TASK_COLORS[(task.colorIndex ?? 0) % TASK_COLORS.length], opacity: isDragOver ? 0.5 : 1}}
+    <div className={`task-card ${task.done?'done':''} ${isDragOver?'drag-over':''} ${task.isEvent?'is-event':''}`}
+      style={{background: (task.isEvent ? EVENT_COLORS : TASK_COLORS)[(task.colorIndex ?? 0) % (task.isEvent ? EVENT_COLORS : TASK_COLORS).length], opacity: isDragOver ? 0.5 : 1}}
       draggable
       onDragStart={onDragStart}
       onDragOver={e=>{e.preventDefault();onDragOver();}}
@@ -867,11 +960,17 @@ function TaskCard({ task, onUpdate, onDelete, onDragStart, onDragOver, onDrop, i
         {confirming ? 'Delete?' : '✕'}
       </button>
       <div className="task-card-header">
-        <span className="drag-handle" title="Drag to reorder">⠿</span>
+        <button
+          className={`task-type-btn ${task.isEvent?'event':''}`}
+          title={task.isEvent ? 'Event — click to make Task' : 'Task — click to make Event'}
+          onClick={e=>{e.stopPropagation();onUpdate({isEvent:!task.isEvent});}}>
+          {task.isEvent ? '📅' : '⠿'}
+        </button>
         <div className={`task-check ${task.done?'done':''}`}
           style={{borderColor: task.done ? '#2d5a3d' : undefined, color: task.done ? '#2d5a3d' : undefined, background: task.done ? '#e8f0eb' : undefined}}
           onClick={()=>onUpdate({done:!task.done})} />
-        <input ref={titleRef} className="task-title-input" placeholder="Task…"
+        <input ref={titleRef} className="task-title-input"
+          placeholder={task.isEvent ? 'Event…' : 'Task…'}
           value={task.title} onChange={e=>onUpdate({title:e.target.value})}
           onClick={e=>e.stopPropagation()} />
         <button className="task-expand-btn" onClick={()=>onUpdate({expanded:!task.expanded})}>
@@ -883,11 +982,20 @@ function TaskCard({ task, onUpdate, onDelete, onDragStart, onDragOver, onDrop, i
           <textarea ref={textareaRef} className="task-details-input" placeholder="Details…"
             value={task.details||''} onChange={e=>onUpdate({details:e.target.value})}
             rows={2} />
+          {task.isEvent && (
+            <div style={{display:'flex',alignItems:'center',gap:6,paddingTop:4}}>
+              <span style={{fontSize:10,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace"}}>Time:</span>
+              <input type="time" className="task-time-input"
+                value={task.eventTime||''}
+                onChange={e=>onUpdate({eventTime:e.target.value})}
+                onClick={e=>e.stopPropagation()} />
+            </div>
+          )}
           <div style={{display:'flex',alignItems:'center',gap:6,paddingTop:6}}>
             <button className="task-color-toggle" onClick={e=>{e.stopPropagation();setShowColors(s=>!s);}}>
               <span style={{
                 display:'inline-block',width:10,height:10,borderRadius:'50%',
-                background:TASK_COLORS[task.colorIndex??0],
+                background:(task.isEvent?EVENT_COLORS:TASK_COLORS)[task.colorIndex??0],
                 border:'1.5px solid rgba(0,0,0,0.2)',marginRight:4,verticalAlign:'middle'
               }}/>
               Color {showColors ? '▲' : '▼'}
@@ -895,7 +1003,7 @@ function TaskCard({ task, onUpdate, onDelete, onDragStart, onDragOver, onDrop, i
           </div>
           {showColors && (
             <div className="task-color-picker">
-              {TASK_COLORS.map((c,i)=>(
+              {(task.isEvent?EVENT_COLORS:TASK_COLORS).map((c,i)=>(
                 <div key={i} className={`task-color-swatch ${(task.colorIndex??0)===i?'active':''}`}
                   style={{background:c}}
                   onClick={e=>{e.stopPropagation();onUpdate({colorIndex:i});setShowColors(false);}}
@@ -1280,6 +1388,257 @@ function DailyView({date, goals, completions, onToggle}) {
 }
 
 // ─────────────────────────────────────────────
+// MONTHLY CALENDAR
+// ─────────────────────────────────────────────
+function MonthlyCalendar({ weekData, setWeekData }) {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const [viewDate, setViewDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
+  const [selectedDate, setSelectedDate] = useState(null);
+  const [showEventModal, setShowEventModal] = useState(false);
+  const [editingEvent, setEditingEvent] = useState(null); // {dayKey, taskId} or null
+  const [eventForm, setEventForm] = useState({title:'', time:'', details:''});
+  const [monthlyGoals, setMonthlyGoals] = useStorage('monthlyGoals', {}); // {yearMonth: [{id,name,done}]}
+
+  const yearMonthKey = `${viewDate.getFullYear()}-${String(viewDate.getMonth()+1).padStart(2,'0')}`;
+
+  function getMonthGoals() { return monthlyGoals[yearMonthKey] || []; }
+  function addMonthGoal() {
+    setMonthlyGoals(mg => ({...mg, [yearMonthKey]: [...(mg[yearMonthKey]||[]), {id:Date.now().toString(), name:'', done:false}]}));
+  }
+  function updateMonthGoal(id, patch) {
+    setMonthlyGoals(mg => ({...mg, [yearMonthKey]: (mg[yearMonthKey]||[]).map(g=>g.id===id?{...g,...patch}:g)}));
+  }
+  function deleteMonthGoal(id) {
+    setMonthlyGoals(mg => ({...mg, [yearMonthKey]: (mg[yearMonthKey]||[]).filter(g=>g.id!==id)}));
+  }
+
+  // Get all events from weekData for a given dateKey
+  function getEventsForDay(dateKey) {
+    const events = [];
+    Object.values(weekData).forEach(wd => {
+      const tasks = (wd.tasks || {})[dateKey] || [];
+      tasks.filter(t => t.isEvent).forEach(t => events.push({...t, dayKey: dateKey}));
+    });
+    return events;
+  }
+
+  // Get all events in the current month, sorted chronologically
+  function getAllMonthEvents() {
+    const year = viewDate.getFullYear();
+    const month = viewDate.getMonth();
+    const daysInMonth = new Date(year, month+1, 0).getDate();
+    const events = [];
+    for (let d = 1; d <= daysInMonth; d++) {
+      const date = new Date(year, month, d);
+      const dk = fmt(date);
+      getEventsForDay(dk).forEach(e => events.push({...e, date}));
+    }
+    events.sort((a,b) => {
+      const da = a.date - b.date;
+      if (da !== 0) return da;
+      return (a.eventTime||'99:99').localeCompare(b.eventTime||'99:99');
+    });
+    return events;
+  }
+
+  function openAddEvent(dateKey) {
+    setSelectedDate(dateKey);
+    setEditingEvent(null);
+    setEventForm({title:'', time:'', details:''});
+    setShowEventModal(true);
+  }
+
+  function openEditEvent(ev) {
+    setEditingEvent({dayKey: ev.dayKey, taskId: ev.id});
+    setEventForm({title: ev.title||'', time: ev.eventTime||'', details: ev.details||''});
+    setShowEventModal(true);
+  }
+
+  function saveEvent() {
+    if (!eventForm.title.trim()) return;
+    if (editingEvent) {
+      // Update existing event in weekData
+      setWeekData(wd => {
+        const updated = {...wd};
+        Object.keys(updated).forEach(wk => {
+          const tasks = (updated[wk].tasks || {})[editingEvent.dayKey];
+          if (tasks) {
+            updated[wk] = {...updated[wk], tasks: {...updated[wk].tasks,
+              [editingEvent.dayKey]: tasks.map(t => t.id===editingEvent.taskId
+                ? {...t, title:eventForm.title, eventTime:eventForm.time, details:eventForm.details}
+                : t)
+            }};
+          }
+        });
+        return updated;
+      });
+    } else {
+      // Add new event to the correct week in weekData
+      const dateObj = new Date(selectedDate + 'T00:00:00');
+      const weekKey = fmt(getWeekStart(dateObj));
+      const newTask = {
+        id: Date.now().toString(), title: eventForm.title, details: eventForm.details,
+        done: false, expanded: false, colorIndex: 3, isEvent: true, eventTime: eventForm.time
+      };
+      setWeekData(wd => {
+        const cur = wd[weekKey] || {proverb:'',toCreate:[],weekGoals:[],people:[],beWord:'',proud:'',story:'',tasks:{}};
+        const dayTasks = (cur.tasks||{})[selectedDate] || [];
+        return {...wd, [weekKey]: {...cur, tasks: {...(cur.tasks||{}), [selectedDate]: [...dayTasks, newTask]}}};
+      });
+    }
+    setShowEventModal(false);
+    setEditingEvent(null);
+  }
+
+  function deleteEvent(ev) {
+    setWeekData(wd => {
+      const updated = {...wd};
+      Object.keys(updated).forEach(wk => {
+        const tasks = (updated[wk].tasks || {})[ev.dayKey];
+        if (tasks) {
+          updated[wk] = {...updated[wk], tasks: {...updated[wk].tasks,
+            [ev.dayKey]: tasks.filter(t => t.id !== ev.id)
+          }};
+        }
+      });
+      return updated;
+    });
+  }
+
+  // Build calendar grid
+  const year = viewDate.getFullYear();
+  const month = viewDate.getMonth();
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month+1, 0).getDate();
+  const cells = [];
+  for (let i = 0; i < firstDay; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(new Date(year, month, d));
+
+  const monthEvents = getAllMonthEvents();
+
+  return (
+    <div className="main-content">
+      {/* SIDEBAR */}
+      <div className="sidebar" style={{overflowY:'auto'}}>
+        {/* Month Nav */}
+        <div className="week-nav">
+          <button className="nav-arrow" onClick={()=>setViewDate(d=>new Date(d.getFullYear(), d.getMonth()-1, 1))}>‹</button>
+          <span className="week-nav-label">{MONTHS[month]} {year}</span>
+          <button className="nav-arrow" onClick={()=>setViewDate(d=>new Date(d.getFullYear(), d.getMonth()+1, 1))}>›</button>
+        </div>
+
+        <a className="sidebar-link daily" href="https://penzu.com">✍️ Daily Pages</a>
+
+        {/* Monthly Goals */}
+        <div className="sidebar-section">
+          <div className="checklist-header">
+            <div className="sidebar-section-title">Monthly Goals:</div>
+            <button className="add-btn" onClick={addMonthGoal}>+</button>
+          </div>
+          {getMonthGoals().map(g=>(
+            <div key={g.id} className={`checklist-item ${g.done?'checked':''}`}>
+              <div className={`check-box ${g.done?'checked':''}`} onClick={()=>updateMonthGoal(g.id,{done:!g.done})} />
+              <input className="checklist-input" placeholder="Goal…" value={g.name}
+                onChange={e=>updateMonthGoal(g.id,{name:e.target.value})} />
+              <button className="delete-item-btn" onClick={()=>deleteMonthGoal(g.id)}>✕</button>
+            </div>
+          ))}
+        </div>
+
+        {/* Events this month */}
+        <div className="sidebar-section" style={{flex:1}}>
+          <div className="sidebar-section-title">Events This Month</div>
+          {monthEvents.length === 0 && (
+            <div style={{fontSize:11,color:'var(--ink-faint)',fontStyle:'italic',marginTop:4}}>No events yet</div>
+          )}
+          {monthEvents.map(ev=>(
+            <div key={ev.id} className="month-event-item" onClick={()=>openEditEvent(ev)}>
+              <div className="month-event-date">
+                {MONTHS[ev.date.getMonth()].slice(0,3)} {ev.date.getDate()}
+                {ev.eventTime && <span className="month-event-time"> {ev.eventTime}</span>}
+              </div>
+              <div className="month-event-title">{ev.title||<em style={{opacity:0.5}}>Untitled</em>}</div>
+              <button className="delete-item-btn" style={{marginLeft:'auto',opacity:0,flexShrink:0}}
+                onMouseEnter={e=>e.target.style.opacity=1} onMouseLeave={e=>e.target.style.opacity=0}
+                onClick={e=>{e.stopPropagation();deleteEvent(ev);}}>✕</button>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* MAIN CALENDAR GRID */}
+      <div className="main-panel" style={{overflowY:'auto'}}>
+        <div className="monthly-cal-wrap">
+          {/* Day-of-week headers */}
+          <div className="monthly-cal-header">
+            {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d=>(
+              <div key={d} className="monthly-dow">{d}</div>
+            ))}
+          </div>
+          {/* Grid */}
+          <div className="monthly-cal-grid">
+            {cells.map((d,i)=>{
+              if (!d) return <div key={'e'+i} className="monthly-cell empty" />;
+              const dk = fmt(d);
+              const isToday = isSameDay(d, today);
+              const dayEvents = getEventsForDay(dk);
+              return (
+                <div key={dk} className={`monthly-cell ${isToday?'today':''}`}
+                  onClick={()=>openAddEvent(dk)}>
+                  <div className="monthly-cell-date">{d.getDate()}</div>
+                  <div className="monthly-cell-events">
+                    {dayEvents.slice(0,3).map(ev=>(
+                      <div key={ev.id} className="monthly-event-chip"
+                        style={{background: TASK_COLORS[(ev.colorIndex??3) % TASK_COLORS.length]}}
+                        onClick={e=>{e.stopPropagation();openEditEvent(ev);}}>
+                        {ev.eventTime && <span className="chip-time">{ev.eventTime}</span>}
+                        {ev.title||'…'}
+                      </div>
+                    ))}
+                    {dayEvents.length > 3 && (
+                      <div className="monthly-event-more">+{dayEvents.length-3} more</div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* EVENT MODAL */}
+      {showEventModal && (
+        <div className="modal-backdrop" onClick={()=>setShowEventModal(false)}>
+          <div className="modal-box" onClick={e=>e.stopPropagation()}>
+            <div className="modal-title">{editingEvent ? 'Edit Event' : `Add Event — ${selectedDate}`}</div>
+            <input className="modal-input" placeholder="Event title…"
+              value={eventForm.title} onChange={e=>setEventForm(f=>({...f,title:e.target.value}))}
+              autoFocus />
+            <div style={{display:'flex',alignItems:'center',gap:8,marginTop:8}}>
+              <label style={{fontSize:12,color:'var(--ink-faint)'}}>Time:</label>
+              <input type="time" className="task-time-input"
+                value={eventForm.time} onChange={e=>setEventForm(f=>({...f,time:e.target.value}))} />
+            </div>
+            <textarea className="modal-textarea" placeholder="Details (optional)…"
+              value={eventForm.details} onChange={e=>setEventForm(f=>({...f,details:e.target.value}))} rows={3} />
+            <div className="modal-actions">
+              {editingEvent && (
+                <button className="modal-btn danger" onClick={()=>{
+                  deleteEvent({id:editingEvent.taskId, dayKey:editingEvent.dayKey});
+                  setShowEventModal(false);
+                }}>Delete</button>
+              )}
+              <button className="modal-btn secondary" onClick={()=>setShowEventModal(false)}>Cancel</button>
+              <button className="modal-btn primary" onClick={saveEvent}>Save</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
 // COLOR PICKER POPOVER
 // ─────────────────────────────────────────────
 const HEADER_PRESETS = [
@@ -1329,6 +1688,7 @@ function App() {
   const [page, setPage] = useState('planner');
   const [navColor, setNavColor] = useStorage('navColor', '#1e3d29');
   const [calHeaderColor, setCalHeaderColor] = useStorage('calHeaderColor', '#2d5a3d');
+  const [weekData, setWeekData] = useStorage('weekData', {});
   return (
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
@@ -1340,16 +1700,18 @@ function App() {
           <button className={`nav-tab ${page==='planner'?'active':''}`} onClick={()=>setPage('planner')}>
             Weekly Planner
           </button>
+          <button className={`nav-tab ${page==='monthly'?'active':''}`} onClick={()=>setPage('monthly')}>
+            Monthly Calendar
+          </button>
           <button className={`nav-tab ${page==='habit'?'active':''}`} onClick={()=>setPage('habit')}>
             Habit Tracker
           </button>
         </div>
         <span style={{width:120}}/>
       </div>
-      {page==='planner'
-        ? <WeeklyPlanner onGoToHabit={()=>setPage('habit')} calHeaderColor={calHeaderColor} setCalHeaderColor={setCalHeaderColor} />
-        : <HabitTracker onGoToPlanner={()=>setPage('planner')} />
-      }
+      {page==='planner' && <WeeklyPlanner weekData={weekData} setWeekData={setWeekData} onGoToHabit={()=>setPage('habit')} calHeaderColor={calHeaderColor} setCalHeaderColor={setCalHeaderColor} />}
+      {page==='monthly' && <MonthlyCalendar weekData={weekData} setWeekData={setWeekData} />}
+      {page==='habit' && <HabitTracker onGoToPlanner={()=>setPage('planner')} />}
     </div>
   );
 }
