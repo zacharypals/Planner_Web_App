@@ -632,6 +632,10 @@ function WeeklyPlanner({ onGoToHabit, calHeaderColor, setCalHeaderColor }) {
   function updateCreate(id,patch) { setWD(w=>({...w, toCreate:(Array.isArray(w.toCreate)?w.toCreate:[]).map(c=>c.id===id?{...c,...patch}:c)})); }
   function deleteCreate(id) { setWD(w=>({...w, toCreate:(Array.isArray(w.toCreate)?w.toCreate:[]).filter(c=>c.id!==id)})); }
 
+  function addGoal() { setWD(w=>({...w, goals:[...(w.goals||[]),{id:Date.now().toString(),name:'',done:false}]})); }
+  function updateGoal(id,patch) { setWD(w=>({...w, goals:(w.goals||[]).map(g=>g.id===id?{...g,...patch}:g)})); }
+  function deleteGoal(id) { setWD(w=>({...w, goals:(w.goals||[]).filter(g=>g.id!==id)})); }
+
   const [dragging, setDragging] = useState(null); // {dayKey, id}
   const [dragOver, setDragOver] = useState(null);  // {dayKey, id}
 
@@ -676,6 +680,21 @@ function WeeklyPlanner({ onGoToHabit, calHeaderColor, setCalHeaderColor }) {
           <div className="sidebar-section-title">Proverb of the Week</div>
           <textarea className="sidebar-textarea" placeholder="Write a quote to meditate on…"
             value={wd.proverb||''} onChange={e=>setWD(w=>({...w,proverb:e.target.value}))} rows={3} />
+        </div>
+
+        <div className="sidebar-section">
+          <div className="checklist-header">
+            <div className="sidebar-section-title">Weekly Goals:</div>
+            <button className="add-btn" onClick={addGoal}>+</button>
+          </div>
+          {(wd.goals||[]).map(g=>(
+            <div key={g.id} className={`checklist-item ${g.done?'checked':''}`}>
+              <div className={`check-box ${g.done?'checked':''}`} onClick={()=>updateGoal(g.id,{done:!g.done})} />
+              <input className="checklist-input" placeholder="Goal…" value={g.name}
+                onChange={e=>updateGoal(g.id,{name:e.target.value})} />
+              <button className="delete-item-btn" onClick={()=>deleteGoal(g.id)}>✕</button>
+            </div>
+          ))}
         </div>
 
         <div className="sidebar-section">
