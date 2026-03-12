@@ -185,8 +185,9 @@
   .cal-scroll-wrapper {
     flex: 1; overflow: auto;
   }
-  .cal-scroll-wrapper::-webkit-scrollbar { width: 5px; height: 5px; }
-  .cal-scroll-wrapper::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  .cal-scroll-wrapper::-webkit-scrollbar { width: 5px; height: 10px; }
+  .cal-scroll-wrapper::-webkit-scrollbar-thumb { background: var(--border); border-radius: 5px; }
+  .cal-scroll-wrapper::-webkit-scrollbar-track { background: rgba(0,0,0,0.05); border-radius: 5px; }
   .cal-grid {
     display: grid;
     grid-template-columns: repeat(7, minmax(220px, 1fr));
