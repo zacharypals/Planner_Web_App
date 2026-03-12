@@ -858,7 +858,7 @@ async function pushEventToCalendar(event, dateKey) {
     let detail = '';
     try { const j = await res.clone().json(); detail = j?.error?.message || ''; } catch {}
     console.error('Calendar push failed:', res.status, detail);
-    return null;
+    throw new Error(`Calendar error ${res.status}${detail ? ': ' + detail : ''}`);
   }
   const created = await res.json();
   console.log('Calendar event created:', created.id);
@@ -1345,7 +1345,7 @@ function TaskCard({ task, onUpdate, onDelete, onDragStart, onDragOver, onDrop, i
           {task.isEvent && (
             <div style={{display:'flex',alignItems:'center',gap:6,paddingTop:4}}>
               <span style={{fontSize:10,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace"}}>Time:</span>
-              <input type="time" className="task-time-input"
+              <input type="time" className="task-time-input" step="300"
                 value={task.eventTime||''}
                 onChange={e=>onUpdate({eventTime:e.target.value})}
                 onClick={e=>e.stopPropagation()} />
@@ -1867,9 +1867,10 @@ function MonthlyCalendar({ weekData, setWeekData }) {
           } else {
             console.warn('Calendar push returned no ID — event may not have synced');
           }
-        }).catch(e => console.error('Calendar push error:', e));
-      } else {
-        console.log('Not signed in — skipping calendar push');
+        }).catch(e => {
+          console.error('Calendar push error:', e);
+          alert('Event saved locally, but could not push to Google Calendar:\n' + (e?.message || 'Unknown error') + '\n\nTry signing out and back in to refresh your Google permissions.');
+        });
       }
     }
     setShowEventModal(false);
@@ -1946,9 +1947,12 @@ function MonthlyCalendar({ weekData, setWeekData }) {
                 {ev.eventTime && <span className="month-event-time"> {ev.eventTime}</span>}
               </div>
               <div className="month-event-title">{ev.title||<em style={{opacity:0.5}}>Untitled</em>}</div>
-              <button className="delete-item-btn" style={{marginLeft:'auto',opacity:0,flexShrink:0}}
-                onMouseEnter={e=>e.target.style.opacity=1} onMouseLeave={e=>e.target.style.opacity=0}
-                onClick={e=>{e.stopPropagation();deleteEvent(ev);}}>✕</button>
+              <button className="delete-item-btn" style={{marginLeft:'auto',flexShrink:0,opacity:0.4,fontSize:13,color:'var(--red)'}}
+                onMouseEnter={e=>e.currentTarget.style.opacity=1} onMouseLeave={e=>e.currentTarget.style.opacity=0.4}
+                onClick={e=>{
+                  e.stopPropagation();
+                  if(window.confirm(`Delete "${ev.title||'Untitled'}"?`)) deleteEvent(ev);
+                }}>✕</button>
             </div>
           ))}
         </div>
@@ -2004,7 +2008,7 @@ function MonthlyCalendar({ weekData, setWeekData }) {
               autoFocus />
             <div style={{display:'flex',alignItems:'center',gap:8,marginTop:8}}>
               <label style={{fontSize:12,color:'var(--ink-faint)'}}>Time:</label>
-              <input type="time" className="task-time-input"
+              <input type="time" className="task-time-input" step="300"
                 value={eventForm.time} onChange={e=>setEventForm(f=>({...f,time:e.target.value}))} />
             </div>
             <textarea className="modal-textarea" placeholder="Details (optional)…"
