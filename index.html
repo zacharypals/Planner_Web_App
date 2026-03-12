@@ -2012,25 +2012,26 @@ function App() {
   const saveTimerRef = useRef(null);
 
   // Load all data from Drive after sign-in
-  async function loadAllFromDrive() {
-    setSaveStatus('saving');
+  async function loadAllFromDrive(silent=false) {
+    if (!silent) setSaveStatus('saving');
     try {
       const { data, fileId } = await loadFromDrive();
       setDriveFileId(fileId);
-      // Merge Drive data into local state — Drive wins for each key present
       ALL_STORAGE_KEYS.forEach(k => {
         if (data[k] !== undefined) {
           try { localStorage.setItem(k, JSON.stringify(data[k])); } catch {}
         }
       });
-      // Reload page state from fresh localStorage
       if (data.weekData) setWeekData(data.weekData);
       if (data.navColor) setNavColor(data.navColor);
       if (data.calHeaderColor) setCalHeaderColor(data.calHeaderColor);
-      setSaveStatus('saved');
-      setTimeout(() => setSaveStatus(''), 2000);
+      if (!silent) {
+        setSaveStatus('saved');
+        setTimeout(() => setSaveStatus(''), 2000);
+      }
     } catch (e) {
-      setSaveStatus('error');
+      // Only show error if user explicitly triggered sign-in
+      if (!silent) setSaveStatus('error:Could not load Drive data');
     }
   }
 
@@ -2048,8 +2049,8 @@ function App() {
         await saveToDrive(fid, allData);
         setSaveStatus('saved');
         setTimeout(() => setSaveStatus(''), 2000);
-      } catch {
-        setSaveStatus('error');
+      } catch (e) {
+        setSaveStatus('error:Drive save failed — check connection');
       }
     }, 1500);
   }, []);
@@ -2076,7 +2077,7 @@ function App() {
             const user = await res.json();
             setAuthUser({ name: user.name, email: user.email, picture: user.picture });
           } catch {}
-          await loadAllFromDrive();
+          await loadAllFromDrive(true);
         },
         () => {} // silent failure — just stay signed out, user can click manually
       );
@@ -2097,7 +2098,7 @@ function App() {
         } catch {}
         await loadAllFromDrive();
       },
-      (err) => { console.error('Auth error:', err); setSaveStatus('error'); }
+      (err) => { console.error('Auth error:', err); }
     );
   }
 
@@ -2126,9 +2127,11 @@ function App() {
     setSyncing(false);
   }
 
+  const isError = saveStatus.startsWith('error');
+  const errorMsg = isError ? saveStatus.split(':')[1] || 'Something went wrong' : '';
   const saveLabel = saveStatus === 'saving' ? '↑ Saving…'
-    : saveStatus === 'saved' ? '✓ Saved'
-    : saveStatus === 'error' ? '✗ Error'
+    : saveStatus === 'saved' ? '✓ Saved to Drive'
+    : isError ? `✗ ${errorMsg}`
     : '';
 
   return (
@@ -2144,7 +2147,7 @@ function App() {
           <button className={`nav-tab ${page==='habit'?'active':''}`} onClick={()=>setPage('habit')}>Habit Tracker</button>
         </div>
         <div className="auth-area">
-          {saveLabel && <span className={`save-status ${saveStatus}`}>{saveLabel}</span>}
+          {saveLabel && <span className={`save-status ${isError ? "error" : saveStatus}`}>{saveLabel}</span>}
           {authUser ? (
             <>
               <button className="auth-btn sync" onClick={handleSyncCalendar} disabled={syncing} title="Pull new events from Google Calendar">
