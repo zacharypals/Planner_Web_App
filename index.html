@@ -1088,48 +1088,38 @@ function WeeklyPlanner({ weekData, setWeekData, onGoToHabit, calHeaderColor, set
     setTasks(dayKey, t => [...t, {id, title:'', details:'', done:false, expanded:false, colorIndex: t.length}]);
   }
   function updateTask(dayKey, id, patch) {
-    // Get current task BEFORE state update for calendar sync decisions
-    const currentTask = getTasks(dayKey).find(t => t.id===id);
-    const mergedTask = currentTask ? {...currentTask, ...patch} : null;
-
-    // State update — pure, no side effects
+    // Pure state update — no calendar sync, safe to call on every keystroke
     setTasks(dayKey, t => t.map(x => x.id===id ? {...x,...patch} : x));
 
-    // Calendar sync — debounced so rapid typing/selection doesn't spam Google API
-    if (mergedTask && getToken()) {
-      const calendarFields = ['title','eventTime','details','isEvent'];
-      const touchedCalField = Object.keys(patch).some(k => calendarFields.includes(k));
-      if (touchedCalField) {
-        if (mergedTask.isEvent) {
-          if (mergedTask.gcalId) {
-            // Debounce updates — wait 1.5s after last change before syncing
-            debouncedCalSync(id, () => {
-              // Re-read task from latest state to get most up-to-date values
-              const latestTask = getTasksFresh(weekKey, dayKey).find(t => t.id===id);
-              if (latestTask && latestTask.gcalId) {
-                updateEventInCalendar(latestTask.gcalId, latestTask, dayKey)
-                  .catch(e => console.error('Calendar update failed:', e));
-              }
-            });
-          } else {
-            // New event push — also debounced so partial titles aren't pushed
-            debouncedCalSync(id, () => {
-              const latestTask = getTasksFresh(weekKey, dayKey).find(t => t.id===id);
-              if (latestTask && latestTask.isEvent && !latestTask.gcalId) {
-                pushEventToCalendar(latestTask, dayKey)
-                  .then(gcalId => {
-                    if (gcalId) setTasks(dayKey, ts => ts.map(x => x.id===id ? {...x, gcalId} : x));
-                  })
-                  .catch(e => console.error('Calendar push failed:', e));
-              }
-            });
-          }
-        } else if (patch.isEvent === false && currentTask?.gcalId) {
-          // Immediate — toggled off, remove from calendar right away
-          deleteEventFromCalendar(currentTask.gcalId).catch(()=>{});
-          setTasks(dayKey, ts => ts.map(x => x.id===id ? {...x, gcalId: null} : x));
-        }
+    // For non-text fields (isEvent toggle, eventTime), sync immediately with debounce
+    const immediateFields = ['eventTime', 'isEvent'];
+    if (Object.keys(patch).some(k => immediateFields.includes(k))) {
+      syncTaskToCalendar(dayKey, id, patch);
+    }
+    // title and details are synced on blur via onBlurSync — not here
+  }
+
+  function syncTaskToCalendar(dayKey, id, patch = {}) {
+    // Always reads fresh state from ref so we get the latest title/details/time
+    const task = getTasksFresh(weekKey, dayKey).find(t => t.id===id);
+    if (!task || !getToken()) return;
+
+    if (task.isEvent) {
+      if (task.gcalId) {
+        updateEventInCalendar(task.gcalId, task, dayKey)
+          .catch(e => console.error('Calendar update failed:', e));
+      } else {
+        // No gcalId yet — push as new event
+        pushEventToCalendar(task, dayKey)
+          .then(gcalId => {
+            if (gcalId) setTasks(dayKey, ts => ts.map(x => x.id===id ? {...x, gcalId} : x));
+          })
+          .catch(e => console.error('Calendar push failed:', e));
       }
+    } else if (patch.isEvent === false && task.gcalId) {
+      // Toggled from event to task — remove from calendar
+      deleteEventFromCalendar(task.gcalId).catch(()=>{});
+      setTasks(dayKey, ts => ts.map(x => x.id===id ? {...x, gcalId: null} : x));
     }
   }
   function deleteTask(dayKey, id) {
@@ -1295,6 +1285,7 @@ function WeeklyPlanner({ weekData, setWeekData, onGoToHabit, calHeaderColor, set
                     {tasks.map(task=>(
                       <TaskCard key={task.id} task={task}
                         onUpdate={p=>updateTask(dk,task.id,p)}
+                        onBlurSync={()=>syncTaskToCalendar(dk,task.id)}
                         onDelete={()=>deleteTask(dk,task.id)}
                         isDragOver={dragOver?.dayKey===dk && dragOver?.id===task.id}
                         onDragStart={()=>setDragging({dayKey:dk, id:task.id})}
@@ -1362,7 +1353,7 @@ const EVENT_COLORS = [
   '#ffe4e6', // blush
   '#ecfdf5', // aqua mist
 ];
-function TaskCard({ task, onUpdate, onDelete, onDragStart, onDragOver, onDrop, isDragOver }) {
+function TaskCard({ task, onUpdate, onBlurSync, onDelete, onDragStart, onDragOver, onDrop, isDragOver }) {
   const titleRef = useRef();
   const textareaRef = useRef();
   const [confirming, setConfirming] = useState(false);
@@ -1415,6 +1406,7 @@ function TaskCard({ task, onUpdate, onDelete, onDragStart, onDragOver, onDrop, i
         <input ref={titleRef} className="task-title-input"
           placeholder={task.isEvent ? 'Event…' : 'Task…'}
           value={task.title} onChange={e=>onUpdate({title:e.target.value})}
+          onBlur={()=>onBlurSync && task.isEvent && onBlurSync()}
           onClick={e=>e.stopPropagation()} />
         <button className="task-expand-btn" onClick={()=>onUpdate({expanded:!task.expanded})}>
           {task.expanded ? '▲' : '▼'}
@@ -1424,6 +1416,7 @@ function TaskCard({ task, onUpdate, onDelete, onDragStart, onDragOver, onDrop, i
         <div className="task-details">
           <textarea ref={textareaRef} className="task-details-input" placeholder="Details…"
             value={task.details||''} onChange={e=>onUpdate({details:e.target.value})}
+            onBlur={()=>onBlurSync && task.isEvent && onBlurSync()}
             rows={2} />
           {task.isEvent && (
             <div style={{display:'flex',alignItems:'center',gap:6,paddingTop:4}} onClick={e=>e.stopPropagation()}>
