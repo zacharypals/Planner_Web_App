@@ -724,24 +724,22 @@ function requestToken(onSuccess, onError) {
   }, 1000);
 }
 
-// Silent re-auth via hidden iframe — browsers don't block iframe creation
-function requestTokenSilent(onSuccess, onError) {
-  const hint = getSavedEmail();
-  if (!hint) { onError('no_hint'); return; }
+// Silent re-auth via hidden iframe
+// prompt=none works when app is Google-verified; falls back to prompt='' for test mode
+function silentIframeAuth(hint, prompt, onSuccess, onError) {
   const redirectUri = 'https://zacharypals.github.io/Planner_Web_App/oauth.html';
   const params = new URLSearchParams({
     client_id: CLIENT_ID,
     redirect_uri: redirectUri,
     response_type: 'token',
     scope: SCOPES,
-    prompt: 'none',
     login_hint: hint,
     include_granted_scopes: 'true',
   });
+  if (prompt) params.set('prompt', prompt);
   const authUrl = 'https://accounts.google.com/o/oauth2/v2/auth?' + params.toString();
   const iframe = document.createElement('iframe');
-  iframe.style.cssText = 'position:fixed;top:-1000px;left:-1000px;width:1px;height:1px;opacity:0;pointer-events:none;';
-  iframe.src = authUrl;
+  iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;border:none;';
   let done = false;
   const cleanup = () => { try { document.body.removeChild(iframe); } catch {} };
   function onMessage(e) {
@@ -757,16 +755,25 @@ function requestTokenSilent(onSuccess, onError) {
     onSuccess(e.data);
   }
   window.addEventListener('message', onMessage);
+  iframe.src = authUrl;
   document.body.appendChild(iframe);
-  // Timeout after 8s — if Google needs interaction, silent auth can't complete
   setTimeout(() => {
-    if (!done) {
-      done = true;
-      window.removeEventListener('message', onMessage);
-      cleanup();
-      onError('timeout');
-    }
-  }, 8000);
+    if (!done) { done = true; window.removeEventListener('message', onMessage); cleanup(); onError('timeout'); }
+  }, 10000);
+}
+
+function requestTokenSilent(onSuccess, onError) {
+  const hint = getSavedEmail();
+  if (!hint) { onError('no_hint'); return; }
+  // Try prompt=none first (works for verified apps & active sessions)
+  silentIframeAuth(hint, 'none', onSuccess, (err) => {
+    console.log('Silent auth prompt=none failed:', err, '— trying without prompt');
+    // Fallback: no explicit prompt — Google may grant silently if session is fresh
+    silentIframeAuth(hint, '', onSuccess, (err2) => {
+      console.log('Silent auth fallback failed:', err2);
+      onError(err2);
+    });
+  });
 }
 
 // ── DRIVE HELPERS ──
@@ -830,7 +837,7 @@ async function saveToDrive(fileId, allData) {
 // ── CALENDAR HELPERS ──
 async function pushEventToCalendar(event, dateKey) {
   const token = getToken();
-  if (!token) return null;
+  if (!token) throw new Error('Not signed in to Google — please sign in and try again');
   const dateObj = new Date(dateKey + 'T00:00:00');
   const dateStr = dateKey; // YYYY-MM-DD
   let start, end;
@@ -935,52 +942,67 @@ async function pullNewFromCalendar(weekData) {
     throw new Error(`Calendar error ${res.status}${detail ? ': ' + detail : ''}`);
   }
   const data = await res.json();
-  console.log('Calendar pull: fetched', data.items?.length || 0, 'events');
   const gcalEvents = data.items || [];
+  console.log('Calendar pull: fetched', gcalEvents.length, 'events');
 
-  // Collect all existing planner event IDs and gcalIds
+  // Build a map of gcalId → local task for quick lookup
+  const gcalIdToTask = {}; // gcalId → {task, wk, dayKey}
   const existingPlannerIds = new Set();
-  const existingGcalIds = new Set();
-  Object.values(weekData).forEach(wd => {
-    Object.values(wd.tasks || {}).forEach(tasks => {
+  Object.entries(weekData).forEach(([wk, wd]) => {
+    Object.entries(wd.tasks || {}).forEach(([dayKey, tasks]) => {
       tasks.filter(t => t.isEvent).forEach(t => {
         existingPlannerIds.add(t.id);
-        if (t.gcalId) existingGcalIds.add(t.gcalId);
+        if (t.gcalId) gcalIdToTask[t.gcalId] = {task: t, wk, dayKey};
       });
     });
   });
 
-  // Only add events not already in the app
-  const toAdd = gcalEvents.filter(ev => {
-    if (existingGcalIds.has(ev.id)) return false;
-    const plannerId = ev.extendedProperties?.private?.plannerId;
-    if (plannerId && existingPlannerIds.has(plannerId)) return false;
-    return true;
+  const newWeekData = JSON.parse(JSON.stringify(weekData));
+  let added = 0, updated = 0;
+
+  gcalEvents.forEach(ev => {
+    const newDateStr = ev.start?.date || ev.start?.dateTime?.slice(0, 10);
+    if (!newDateStr) return;
+    const newTimeStr = ev.start?.dateTime ? ev.start.dateTime.slice(11, 16) : '';
+
+    if (gcalIdToTask[ev.id]) {
+      // Event exists in app — update title, details, time, and date if changed
+      const {task, wk, dayKey} = gcalIdToTask[ev.id];
+      const changed = task.title !== (ev.summary||'') ||
+        task.details !== (ev.description||'') ||
+        task.eventTime !== newTimeStr ||
+        dayKey !== newDateStr;
+      if (!changed) return;
+      updated++;
+      // Remove from old location
+      newWeekData[wk].tasks[dayKey] = (newWeekData[wk].tasks[dayKey] || []).filter(t => t.id !== task.id);
+      // Insert at new location
+      const newDateObj = new Date(newDateStr + 'T00:00:00');
+      const newWeekKey = fmt(getWeekStart(newDateObj));
+      if (!newWeekData[newWeekKey]) newWeekData[newWeekKey] = {proverb:'',toCreate:[],weekGoals:[],people:[],beWord:'',proud:'',story:'',tasks:{}};
+      if (!newWeekData[newWeekKey].tasks[newDateStr]) newWeekData[newWeekKey].tasks[newDateStr] = [];
+      newWeekData[newWeekKey].tasks[newDateStr].push({
+        ...task, title: ev.summary||'', details: ev.description||'', eventTime: newTimeStr,
+      });
+    } else {
+      // Net new event — add it
+      const plannerId = ev.extendedProperties?.private?.plannerId;
+      if (plannerId && existingPlannerIds.has(plannerId)) return; // already tracked
+      added++;
+      const newDateObj = new Date(newDateStr + 'T00:00:00');
+      const newWeekKey = fmt(getWeekStart(newDateObj));
+      if (!newWeekData[newWeekKey]) newWeekData[newWeekKey] = {proverb:'',toCreate:[],weekGoals:[],people:[],beWord:'',proud:'',story:'',tasks:{}};
+      if (!newWeekData[newWeekKey].tasks[newDateStr]) newWeekData[newWeekKey].tasks[newDateStr] = [];
+      newWeekData[newWeekKey].tasks[newDateStr].push({
+        id: 'gcal_' + ev.id, gcalId: ev.id,
+        title: ev.summary||'', details: ev.description||'',
+        done: false, expanded: false, colorIndex: 3,
+        isEvent: true, eventTime: newTimeStr,
+      });
+    }
   });
 
-  if (toAdd.length === 0) return { added: 0, newWeekData: weekData };
-
-  const newWeekData = JSON.parse(JSON.stringify(weekData)); // deep clone
-  toAdd.forEach(ev => {
-    const dateStr = ev.start?.date || ev.start?.dateTime?.slice(0, 10);
-    if (!dateStr) return;
-    const dateObj = new Date(dateStr + 'T00:00:00');
-    const weekKey = fmt(getWeekStart(dateObj));
-    const cur = newWeekData[weekKey] || { proverb:'', toCreate:[], weekGoals:[], people:[], beWord:'', proud:'', story:'', tasks:{} };
-    const dayTasks = (cur.tasks || {})[dateStr] || [];
-    const timeStr = ev.start?.dateTime ? ev.start.dateTime.slice(11, 16) : '';
-    dayTasks.push({
-      id: 'gcal_' + ev.id,
-      gcalId: ev.id,
-      title: ev.summary || '',
-      details: ev.description || '',
-      done: false, expanded: false, colorIndex: 3,
-      isEvent: true, eventTime: timeStr,
-    });
-    newWeekData[weekKey] = { ...cur, tasks: { ...(cur.tasks || {}), [dateStr]: dayTasks } };
-  });
-
-  return { added: toAdd.length, newWeekData };
+  return { added, updated, newWeekData };
 }
 
 function useStorage(key, init) {
@@ -1345,12 +1367,9 @@ function TaskCard({ task, onUpdate, onDelete, onDragStart, onDragOver, onDrop, i
             value={task.details||''} onChange={e=>onUpdate({details:e.target.value})}
             rows={2} />
           {task.isEvent && (
-            <div style={{display:'flex',alignItems:'center',gap:6,paddingTop:4}}>
+            <div style={{display:'flex',alignItems:'center',gap:6,paddingTop:4}} onClick={e=>e.stopPropagation()}>
               <span style={{fontSize:10,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace"}}>Time:</span>
-              <input type="time" className="task-time-input" step="300"
-                value={task.eventTime||''}
-                onChange={e=>onUpdate({eventTime:e.target.value})}
-                onClick={e=>e.stopPropagation()} />
+              <TimeSelect value={task.eventTime||''} onChange={v=>onUpdate({eventTime:v})} />
             </div>
           )}
           <div style={{display:'flex',alignItems:'center',gap:6,paddingTop:6}}>
@@ -2302,11 +2321,14 @@ function App() {
       const result = await pullNewFromCalendar(weekData);
       if (!result) {
         alert('Calendar sync failed: could not reach Google Calendar.\n\nMake sure:\n1. Google Calendar API is enabled in Cloud Console\n2. You signed in and approved Calendar access on the consent screen\n3. Try signing out and back in');
-      } else if (result.added > 0) {
+      } else if (result.added > 0 || result.updated > 0) {
         setWeekData(result.newWeekData);
-        alert(`✓ Synced ${result.added} new event${result.added === 1 ? '' : 's'} from Google Calendar.`);
+        const parts = [];
+        if (result.added > 0) parts.push(`${result.added} new event${result.added===1?'':'s'} added`);
+        if (result.updated > 0) parts.push(`${result.updated} event${result.updated===1?'':'s'} updated`);
+        alert('✓ ' + parts.join(', ') + ' from Google Calendar.');
       } else {
-        alert('✓ All caught up — no new events to import from Google Calendar.');
+        alert('✓ All caught up — no changes to import from Google Calendar.');
       }
     } catch (e) {
       const msg = e?.message || 'Unknown error';
