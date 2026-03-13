@@ -9,7 +9,7 @@
 <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-<script src="https://accounts.google.com/gsi/client" async defer></script>
+
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -652,31 +652,35 @@ function isSameDay(a,b) { return fmt(a)===fmt(b); }
 // ─────────────────────────────────────────────
 // GOOGLE AUTH + DRIVE + CALENDAR ENGINE
 // ─────────────────────────────────────────────
-const CLIENT_ID = '1050376914317-haudi6cagd8c3s3bmooc85pb5mlj309b.apps.googleusercontent.com';
+const CLIENT_ID = '1050376914317-d9al0irmqsmhkq334rffqg30mbtlguuf.apps.googleusercontent.com';
 const SCOPES = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/calendar';
 const DRIVE_FILE_NAME = 'planner-data.json';
+const REDIRECT_URI = 'https://zacharypals.github.io/Planner_Web_App/oauth.html';
+// !! Update this after deploying your Cloudflare Worker !!
+const WORKER_URL = 'https://plannertracker.workers.dev.';
 
-// Token in sessionStorage — survives page refresh, cleared when tab closes
 let _loadingFromDrive = false;
 
+// Token in localStorage — persists across tab closes, auto-expires after ~1hr
 function getToken() {
   try {
-    const t = sessionStorage.getItem('plannerToken');
-    const exp = parseInt(sessionStorage.getItem('plannerTokenExp') || '0');
+    const t = localStorage.getItem('plannerToken');
+    const exp = parseInt(localStorage.getItem('plannerTokenExp') || '0');
     if (t && Date.now() < exp) return t;
+    if (t) { localStorage.removeItem('plannerToken'); localStorage.removeItem('plannerTokenExp'); }
   } catch {}
   return null;
 }
 function setToken(token, expiresIn) {
   try {
-    sessionStorage.setItem('plannerToken', token);
-    sessionStorage.setItem('plannerTokenExp', String(Date.now() + ((expiresIn||3600) - 60) * 1000));
+    localStorage.setItem('plannerToken', token);
+    // 5min buffer so we refresh before it actually expires
+    localStorage.setItem('plannerTokenExp', String(Date.now() + ((expiresIn||3600) - 300) * 1000));
   } catch {}
 }
 function clearToken() {
-  try { sessionStorage.removeItem('plannerToken'); sessionStorage.removeItem('plannerTokenExp'); } catch {}
+  try { localStorage.removeItem('plannerToken'); localStorage.removeItem('plannerTokenExp'); } catch {}
 }
-
 function getSavedEmail() {
   try { return localStorage.getItem('plannerAuthEmail') || ''; } catch { return ''; }
 }
@@ -687,102 +691,70 @@ function clearEmail() {
   try { localStorage.removeItem('plannerAuthEmail'); } catch {}
 }
 
-let _tokenClient = null;
+// ── OAuth2 Authorization Code Flow ──
+// Opens a popup → Google redirects to oauth.html with ?code=...
+// oauth.html posts the code back → we send it to the Worker → get access+refresh tokens
 
-function buildTokenClient(hint, prompt, onSuccess, onError) {
-  if (!window.google) { onError('Google API not loaded'); return; }
-  _tokenClient = window.google.accounts.oauth2.initTokenClient({
-    client_id: CLIENT_ID,
-    scope: SCOPES,
-    hint: hint || undefined,
-    prompt: prompt,
-    callback: (resp) => {
-      if (resp.error) { onError(resp.error); return; }
-      setToken(resp.access_token, resp.expires_in || 3600);
-      onSuccess(resp);
-    },
-  });
-  _tokenClient.requestAccessToken();
-}
-
-// Manual sign-in: open a real OAuth popup that always shows account chooser
 function requestToken(onSuccess, onError) {
-  const redirectUri = 'https://zacharypals.github.io/Planner_Web_App/oauth.html';
   const params = new URLSearchParams({
     client_id: CLIENT_ID,
-    redirect_uri: redirectUri,
-    response_type: 'token',
-    scope: SCOPES,
-    prompt: 'select_account consent',
+    redirect_uri: REDIRECT_URI,
+    response_type: 'code',
+    scope: SCOPES + ' profile email',
+    access_type: 'offline',
+    prompt: 'select_account consent', // force consent to always get refresh_token
     include_granted_scopes: 'true',
   });
   const authUrl = 'https://accounts.google.com/o/oauth2/v2/auth?' + params.toString();
   const popup = window.open(authUrl, 'googleAuth', 'width=500,height=620,top=100,left=200');
   if (!popup) { onError('Popup blocked'); return; }
-  // Listen for the token posted back from the redirect page
-  function onMessage(e) {
-    if (e.origin !== 'https://zacharypals.github.io') return;
-    if (!e.data?.access_token) return;
-    window.removeEventListener('message', onMessage);
-    setToken(e.data.access_token, e.data.expires_in || 3600);
-    onSuccess(e.data);
-  }
-  window.addEventListener('message', onMessage);
-  // Clean up if popup closed without completing
-  const check = setInterval(() => {
-    if (popup.closed) { clearInterval(check); window.removeEventListener('message', onMessage); }
-  }, 1000);
-}
-
-// Silent re-auth via hidden iframe
-// prompt=none works when app is Google-verified; falls back to prompt='' for test mode
-function silentIframeAuth(hint, prompt, onSuccess, onError) {
-  const redirectUri = 'https://zacharypals.github.io/Planner_Web_App/oauth.html';
-  const params = new URLSearchParams({
-    client_id: CLIENT_ID,
-    redirect_uri: redirectUri,
-    response_type: 'token',
-    scope: SCOPES,
-    login_hint: hint,
-    include_granted_scopes: 'true',
-  });
-  if (prompt) params.set('prompt', prompt);
-  const authUrl = 'https://accounts.google.com/o/oauth2/v2/auth?' + params.toString();
-  const iframe = document.createElement('iframe');
-  iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;border:none;';
   let done = false;
-  const cleanup = () => { try { document.body.removeChild(iframe); } catch {} };
   function onMessage(e) {
     if (e.origin !== 'https://zacharypals.github.io') return;
-    if (!e.data?.access_token && !e.data?.error) return;
+    if (!e.data?.code && !e.data?.error) return;
     if (done) return;
     done = true;
     window.removeEventListener('message', onMessage);
-    cleanup();
+    clearInterval(check);
     if (e.data.error) { onError(e.data.error); return; }
-    setToken(e.data.access_token, e.data.expires_in || 3600);
-    onSuccess(e.data);
+    // Exchange code for tokens via Worker
+    fetch(`${WORKER_URL}/exchange`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: e.data.code, redirect_uri: REDIRECT_URI }),
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (data.error) { onError(data.error); return; }
+        setToken(data.access_token, data.expires_in || 3600);
+        onSuccess(data); // data includes email, name, picture
+      })
+      .catch(err => onError(err.message));
   }
   window.addEventListener('message', onMessage);
-  iframe.src = authUrl;
-  document.body.appendChild(iframe);
-  setTimeout(() => {
-    if (!done) { done = true; window.removeEventListener('message', onMessage); cleanup(); onError('timeout'); }
-  }, 10000);
+  const check = setInterval(() => {
+    if (popup.closed) { clearInterval(check); if (!done) { done=true; window.removeEventListener('message', onMessage); } }
+  }, 1000);
 }
 
-function requestTokenSilent(onSuccess, onError) {
-  const hint = getSavedEmail();
-  if (!hint) { onError('no_hint'); return; }
-  // Try prompt=none first (works for verified apps & active sessions)
-  silentIframeAuth(hint, 'none', onSuccess, (err) => {
-    console.log('Silent auth prompt=none failed:', err, '— trying without prompt');
-    // Fallback: no explicit prompt — Google may grant silently if session is fresh
-    silentIframeAuth(hint, '', onSuccess, (err2) => {
-      console.log('Silent auth fallback failed:', err2);
-      onError(err2);
+// Silent refresh via Worker — no popup, no user interaction needed
+async function requestTokenSilent(onSuccess, onError) {
+  const email = getSavedEmail();
+  if (!email) { onError('no_email'); return; }
+  if (WORKER_URL.includes('YOUR_SUBDOMAIN')) { onError('worker_not_configured'); return; }
+  try {
+    const res = await fetch(`${WORKER_URL}/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
     });
-  });
+    const data = await res.json();
+    if (!res.ok || data.error) { onError(data.error || 'refresh_failed'); return; }
+    setToken(data.access_token, data.expires_in || 3600);
+    onSuccess(data);
+  } catch (e) {
+    onError(e.message);
+  }
 }
 
 // ── DRIVE HELPERS ──
@@ -2267,10 +2239,10 @@ function App() {
     scheduleSave(driveFileId);
   }, [weekData, navColor, calHeaderColor, driveFileId]);
 
-  // On mount: restore session from sessionStorage or try silent re-auth
+  // On mount: restore session from localStorage token or silent Worker refresh
   useEffect(() => {
     async function tryRestoreSession() {
-      // Case 1: token still valid in sessionStorage — restore immediately
+      // Case 1: token still valid in localStorage — restore immediately
       if (getToken()) {
         try {
           const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
@@ -2287,19 +2259,15 @@ function App() {
       // Case 2: no valid token — try silent iframe re-auth if we have a hint
       const hint = getSavedEmail();
       if (!hint) return;
+      // Worker-based silent refresh
       requestTokenSilent(
-        async (resp) => {
-          setToken(resp.access_token, resp.expires_in || 3600);
-          try {
-            const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-              headers: { Authorization: `Bearer ${resp.access_token}` }
-            });
-            const user = await res.json();
-            setAuthUser({ name: user.name, email: user.email, picture: user.picture });
-          } catch {}
+        async (data) => {
+          // Silent refresh doesn't return user info — use saved email
+          const email = getSavedEmail();
+          setAuthUser({ name: email, email, picture: null }); // will be updated after Drive load
           await loadAllFromDrive();
         },
-        (err) => console.log('Silent re-auth failed (expected in test mode):', err)
+        (err) => console.log('Silent refresh failed:', err, '— user must sign in manually')
       );
     }
     tryRestoreSession();
@@ -2307,27 +2275,29 @@ function App() {
 
   function handleSignIn() {
     requestToken(
-      async (resp) => {
-        try {
-          const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-            headers: { Authorization: `Bearer ${resp.access_token}` }
-          });
-          const user = await res.json();
-          setAuthUser({ name: user.name, email: user.email, picture: user.picture });
-          saveEmail(user.email); // persist for silent re-auth next visit
-        } catch {}
+      async (data) => {
+        // Worker returns name/email/picture directly from userinfo
+        setAuthUser({ name: data.name||data.email, email: data.email, picture: data.picture||null });
+        saveEmail(data.email);
         await loadAllFromDrive();
       },
-      (err) => { console.error('Auth error:', err); }
+      (err) => { console.error('Auth error:', err); alert('Sign-in failed: ' + err); }
     );
   }
 
   function handleSignOut() {
-    const token = getToken();
+    const email = getSavedEmail();
     clearToken();
     clearEmail();
     setAuthUser(null); setDriveFileId(null); setSaveStatus('');
-    if (window.google && token) try { window.google.accounts.oauth2.revoke(token, () => {}); } catch {}
+    // Tell Worker to delete the stored refresh token
+    if (email && !WORKER_URL.includes('YOUR_SUBDOMAIN')) {
+      fetch(`${WORKER_URL}/revoke`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      }).catch(() => {});
+    }
   }
 
   async function handleSyncCalendar() {
