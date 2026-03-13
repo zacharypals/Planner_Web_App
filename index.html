@@ -873,35 +873,36 @@ async function updateEventInCalendar(gcalId, event, dateKey) {
   if (event.eventTime) {
     const [h, m] = event.eventTime.split(':');
     const endH = String(parseInt(h) + 1).padStart(2, '0');
+    // Explicitly only set dateTime, no date field at all
     start = { dateTime: `${dateStr}T${event.eventTime}:00`, timeZone: tz };
     end   = { dateTime: `${dateStr}T${endH}:${m}:00`, timeZone: tz };
   } else {
     const nextDay = new Date(dateStr + 'T00:00:00'); nextDay.setDate(nextDay.getDate() + 1);
+    // Explicitly only set date, no dateTime field at all
     start = { date: dateStr };
     end   = { date: fmt(nextDay) };
   }
-  // Use PUT (full replace) so switching all-day ↔ timed works correctly
-  // First fetch the existing event to preserve fields we don't manage (attendees, etc.)
-  const getRes = await fetch(
-    `https://www.googleapis.com/calendar/v3/calendars/primary/events/${gcalId}`,
-    { headers: { 'Authorization': `Bearer ${token}` } }
-  );
-  let existing = {};
-  if (getRes.ok) existing = await getRes.json();
+  // Build a clean body — do NOT spread the existing event as it contains
+  // read-only fields (etag, htmlLink, etc.) that cause PUT to fail or be ignored.
+  // Only include fields we actually manage.
   const body = {
-    ...existing,
     summary: event.title || 'Untitled Event',
     description: event.details || '',
-    start, end,
+    start,
+    end,
   };
-  // Remove the opposite time format to avoid Google rejecting mixed date/dateTime
-  if (start.dateTime) { delete body.start?.date; delete body.end?.date; }
-  if (start.date)     { delete body.start?.dateTime; delete body.end?.dateTime; }
-  await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${gcalId}`, {
+  console.log('updateEventInCalendar PUT body:', JSON.stringify({gcalId, start, end, summary: body.summary}));
+  const res = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${gcalId}`, {
     method: 'PUT',
     headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
+  if (!res.ok) {
+    const err = await res.json().catch(()=>({}));
+    console.error('updateEventInCalendar failed:', res.status, err?.error?.message);
+  } else {
+    console.log('updateEventInCalendar succeeded:', res.status);
+  }
 }
 
 async function calendarRequest(url, opts = {}) {
