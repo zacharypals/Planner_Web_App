@@ -662,13 +662,7 @@ const WORKER_URL = 'https://planner-auth.plannertracker.workers.dev';
 let _loadingFromDrive = false;
 // Debounce timers for calendar sync — keyed by task id
 const _calSyncTimers = {};
-function debouncedCalSync(id, fn, delay = 1500) {
-  if (_calSyncTimers[id]) clearTimeout(_calSyncTimers[id]);
-  _calSyncTimers[id] = setTimeout(() => { delete _calSyncTimers[id]; fn(); }, delay);
-}
-// Debounce timers for calendar sync — keyed by task id
-const _calSyncTimers = {};
-function debouncedCalSync(id, fn, delay = 1500) {
+function debouncedCalSync(id, fn, delay = 2500) {
   if (_calSyncTimers[id]) clearTimeout(_calSyncTimers[id]);
   _calSyncTimers[id] = setTimeout(() => { delete _calSyncTimers[id]; fn(); }, delay);
 }
@@ -2314,7 +2308,7 @@ function App() {
         setSaveStatus('ERR:' + msg);
         setTimeout(() => setSaveStatus(''), 8000);
       }
-    }, 1500);
+    }, 2500);
   }, []);
 
   // Watch for localStorage changes and trigger Drive save
