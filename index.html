@@ -656,13 +656,25 @@ const CLIENT_ID = '1050376914317-haudi6cagd8c3s3bmooc85pb5mlj309b.apps.googleuse
 const SCOPES = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/calendar';
 const DRIVE_FILE_NAME = 'planner-data.json';
 
-// Token stored in memory; email hint persisted for silent re-auth
-let _accessToken = null;
-let _tokenExpiry = 0;
+// Token in sessionStorage — survives page refresh, cleared when tab closes
+let _loadingFromDrive = false;
 
 function getToken() {
-  if (_accessToken && Date.now() < _tokenExpiry) return _accessToken;
+  try {
+    const t = sessionStorage.getItem('plannerToken');
+    const exp = parseInt(sessionStorage.getItem('plannerTokenExp') || '0');
+    if (t && Date.now() < exp) return t;
+  } catch {}
   return null;
+}
+function setToken(token, expiresIn) {
+  try {
+    sessionStorage.setItem('plannerToken', token);
+    sessionStorage.setItem('plannerTokenExp', String(Date.now() + ((expiresIn||3600) - 60) * 1000));
+  } catch {}
+}
+function clearToken() {
+  try { sessionStorage.removeItem('plannerToken'); sessionStorage.removeItem('plannerTokenExp'); } catch {}
 }
 
 function getSavedEmail() {
@@ -686,8 +698,7 @@ function buildTokenClient(hint, prompt, onSuccess, onError) {
     prompt: prompt,
     callback: (resp) => {
       if (resp.error) { onError(resp.error); return; }
-      _accessToken = resp.access_token;
-      _tokenExpiry = Date.now() + (resp.expires_in - 60) * 1000;
+      setToken(resp.access_token, resp.expires_in || 3600);
       onSuccess(resp);
     },
   });
@@ -713,8 +724,7 @@ function requestToken(onSuccess, onError) {
     if (e.origin !== 'https://zacharypals.github.io') return;
     if (!e.data?.access_token) return;
     window.removeEventListener('message', onMessage);
-    _accessToken = e.data.access_token;
-    _tokenExpiry = Date.now() + ((e.data.expires_in || 3600) - 60) * 1000;
+    setToken(e.data.access_token, e.data.expires_in || 3600);
     onSuccess(e.data);
   }
   window.addEventListener('message', onMessage);
@@ -750,8 +760,7 @@ function silentIframeAuth(hint, prompt, onSuccess, onError) {
     window.removeEventListener('message', onMessage);
     cleanup();
     if (e.data.error) { onError(e.data.error); return; }
-    _accessToken = e.data.access_token;
-    _tokenExpiry = Date.now() + ((e.data.expires_in || 3600) - 60) * 1000;
+    setToken(e.data.access_token, e.data.expires_in || 3600);
     onSuccess(e.data);
   }
   window.addEventListener('message', onMessage);
@@ -2206,23 +2215,23 @@ function App() {
 
   // Load all data from Drive after sign-in
   async function loadAllFromDrive() {
+    _loadingFromDrive = true;
     setSaveStatus('saving');
     try {
       const { data, fileId } = await loadFromDrive();
-      setDriveFileId(fileId);
-      // Merge Drive data into local state — Drive wins for each key present
       ALL_STORAGE_KEYS.forEach(k => {
         if (data[k] !== undefined) {
           try { localStorage.setItem(k, JSON.stringify(data[k])); } catch {}
         }
       });
-      // Reload page state from fresh localStorage
       if (data.weekData) setWeekData(data.weekData);
       if (data.navColor) setNavColor(data.navColor);
       if (data.calHeaderColor) setCalHeaderColor(data.calHeaderColor);
+      setDriveFileId(fileId); // set last to arm the save effect
       setSaveStatus('saved');
-      setTimeout(() => setSaveStatus(''), 2000);
+      setTimeout(() => { setSaveStatus(''); _loadingFromDrive = false; }, 2000);
     } catch (e) {
+      _loadingFromDrive = false;
       const msg = e?.message || 'Unknown error';
       console.error('Drive load failed:', msg);
       setSaveStatus('ERR:' + msg);
@@ -2232,7 +2241,7 @@ function App() {
 
   // Debounced save to Drive whenever data changes
   const scheduleSave = useCallback((fid) => {
-    if (!fid) return;
+    if (!fid || _loadingFromDrive) return;
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     setSaveStatus('saving');
     saveTimerRef.current = setTimeout(async () => {
@@ -2258,19 +2267,29 @@ function App() {
     scheduleSave(driveFileId);
   }, [weekData, navColor, calHeaderColor, driveFileId]);
 
-  // Silent re-auth on mount if we have a stored email hint
+  // On mount: restore session from sessionStorage or try silent re-auth
   useEffect(() => {
-    const hint = getSavedEmail();
-    if (!hint) return;
-    // Wait for Google GSI to load
-    const tryAuth = (attempts = 0) => {
-      if (!window.google?.accounts?.oauth2) {
-        // GSI not loaded yet — retry up to 10 times (5 seconds total)
-        if (attempts < 10) setTimeout(() => tryAuth(attempts + 1), 500);
-        return;
+    async function tryRestoreSession() {
+      // Case 1: token still valid in sessionStorage — restore immediately
+      if (getToken()) {
+        try {
+          const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+            headers: { Authorization: `Bearer ${getToken()}` }
+          });
+          const user = await res.json();
+          if (user.email) {
+            setAuthUser({ name: user.name, email: user.email, picture: user.picture });
+            await loadAllFromDrive();
+            return;
+          }
+        } catch {}
       }
+      // Case 2: no valid token — try silent iframe re-auth if we have a hint
+      const hint = getSavedEmail();
+      if (!hint) return;
       requestTokenSilent(
         async (resp) => {
+          setToken(resp.access_token, resp.expires_in || 3600);
           try {
             const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
               headers: { Authorization: `Bearer ${resp.access_token}` }
@@ -2280,13 +2299,10 @@ function App() {
           } catch {}
           await loadAllFromDrive();
         },
-        (err) => {
-          console.log('Silent re-auth failed:', err);
-          // Silent failure — user stays signed out and can click manually
-        }
+        (err) => console.log('Silent re-auth failed (expected in test mode):', err)
       );
-    };
-    setTimeout(() => tryAuth(0), 1000);
+    }
+    tryRestoreSession();
   }, []);
 
   function handleSignIn() {
@@ -2302,16 +2318,16 @@ function App() {
         } catch {}
         await loadAllFromDrive();
       },
-      (err) => { console.error('Auth error:', err); setSaveStatus('error'); }
+      (err) => { console.error('Auth error:', err); }
     );
   }
 
   function handleSignOut() {
-    const token = _accessToken;
-    _accessToken = null; _tokenExpiry = 0;
+    const token = getToken();
+    clearToken();
     clearEmail();
     setAuthUser(null); setDriveFileId(null); setSaveStatus('');
-    if (window.google && token) window.google.accounts.oauth2.revoke(token, () => {});
+    if (window.google && token) try { window.google.accounts.oauth2.revoke(token, () => {}); } catch {}
   }
 
   async function handleSyncCalendar() {
