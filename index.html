@@ -1059,29 +1059,40 @@ function WeeklyPlanner({ weekData, setWeekData, onGoToHabit, calHeaderColor, set
     setTasks(dayKey, t => [...t, {id, title:'', details:'', done:false, expanded:false, colorIndex: t.length}]);
   }
   function updateTask(dayKey, id, patch) {
-    setTasks(dayKey, t => {
-      const updated = t.map(x => x.id===id ? {...x,...patch} : x);
-      const task = updated.find(x => x.id===id);
-      if (task && getToken()) {
-        const calendarFields = ['title','eventTime','details','isEvent'];
-        const touchedCalField = Object.keys(patch).some(k => calendarFields.includes(k));
-        if (touchedCalField) {
-          if (task.isEvent) {
-            if (task.gcalId) {
-              updateEventInCalendar(task.gcalId, task, dayKey).catch(e => console.error('Calendar update failed:', e));
-            } else {
-              pushEventToCalendar(task, dayKey).then(gcalId => {
+    // Get current task BEFORE state update for calendar sync decisions
+    const currentTask = getTasks(dayKey).find(t => t.id===id);
+    const mergedTask = currentTask ? {...currentTask, ...patch} : null;
+
+    // State update — pure, no side effects
+    setTasks(dayKey, t => t.map(x => x.id===id ? {...x,...patch} : x));
+
+    // Calendar sync — outside state updater so it runs exactly once
+    if (mergedTask && getToken()) {
+      const calendarFields = ['title','eventTime','details','isEvent'];
+      const touchedCalField = Object.keys(patch).some(k => calendarFields.includes(k));
+      console.log('updateTask:', {dayKey, id, patch, isEvent: mergedTask.isEvent, gcalId: mergedTask.gcalId, touchedCalField, hasToken: !!getToken()});
+      if (touchedCalField) {
+        if (mergedTask.isEvent) {
+          if (mergedTask.gcalId) {
+            console.log('Calling updateEventInCalendar for gcalId:', mergedTask.gcalId);
+            updateEventInCalendar(mergedTask.gcalId, mergedTask, dayKey)
+              .catch(e => console.error('Calendar update failed:', e));
+          } else {
+            console.log('Calling pushEventToCalendar — no gcalId yet');
+            pushEventToCalendar(mergedTask, dayKey)
+              .then(gcalId => {
+                console.log('Push succeeded, gcalId:', gcalId);
                 if (gcalId) setTasks(dayKey, ts => ts.map(x => x.id===id ? {...x, gcalId} : x));
-              }).catch(e => console.error('Calendar push failed:', e));
-            }
-          } else if (patch.isEvent === false && task.gcalId) {
-            deleteEventFromCalendar(task.gcalId).catch(()=>{});
-            setTasks(dayKey, ts => ts.map(x => x.id===id ? {...x, gcalId: null} : x));
+              })
+              .catch(e => console.error('Calendar push failed:', e));
           }
+        } else if (patch.isEvent === false && currentTask?.gcalId) {
+          console.log('Deleting from calendar — toggled to task');
+          deleteEventFromCalendar(currentTask.gcalId).catch(()=>{});
+          setTasks(dayKey, ts => ts.map(x => x.id===id ? {...x, gcalId: null} : x));
         }
       }
-      return updated;
-    });
+    }
   }
   function deleteTask(dayKey, id) {
     const task = getTasks(dayKey).find(t => t.id===id);
