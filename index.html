@@ -660,6 +660,18 @@ const REDIRECT_URI = 'https://zacharypals.github.io/Planner_Web_App/oauth.html';
 const WORKER_URL = 'https://planner-auth.plannertracker.workers.dev';
 
 let _loadingFromDrive = false;
+// Debounce timers for calendar sync — keyed by task id
+const _calSyncTimers = {};
+function debouncedCalSync(id, fn, delay = 1500) {
+  if (_calSyncTimers[id]) clearTimeout(_calSyncTimers[id]);
+  _calSyncTimers[id] = setTimeout(() => { delete _calSyncTimers[id]; fn(); }, delay);
+}
+// Debounce timers for calendar sync — keyed by task id
+const _calSyncTimers = {};
+function debouncedCalSync(id, fn, delay = 1500) {
+  if (_calSyncTimers[id]) clearTimeout(_calSyncTimers[id]);
+  _calSyncTimers[id] = setTimeout(() => { delete _calSyncTimers[id]; fn(); }, delay);
+}
 
 // Token in localStorage — persists across tab closes, auto-expires after ~1hr
 function getToken() {
@@ -1048,6 +1060,9 @@ function WeeklyPlanner({ weekData, setWeekData, onGoToHabit, calHeaderColor, set
   const today = new Date(); today.setHours(0,0,0,0);
   const [weekStart, setWeekStart] = useState(getWeekStart(today));
   const weekKey = fmt(weekStart);
+  // Ref always holds latest weekData so debounced callbacks read fresh state
+  const weekDataRef = useRef(weekData);
+  useEffect(() => { weekDataRef.current = weekData; }, [weekData]);
 
   // Per-week data — now uses shared weekData prop
 
@@ -1063,6 +1078,10 @@ function WeeklyPlanner({ weekData, setWeekData, onGoToHabit, calHeaderColor, set
 
   // Tasks: { [dayKey]: [{id, title, details, done, color, expanded, order}] }
   function getTasks(dayKey) { return (wd.tasks||{})[dayKey] || []; }
+  // Reads from ref — safe to call from debounced callbacks where closure may be stale
+  function getTasksFresh(wk, dayKey) {
+    return ((weekDataRef.current[wk]||{}).tasks||{})[dayKey] || [];
+  }
   function setTasks(dayKey, fn) {
     setWD(w => {
       const current = (w.tasks||{})[dayKey] || [];
@@ -1082,28 +1101,37 @@ function WeeklyPlanner({ weekData, setWeekData, onGoToHabit, calHeaderColor, set
     // State update — pure, no side effects
     setTasks(dayKey, t => t.map(x => x.id===id ? {...x,...patch} : x));
 
-    // Calendar sync — outside state updater so it runs exactly once
+    // Calendar sync — debounced so rapid typing/selection doesn't spam Google API
     if (mergedTask && getToken()) {
       const calendarFields = ['title','eventTime','details','isEvent'];
       const touchedCalField = Object.keys(patch).some(k => calendarFields.includes(k));
-      console.log('updateTask:', {dayKey, id, patch, isEvent: mergedTask.isEvent, gcalId: mergedTask.gcalId, touchedCalField, hasToken: !!getToken()});
       if (touchedCalField) {
         if (mergedTask.isEvent) {
           if (mergedTask.gcalId) {
-            console.log('Calling updateEventInCalendar for gcalId:', mergedTask.gcalId);
-            updateEventInCalendar(mergedTask.gcalId, mergedTask, dayKey)
-              .catch(e => console.error('Calendar update failed:', e));
+            // Debounce updates — wait 1.5s after last change before syncing
+            debouncedCalSync(id, () => {
+              // Re-read task from latest state to get most up-to-date values
+              const latestTask = getTasksFresh(weekKey, dayKey).find(t => t.id===id);
+              if (latestTask && latestTask.gcalId) {
+                updateEventInCalendar(latestTask.gcalId, latestTask, dayKey)
+                  .catch(e => console.error('Calendar update failed:', e));
+              }
+            });
           } else {
-            console.log('Calling pushEventToCalendar — no gcalId yet');
-            pushEventToCalendar(mergedTask, dayKey)
-              .then(gcalId => {
-                console.log('Push succeeded, gcalId:', gcalId);
-                if (gcalId) setTasks(dayKey, ts => ts.map(x => x.id===id ? {...x, gcalId} : x));
-              })
-              .catch(e => console.error('Calendar push failed:', e));
+            // New event push — also debounced so partial titles aren't pushed
+            debouncedCalSync(id, () => {
+              const latestTask = getTasksFresh(weekKey, dayKey).find(t => t.id===id);
+              if (latestTask && latestTask.isEvent && !latestTask.gcalId) {
+                pushEventToCalendar(latestTask, dayKey)
+                  .then(gcalId => {
+                    if (gcalId) setTasks(dayKey, ts => ts.map(x => x.id===id ? {...x, gcalId} : x));
+                  })
+                  .catch(e => console.error('Calendar push failed:', e));
+              }
+            });
           }
         } else if (patch.isEvent === false && currentTask?.gcalId) {
-          console.log('Deleting from calendar — toggled to task');
+          // Immediate — toggled off, remove from calendar right away
           deleteEventFromCalendar(currentTask.gcalId).catch(()=>{});
           setTasks(dayKey, ts => ts.map(x => x.id===id ? {...x, gcalId: null} : x));
         }
