@@ -1059,9 +1059,33 @@ function WeeklyPlanner({ weekData, setWeekData, onGoToHabit, calHeaderColor, set
     setTasks(dayKey, t => [...t, {id, title:'', details:'', done:false, expanded:false, colorIndex: t.length}]);
   }
   function updateTask(dayKey, id, patch) {
-    setTasks(dayKey, t => t.map(x => x.id===id ? {...x,...patch} : x));
+    setTasks(dayKey, t => {
+      const updated = t.map(x => x.id===id ? {...x,...patch} : x);
+      const task = updated.find(x => x.id===id);
+      if (task && getToken()) {
+        const calendarFields = ['title','eventTime','details','isEvent'];
+        const touchedCalField = Object.keys(patch).some(k => calendarFields.includes(k));
+        if (touchedCalField) {
+          if (task.isEvent) {
+            if (task.gcalId) {
+              updateEventInCalendar(task.gcalId, task, dayKey).catch(e => console.error('Calendar update failed:', e));
+            } else {
+              pushEventToCalendar(task, dayKey).then(gcalId => {
+                if (gcalId) setTasks(dayKey, ts => ts.map(x => x.id===id ? {...x, gcalId} : x));
+              }).catch(e => console.error('Calendar push failed:', e));
+            }
+          } else if (patch.isEvent === false && task.gcalId) {
+            deleteEventFromCalendar(task.gcalId).catch(()=>{});
+            setTasks(dayKey, ts => ts.map(x => x.id===id ? {...x, gcalId: null} : x));
+          }
+        }
+      }
+      return updated;
+    });
   }
   function deleteTask(dayKey, id) {
+    const task = getTasks(dayKey).find(t => t.id===id);
+    if (task && task.gcalId && getToken()) deleteEventFromCalendar(task.gcalId).catch(()=>{});
     setTasks(dayKey, t => t.filter(x=>x.id!==id));
   }
 
@@ -1930,7 +1954,7 @@ function MonthlyCalendar({ weekData, setWeekData }) {
       };
       setWeekData(wd => {
         const cur = wd[weekKey] || {proverb:'',toCreate:[],weekGoals:[],people:[],beWord:'',proud:'',story:'',tasks:{}};
-        const dayTasks = (cur.tasks||{})[selectedDate] || [];
+        const dayTasks = (cur.tasks||{})[targetDate] || [];
         return {...wd, [weekKey]: {...cur, tasks: {...(cur.tasks||{}), [targetDate]: [...dayTasks, newTask]}}};
       });
       // Push to Google Calendar and store gcalId back
