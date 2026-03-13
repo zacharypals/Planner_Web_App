@@ -867,25 +867,40 @@ async function deleteEventFromCalendar(gcalId) {
 async function updateEventInCalendar(gcalId, event, dateKey) {
   const token = getToken();
   if (!token || !gcalId) return;
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const dateStr = dateKey;
   let start, end;
   if (event.eventTime) {
     const [h, m] = event.eventTime.split(':');
-    start = { dateTime: `${dateStr}T${event.eventTime}:00`, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone };
     const endH = String(parseInt(h) + 1).padStart(2, '0');
-    end = { dateTime: `${dateStr}T${endH}:${m}:00`, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone };
+    start = { dateTime: `${dateStr}T${event.eventTime}:00`, timeZone: tz };
+    end   = { dateTime: `${dateStr}T${endH}:${m}:00`, timeZone: tz };
   } else {
     const nextDay = new Date(dateStr + 'T00:00:00'); nextDay.setDate(nextDay.getDate() + 1);
-    start = { date: dateStr }; end = { date: fmt(nextDay) };
+    start = { date: dateStr };
+    end   = { date: fmt(nextDay) };
   }
+  // Use PUT (full replace) so switching all-day ↔ timed works correctly
+  // First fetch the existing event to preserve fields we don't manage (attendees, etc.)
+  const getRes = await fetch(
+    `https://www.googleapis.com/calendar/v3/calendars/primary/events/${gcalId}`,
+    { headers: { 'Authorization': `Bearer ${token}` } }
+  );
+  let existing = {};
+  if (getRes.ok) existing = await getRes.json();
+  const body = {
+    ...existing,
+    summary: event.title || 'Untitled Event',
+    description: event.details || '',
+    start, end,
+  };
+  // Remove the opposite time format to avoid Google rejecting mixed date/dateTime
+  if (start.dateTime) { delete body.start?.date; delete body.end?.date; }
+  if (start.date)     { delete body.start?.dateTime; delete body.end?.dateTime; }
   await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${gcalId}`, {
-    method: 'PATCH',
+    method: 'PUT',
     headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      summary: event.title || 'Untitled Event',
-      description: event.details || '',
-      start, end,
-    }),
+    body: JSON.stringify(body),
   });
 }
 
@@ -1143,6 +1158,11 @@ function WeeklyPlanner({ weekData, setWeekData, onGoToHabit, calHeaderColor, set
       dstTasks.splice(insertAt === -1 ? dstTasks.length : insertAt, 0, task);
       return { ...w, tasks: { ...allTasks, [fromDayKey]: srcTasks, [toDayKey]: dstTasks } };
     });
+    // Sync date change to Google Calendar
+    if (task.isEvent && task.gcalId && getToken()) {
+      updateEventInCalendar(task.gcalId, task, toDayKey)
+        .catch(e => console.error('Calendar move failed:', e));
+    }
   }
 
   return (
