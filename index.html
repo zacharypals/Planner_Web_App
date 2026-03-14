@@ -1914,8 +1914,11 @@ function HabitTracker({ onGoToPlanner }) {
           <MonthlyView date={selectedDate} selected={selectedDate} goals={displayGoals} completions={completions}
             onDayClick={setSelectedDate} today={today} />
           <div className="monthly-habit-checklist">
-            <div className="monthly-habit-checklist-title">
-              {DAYS[selectedDate.getDay()]}, {MONTHS[selectedDate.getMonth()].slice(0,3)} {selectedDate.getDate()}
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
+              <div className="monthly-habit-checklist-title" style={{marginBottom:0}}>
+                {DAYS[selectedDate.getDay()]}, {MONTHS[selectedDate.getMonth()].slice(0,3)} {selectedDate.getDate()}
+              </div>
+              <button className="add-btn" onClick={addGoal} title="Add habit">+</button>
             </div>
             <div className="monthly-habit-checklist-items">
               {displayGoals.map(g => {
