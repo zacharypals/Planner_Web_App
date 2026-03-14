@@ -1,6 +1,6 @@
 {
-  "name": "My Planner",
-  "short_name": "Planner",
+  "name": "Little-Pals Planner",
+  "short_name": "LP Planner",
   "description": "Weekly planner, habit tracker, and monthly calendar",
   "start_url": "/Planner_Web_App/",
   "display": "standalone",
