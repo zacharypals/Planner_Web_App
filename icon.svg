@@ -17,53 +17,72 @@
       <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#1a0a30" flood-opacity="0.5"/>
     </filter>
   </defs>
+
+  <!-- Background -->
   <rect width="512" height="512" rx="100" ry="100" fill="url(#bg)"/>
   <rect width="512" height="512" rx="100" ry="100" fill="url(#shine)"/>
+
+  <!-- Outer brass border -->
   <rect x="28" y="28" width="456" height="456" rx="76" ry="76"
     fill="none" stroke="url(#brass)" stroke-width="4" opacity="0.7"/>
+  <!-- Inner brass border -->
   <rect x="42" y="42" width="428" height="428" rx="64" ry="64"
     fill="none" stroke="url(#brass)" stroke-width="1.5" opacity="0.35"/>
+
+  <!-- Corner ornaments - top left -->
   <g fill="url(#brass)" opacity="0.8">
     <rect x="54" y="54" width="24" height="3" rx="1.5"/>
     <rect x="54" y="54" width="3" height="24" rx="1.5"/>
   </g>
+  <!-- Corner ornaments - top right -->
   <g fill="url(#brass)" opacity="0.8">
     <rect x="434" y="54" width="24" height="3" rx="1.5"/>
     <rect x="455" y="54" width="3" height="24" rx="1.5"/>
   </g>
+  <!-- Corner ornaments - bottom left -->
   <g fill="url(#brass)" opacity="0.8">
     <rect x="54" y="455" width="24" height="3" rx="1.5"/>
     <rect x="54" y="434" width="3" height="24" rx="1.5"/>
   </g>
+  <!-- Corner ornaments - bottom right -->
   <g fill="url(#brass)" opacity="0.8">
     <rect x="434" y="455" width="24" height="3" rx="1.5"/>
     <rect x="455" y="434" width="3" height="24" rx="1.5"/>
   </g>
+
+  <!-- Diamond accents top and bottom -->
   <polygon points="256,72 263,82 256,92 249,82" fill="url(#brass)" opacity="0.7"/>
   <polygon points="256,420 263,430 256,440 249,430" fill="url(#brass)" opacity="0.7"/>
-  <g filter="url(#shadow)">
-    <path d="
-      M 108 148
-      L 148 148
-      L 196 320
-      L 236 190
-      L 256 148
-      L 276 190
-      L 316 320
-      L 364 148
-      L 404 148
-      L 334 384
-      L 290 384
-      L 256 272
-      L 222 384
-      L 178 384
-      Z
-    " fill="url(#brass)" stroke="none"/>
-  </g>
-  <g fill="url(#brass)">
-    <rect x="96"  y="148" width="48" height="9" rx="4"/>
-    <rect x="368" y="148" width="48" height="9" rx="4"/>
-    <rect x="164" y="379" width="44" height="9" rx="4"/>
-    <rect x="304" y="379" width="44" height="9" rx="4"/>
+
+  <!-- PT letterforms -->
+  <g filter="url(#shadow)" fill="url(#brass)">
+
+    <!-- P stem -->
+    <rect x="96" y="145" width="38" height="222" rx="4"/>
+    <!-- P top serif -->
+    <rect x="78" y="145" width="56" height="11" rx="5.5"/>
+    <!-- P bottom serif -->
+    <rect x="78" y="356" width="56" height="11" rx="5.5"/>
+    <!-- P bowl - top bar -->
+    <rect x="96" y="145" width="108" height="34" rx="8"/>
+    <!-- P bowl - bottom bar -->
+    <rect x="96" y="241" width="108" height="30" rx="8"/>
+    <!-- P bowl - right side -->
+    <rect x="192" y="145" width="34" height="126" rx="17"/>
+
+    <!-- Center divider dot -->
+    <circle cx="256" cy="256" r="9" opacity="0.55"/>
+
+    <!-- T crossbar -->
+    <rect x="274" y="145" width="144" height="34" rx="8"/>
+    <!-- T crossbar left serif -->
+    <rect x="274" y="145" width="12" height="34" rx="6"/>
+    <!-- T crossbar right serif -->
+    <rect x="406" y="145" width="12" height="34" rx="6"/>
+    <!-- T stem -->
+    <rect x="327" y="179" width="38" height="188" rx="4"/>
+    <!-- T bottom serif left -->
+    <rect x="309" y="356" width="56" height="11" rx="5.5"/>
+
   </g>
 </svg>
