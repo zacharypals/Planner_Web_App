@@ -625,12 +625,16 @@
   }
   .sidebar-wrap.collapsed { width: 32px; }
   .sidebar {
-    width: 280px; min-width: 280px; /* fixed, never shrinks */
+    width: 280px; flex-shrink: 0;
     background: var(--paper);
     display: flex; flex-direction: column; overflow-y: auto; overflow-x: hidden;
-    padding: 16px; transition: opacity 0.2s;
+    padding: 16px;
   }
-  .sidebar-wrap.collapsed .sidebar { opacity: 0; pointer-events: none; }
+  /* Only the weekly planner sidebar gets the collapse treatment */
+  .sidebar-wrap > .sidebar {
+    width: 280px; min-width: 280px; transition: opacity 0.2s;
+  }
+  .sidebar-wrap.collapsed > .sidebar { opacity: 0; pointer-events: none; }
   .sidebar::-webkit-scrollbar { width: 4px; }
   .sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
   .sidebar-toggle-strip {
@@ -679,12 +683,13 @@
     .save-status { font-size: 10px; }
     .auth-btn.sync { display: none; } /* hide sync btn — use mobile sync in bottom sheet */
 
-    /* Hide desktop sidebar entirely */
-    .sidebar { display: none !important; }
+    /* Hide desktop sidebar entirely on mobile */
+    .sidebar-wrap { display: none !important; }
+    .week-review { display: none !important; }
 
     /* Main content stacks */
     .main-content { flex-direction: column; overflow: visible; }
-    .main-panel { overflow: visible; }
+    .main-panel { display: none !important; } /* hidden on mobile — replaced by mobile-day-view */
 
     /* ── Mobile day view ── */
     .mobile-day-view { display: flex; flex-direction: column; flex: 1; min-height: 0; }
@@ -784,8 +789,7 @@
     /* hide top nav tabs on mobile — use bottom nav instead */
     .nav-tabs { display: none; }
 
-    /* week-review hidden on mobile — proud/story are in the bottom sheet */
-    .week-review { display: none; }
+
 
     /* extra bottom padding so content isn't behind bottom nav */
     .main-panel { padding-bottom: 64px; }
