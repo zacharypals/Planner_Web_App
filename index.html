@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v1.1.1 -->
+<!-- LP Planner v1.1.2 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -962,6 +962,12 @@
     background: var(--accent-light); color: var(--accent);
     padding: 1px 6px; border-radius: 10px;
   }
+  .pages-task-details-input {
+    border: none; background: transparent; outline: none; width: 100%;
+    font-family: 'DM Sans', sans-serif; font-size: 12px; color: var(--ink-light);
+    min-height: 20px; line-height: 1.5;
+  }
+  .pages-task-details-input::placeholder { color: var(--ink-faint); font-style: italic; }
   .pages-task-delete {
     background: none; border: none; color: var(--ink-faint); cursor: pointer;
     font-size: 14px; padding: 0 2px; opacity: 0; transition: opacity 0.15s;
@@ -1462,7 +1468,7 @@ function ColorPicker({ value, onChange }) {
 // ─────────────────────────────────────────────
 // WEEKLY PLANNER
 // ─────────────────────────────────────────────
-function WeeklyPlanner({ weekData, setWeekData, pagesData, onGoToHabit, calHeaderColor, setCalHeaderColor }) {
+function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToHabit, calHeaderColor, setCalHeaderColor }) {
   const today = new Date(); today.setHours(0,0,0,0);
   const [weekStart, setWeekStart] = useState(getWeekStart(today));
   const weekKey = fmt(weekStart);
@@ -1504,6 +1510,16 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, onGoToHabit, calHeade
   function updateTask(dayKey, id, patch) {
     // Pure state update — no calendar sync, safe to call on every keystroke
     setTasks(dayKey, t => t.map(x => x.id===id ? {...x,...patch} : x));
+    // Sync back to pagesData if this is a project task
+    const task = getTasks(dayKey).find(t => t.id===id);
+    if (task?.isProjectTask && task?.projectDocId && setPagesData) {
+      const syncFields = ['done','title','details'];
+      if (Object.keys(patch).some(k => syncFields.includes(k))) {
+        setPagesData(p => p.map(doc => doc.id !== task.projectDocId ? doc : {
+          ...doc, tasks: (doc.tasks||[]).map(t => t.id===id ? {...t,...patch} : t)
+        }));
+      }
+    }
 
     // For non-text fields (isEvent toggle, eventTime), sync immediately with debounce
     const immediateFields = ['eventTime', 'isEvent'];
@@ -1877,28 +1893,35 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onDragStart, onDragOve
         {confirming ? 'Delete?' : '✕'}
       </button>
       <div className="task-card-header">
-        <button
-          className={`task-type-btn ${task.isEvent?'event':''}`}
-          title={task.isEvent ? 'Event — click to make Task' : 'Task — click to make Event'}
-          onClick={e=>{e.stopPropagation();onUpdate({isEvent:!task.isEvent});}}>
-          {task.isEvent ? '📅' : '⠿'}
-        </button>
+        {task.isProjectTask ? (
+          <span className="task-type-btn event" title={`From project: ${task.projectTitle||''}`}
+            style={{cursor:'default',fontSize:14}}>📝</span>
+        ) : (
+          <button
+            className={`task-type-btn ${task.isEvent?'event':''}`}
+            title={task.isEvent ? 'Event — click to make Task' : 'Task — click to make Event'}
+            onClick={e=>{e.stopPropagation();onUpdate({isEvent:!task.isEvent});}}>
+            {task.isEvent ? '📅' : '⠿'}
+          </button>
+        )}
         <div className={`task-check ${task.done?'done':''}`}
           style={{borderColor: task.done ? '#2d5a3d' : undefined, color: task.done ? '#2d5a3d' : undefined, background: task.done ? '#e8f0eb' : undefined}}
           onClick={()=>onUpdate({done:!task.done})} />
-        <input ref={titleRef} className="task-title-input"
-          placeholder={task.isEvent ? 'Event…' : 'Task…'}
-          value={task.title} onChange={e=>onUpdate({title:e.target.value})}
-          onBlur={()=>onBlurSync && task.isEvent && onBlurSync()}
-          onClick={e=>e.stopPropagation()}
-          readOnly={!!task.isProjectTask}
-          style={task.isProjectTask ? {cursor:'default'} : {}}
-        />
-        {task.isProjectTask && task.projectTitle && (
-          <div className="project-task-badge" title={`From: ${task.projectTitle}`}>
-            📝 {task.projectTitle}
-          </div>
-        )}
+        <div style={{flex:1,minWidth:0}}>
+          <input ref={titleRef} className="task-title-input"
+            placeholder={task.isEvent ? 'Event…' : 'Task…'}
+            value={task.title} onChange={e=>onUpdate({title:e.target.value})}
+            onBlur={()=>onBlurSync && task.isEvent && onBlurSync()}
+            onClick={e=>e.stopPropagation()}
+            readOnly={!!task.isProjectTask}
+            style={{...(task.isProjectTask ? {cursor:'default'} : {}), width:'100%'}}
+          />
+          {task.isProjectTask && task.projectTitle && (
+            <div className="project-task-badge" title={`From: ${task.projectTitle}`}>
+              {task.projectTitle}
+            </div>
+          )}
+        </div>
         <button className="task-expand-btn" onClick={()=>onUpdate({expanded:!task.expanded})}>
           {task.expanded ? '▲' : '▼'}
         </button>
@@ -2864,6 +2887,7 @@ function App() {
   const [calHeaderColor, setCalHeaderColor] = useStorage('calHeaderColor', '#2d5a3d');
   const [weekData, setWeekData] = useStorage('weekData', {});
   const [pagesData, setPagesData] = useStorage('pagesData', []); // [{id,title,body,createdAt,tasks:[]}]
+  const [selectedPagesId, setSelectedPagesId] = useState(null);
   const [habitGoals, setHabitGoals] = useStorage('habitGoals', [
     {id:'g1', name:'Daily Pages', color:'#2d5a3d'},
     {id:'g2', name:'Run', color:'#c0392b'},
@@ -3033,7 +3057,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.1.1</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.1.2</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -3057,13 +3081,13 @@ function App() {
           )}
         </div>
       </div>
-      {page==='planner' && <WeeklyPlanner weekData={weekData} setWeekData={setWeekData} pagesData={pagesData} onGoToHabit={()=>setPage('habit')} calHeaderColor={calHeaderColor} setCalHeaderColor={setCalHeaderColor} />}
+      {page==='planner' && <WeeklyPlanner weekData={weekData} setWeekData={setWeekData} pagesData={pagesData} setPagesData={setPagesData} onGoToHabit={()=>setPage('habit')} calHeaderColor={calHeaderColor} setCalHeaderColor={setCalHeaderColor} />}
       {page==='monthly' && <MonthlyCalendar weekData={weekData} setWeekData={setWeekData} monthlyGoals={monthlyGoals} setMonthlyGoals={setMonthlyGoals} />}
       {page==='habit' && <HabitTracker
         goals={habitGoals} setGoals={setHabitGoals}
         completions={habitCompletions} setCompletions={setHabitCompletions}
         onGoToPlanner={()=>setPage('planner')} />}
-      {page==='pages' && <PagesView pagesData={pagesData} setPagesData={setPagesData} weekData={weekData} setWeekData={setWeekData} />}
+      {page==='pages' && <PagesView pagesData={pagesData} setPagesData={setPagesData} weekData={weekData} setWeekData={setWeekData} selectedId={selectedPagesId} setSelectedId={setSelectedPagesId} />}
 
       {/* Mobile bottom nav — only visible on phones via CSS */}
       <div className="mobile-bottom-nav">
@@ -3093,8 +3117,7 @@ function App() {
 // ─────────────────────────────────────────────
 // PAGES VIEW
 // ─────────────────────────────────────────────
-function PagesView({ pagesData, setPagesData, weekData, setWeekData }) {
-  const [selectedId, setSelectedId] = useState(null);
+function PagesView({ pagesData, setPagesData, weekData, setWeekData, selectedId, setSelectedId }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileView, setMobileView] = useState('list'); // 'list' | 'editor'
   const bodyRef = useRef(null);
@@ -3144,12 +3167,15 @@ function PagesView({ pagesData, setPagesData, weekData, setWeekData }) {
       if (d.id !== docId) return d;
       const oldTask = (d.tasks||[]).find(t => t.id === taskId);
       const updatedTask = { ...oldTask, ...patch };
-      // Handle date scheduling changes
       if (patch.scheduledDate !== undefined) {
+        // Date changed — move in weekly planner
         const oldDate = oldTask?.scheduledDate;
         const newDate = patch.scheduledDate;
         if (oldDate && oldDate !== newDate) removeTaskFromWeek(taskId, oldDate);
         if (newDate) scheduleTaskToWeek(updatedTask, d.title || 'Untitled', newDate);
+      } else if (oldTask?.scheduledDate) {
+        // Non-date field changed (title, done, details) — re-sync to week
+        scheduleTaskToWeek(updatedTask, d.title || 'Untitled', oldTask.scheduledDate);
       }
       return { ...d, tasks: (d.tasks||[]).map(t => t.id === taskId ? updatedTask : t) };
     }));
@@ -3388,6 +3414,13 @@ function PagesView({ pagesData, setPagesData, weekData, setWeekData }) {
                       value={task.title}
                       onChange={e=>updateTask(selectedDoc.id, task.id, {title:e.target.value})}
                     />
+                    <textarea className="pages-task-details-input"
+                      placeholder="Details (optional)…"
+                      value={task.details||''}
+                      rows={1}
+                      onChange={e=>updateTask(selectedDoc.id, task.id, {details:e.target.value})}
+                      style={{resize:'vertical'}}
+                    />
                     <div className="pages-task-date-row">
                       <span style={{fontSize:10,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace"}}>📅</span>
                       <input type="date" className="pages-task-date-input"
@@ -3395,7 +3428,8 @@ function PagesView({ pagesData, setPagesData, weekData, setWeekData }) {
                         onChange={e=>updateTask(selectedDoc.id, task.id, {scheduledDate:e.target.value, projectDocId:selectedDoc.id})}
                       />
                       {task.scheduledDate && (
-                        <span className="pages-task-date-badge">{task.scheduledDate}</span>
+                        <button onClick={()=>updateTask(selectedDoc.id, task.id, {scheduledDate:''})}
+                          style={{background:'none',border:'none',color:'var(--ink-faint)',cursor:'pointer',fontSize:11,padding:'0 2px'}}>✕</button>
                       )}
                     </div>
                   </div>
