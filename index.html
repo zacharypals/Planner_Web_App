@@ -681,12 +681,12 @@
   /* ── MOBILE (< 768px) ── */
   @media (max-width: 767px) {
     /* Nav bar */
-    .nav-bar { flex-wrap: wrap; gap: 6px; padding: 8px 10px; }
-    .nav-tabs { order: 3; width: 100%; justify-content: center; gap: 2px; }
-    .nav-tab { padding: 5px 10px; font-size: 11px; }
-    .hdr-color-area { flex: 1; }
-    .auth-area { gap: 6px; }
-    .auth-btn { padding: 5px 8px; font-size: 11px; }
+    .nav-bar { flex-wrap: nowrap; gap: 4px; padding: 6px 10px; }
+    .nav-tabs { display: none; } /* hidden — use bottom nav */
+    .hdr-color-area { flex: 1; min-width: 0; }
+    .nav-brand { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .auth-area { gap: 4px; flex-shrink: 0; }
+    .auth-btn { padding: 5px 8px; font-size: 11px; white-space: nowrap; }
     .save-status { font-size: 10px; }
     .auth-btn.sync { display: none; } /* hide sync btn — use mobile sync in bottom sheet */
 
@@ -697,8 +697,9 @@
 
     /* Main content stacks */
     .main-content { flex-direction: column; overflow: visible; padding-bottom: 64px; }
-    /* main-panel hidden only on weekly planner — monthly/habit need it */
     .main-panel { overflow: visible; }
+    /* Hide weekly desktop panel on mobile — replaced by mobile-day-view */
+    .weekly-main-panel { display: none !important; }
 
     /* ── Mobile day view ── */
     .mobile-day-view { display: flex; flex-direction: column; flex: 1; min-height: 0; }
@@ -795,8 +796,7 @@
     .mobile-bottom-nav-btn.active { color: var(--accent); }
     .mobile-bottom-nav-btn .icon { font-size: 18px; }
 
-    /* hide top nav tabs on mobile — use bottom nav instead */
-    .nav-tabs { display: none; }
+
 
 
 
@@ -1438,7 +1438,7 @@ function WeeklyPlanner({ weekData, setWeekData, onGoToHabit, calHeaderColor, set
 
 
       {/* MAIN */}
-      <div className="main-panel">
+      <div className="main-panel weekly-main-panel">
         <div className="weekly-calendar">
           <div className="cal-scroll-wrapper">
             <div className="cal-grid">
@@ -2659,7 +2659,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ Planner & Tracker</span>
+          <span className="nav-brand">✦ LP Planner</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
