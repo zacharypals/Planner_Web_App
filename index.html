@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v1.0.0 -->
+<!-- LP Planner v1.0.1 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -1916,46 +1916,90 @@ function HabitTracker({ onGoToPlanner }) {
         {view==='monthly' && <>
           <MonthlyView date={selectedDate} selected={selectedDate} goals={displayGoals} completions={completions}
             onDayClick={setSelectedDate} today={today} />
-          <div className="monthly-habit-checklist">
-            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
-              <div className="monthly-habit-checklist-title" style={{marginBottom:0}}>
-                {DAYS[selectedDate.getDay()]}, {MONTHS[selectedDate.getMonth()].slice(0,3)} {selectedDate.getDate()}
-              </div>
-              <button className="add-btn" onClick={addGoal} title="Add habit">+</button>
-            </div>
-            <div className="monthly-habit-checklist-items">
-              {goals.length === 0 && (
-                <div style={{fontSize:12,color:'var(--ink-faint)',fontFamily:"'DM Sans',sans-serif",padding:'4px 0'}}>
-                  No habits yet — tap + to add one
-                </div>
-              )}
-              {goals.map(g => {
-                const done = isCompleted(g.id, fmt(selectedDate));
-                return (
-                  <div key={g.id}
-                    className={`monthly-habit-check-row ${done?'done':''}`}
-                    onClick={()=>toggleCompletion(g.id, fmt(selectedDate))}
-                    style={{borderLeft: `3px solid ${g.color}`}}>
-                    <div className="mhc-check" style={{
-                      background: done ? g.color : 'transparent',
-                      borderColor: g.color
-                    }}>
-                      {done && <span style={{color:'white',fontSize:11,lineHeight:1}}>✓</span>}
-                    </div>
-                    <span className="mhc-name" style={{color: done ? g.color : 'var(--ink)'}}>{g.name}</span>
-                    {done && <span style={{marginLeft:'auto',fontSize:10,color:g.color,fontFamily:"'DM Mono',monospace"}}>done</span>}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+          <HabitChecklist date={selectedDate} goals={goals} completions={completions}
+            onToggle={toggleCompletion} onAdd={addGoal} onDelete={deleteGoal} />
         </>}
-        {view==='weekly' && <WeeklyHabitView date={selectedDate} selected={selectedDate} goals={displayGoals} completions={completions} today={today} onDayClick={setSelectedDate} />}
-        {view==='yearly' && <YearlyView date={selectedDate} selected={selectedDate} goals={displayGoals} completions={completions} today={today} onDayClick={setSelectedDate} />}
+        {view==='weekly' && <>
+          <WeeklyHabitView date={selectedDate} selected={selectedDate} goals={displayGoals} completions={completions} today={today} onDayClick={setSelectedDate} />
+          <HabitChecklist date={selectedDate} goals={goals} completions={completions}
+            onToggle={toggleCompletion} onAdd={addGoal} onDelete={deleteGoal} />
+        </>}
+        {view==='yearly' && <>
+          <YearlyView date={selectedDate} selected={selectedDate} goals={displayGoals} completions={completions} today={today} onDayClick={setSelectedDate} />
+          <HabitChecklist date={selectedDate} goals={goals} completions={completions}
+            onToggle={toggleCompletion} onAdd={addGoal} onDelete={deleteGoal} />
+        </>}
         {view==='daily' && <DailyView date={selectedDate} goals={displayGoals} completions={completions}
           onToggle={(gid)=>toggleCompletion(gid,fmt(selectedDate))} />}
       </div>
       );})()}
+    </div>
+  );
+}
+
+function HabitChecklist({ date, goals, completions, onToggle, onAdd, onDelete }) {
+  const dk = fmt(date);
+  const [confirmId, setConfirmId] = useState(null);
+
+  function handleDelete(e, id) {
+    e.stopPropagation();
+    if (confirmId === id) {
+      onDelete(id);
+      setConfirmId(null);
+    } else {
+      setConfirmId(id);
+    }
+  }
+
+  return (
+    <div className="monthly-habit-checklist">
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
+        <div className="monthly-habit-checklist-title" style={{marginBottom:0}}>
+          {DAYS[date.getDay()]}, {MONTHS[date.getMonth()].slice(0,3)} {date.getDate()}
+        </div>
+        <button className="add-btn" onClick={onAdd} title="Add habit">+</button>
+      </div>
+      <div className="monthly-habit-checklist-items">
+        {goals.length === 0 && (
+          <div style={{fontSize:12,color:'var(--ink-faint)',fontFamily:"'DM Sans',sans-serif",padding:'4px 0'}}>
+            No habits yet — tap + to add one
+          </div>
+        )}
+        {goals.map(g => {
+          const done = (completions[dk]||[]).includes(g.id);
+          const confirming = confirmId === g.id;
+          return (
+            <div key={g.id}
+              className={`monthly-habit-check-row ${done?'done':''}`}
+              onClick={()=>{setConfirmId(null);onToggle(g.id,dk);}}
+              style={{borderLeft:`3px solid ${g.color}`}}
+              onMouseLeave={()=>setConfirmId(null)}>
+              <div className="mhc-check" style={{
+                background: done ? g.color : 'transparent',
+                borderColor: g.color
+              }}>
+                {done && <span style={{color:'white',fontSize:11,lineHeight:1}}>✓</span>}
+              </div>
+              <span className="mhc-name" style={{color: done ? g.color : 'var(--ink)'}}>{g.name}</span>
+              {done && <span style={{fontSize:10,color:g.color,fontFamily:"'DM Mono',monospace"}}>done</span>}
+              <button
+                onClick={e=>handleDelete(e,g.id)}
+                style={{
+                  marginLeft:'auto', background: confirming ? '#ef4444' : 'none',
+                  border: confirming ? 'none' : 'none',
+                  color: confirming ? 'white' : 'var(--ink-faint)',
+                  fontSize: confirming ? 11 : 14,
+                  padding: confirming ? '2px 6px' : '0 2px',
+                  borderRadius: confirming ? 4 : 0,
+                  cursor:'pointer', flexShrink:0, lineHeight:1,
+                  fontFamily:"'DM Sans',sans-serif",
+                }}>
+                {confirming ? 'Delete?' : '✕'}
+              </button>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -2750,7 +2794,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.0.0</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.0.1</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
