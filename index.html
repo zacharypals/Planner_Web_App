@@ -695,9 +695,11 @@
     .sidebar { display: none !important; }
     .week-review { display: none !important; }
 
-    /* Main content stacks */
+    /* Main content stacks — allow full scroll on mobile */
+    .app { height: auto; min-height: 100vh; overflow: visible; }
     .main-content { flex-direction: column; overflow: visible; padding-bottom: 64px; }
     .main-panel { overflow: visible; }
+    .habit-main { overflow: visible; height: auto; }
     /* Hide weekly desktop panel on mobile — replaced by mobile-day-view */
     .weekly-main-panel { display: none !important; }
 
