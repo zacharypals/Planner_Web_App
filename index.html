@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v1.1.0 -->
+<!-- LP Planner v1.1.1 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -1944,18 +1944,11 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onDragStart, onDragOve
 // ─────────────────────────────────────────────
 // HABIT TRACKER
 // ─────────────────────────────────────────────
-function HabitTracker({ onGoToPlanner }) {
+function HabitTracker({ onGoToPlanner, goals, setGoals, completions, setCompletions }) {
   const today = new Date(); today.setHours(0,0,0,0);
   const [selectedDate, setSelectedDate] = useState(today);
   const [view, setView] = useState('monthly'); // daily, weekly, monthly, yearly
   const [filterGoal, setFilterGoal] = useState(null); // null = all
-
-  const [goals, setGoals] = useStorage('habitGoals', [
-    {id:'g1', name:'Daily Pages', color:'#2d5a3d'},
-    {id:'g2', name:'Run', color:'#c0392b'},
-    {id:'g3', name:'Vocal Exercises', color:'#e0a800'},
-  ]);
-  const [completions, setCompletions] = useStorage('habitCompletions', {}); // {dateKey: [goalId,...]}
 
   function isCompleted(goalId, dateKey) {
     return (completions[dateKey]||[]).includes(goalId);
@@ -2469,14 +2462,13 @@ function TimeSelect({ value, onChange }) {
   );
 }
 
-function MonthlyCalendar({ weekData, setWeekData }) {
+function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals }) {
   const today = new Date(); today.setHours(0,0,0,0);
   const [viewDate, setViewDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
   const [selectedDate, setSelectedDate] = useState(null);
   const [showEventModal, setShowEventModal] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null); // {dayKey, taskId} or null
   const [eventForm, setEventForm] = useState({title:'', time:'', date:'', details:''});
-  const [monthlyGoals, setMonthlyGoals] = useStorage('monthlyGoals', {}); // {yearMonth: [{id,name,done}]}
   const [dragInfo, setDragInfo] = useState(null); // {eventId, fromDayKey}
   const [dragOverDay, setDragOverDay] = useState(null);
 
@@ -2872,6 +2864,13 @@ function App() {
   const [calHeaderColor, setCalHeaderColor] = useStorage('calHeaderColor', '#2d5a3d');
   const [weekData, setWeekData] = useStorage('weekData', {});
   const [pagesData, setPagesData] = useStorage('pagesData', []); // [{id,title,body,createdAt,tasks:[]}]
+  const [habitGoals, setHabitGoals] = useStorage('habitGoals', [
+    {id:'g1', name:'Daily Pages', color:'#2d5a3d'},
+    {id:'g2', name:'Run', color:'#c0392b'},
+    {id:'g3', name:'Vocal Exercises', color:'#e0a800'},
+  ]);
+  const [habitCompletions, setHabitCompletions] = useStorage('habitCompletions', {});
+  const [monthlyGoals, setMonthlyGoals] = useStorage('monthlyGoals', {});
 
   // Auth state
   const [authUser, setAuthUser] = useState(null); // {name, email, picture}
@@ -2894,6 +2893,10 @@ function App() {
       if (data.weekData) setWeekData(data.weekData);
       if (data.navColor) setNavColor(data.navColor);
       if (data.calHeaderColor) setCalHeaderColor(data.calHeaderColor);
+      if (data.habitGoals) setHabitGoals(data.habitGoals);
+      if (data.habitCompletions) setHabitCompletions(data.habitCompletions);
+      if (data.monthlyGoals) setMonthlyGoals(data.monthlyGoals);
+      if (data.pagesData) setPagesData(data.pagesData);
       setDriveFileId(fileId); // set last to arm the save effect
       setSaveStatus('saved');
       setTimeout(() => { setSaveStatus(''); _loadingFromDrive = false; }, 2000);
@@ -2932,7 +2935,7 @@ function App() {
   useEffect(() => {
     if (!driveFileId) return;
     scheduleSave(driveFileId);
-  }, [weekData, navColor, calHeaderColor, driveFileId]);
+  }, [weekData, navColor, calHeaderColor, habitGoals, habitCompletions, monthlyGoals, pagesData, driveFileId]);
 
   // On mount: restore session from localStorage token or silent Worker refresh
   useEffect(() => {
@@ -3030,7 +3033,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.1.0</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.1.1</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -3055,8 +3058,11 @@ function App() {
         </div>
       </div>
       {page==='planner' && <WeeklyPlanner weekData={weekData} setWeekData={setWeekData} pagesData={pagesData} onGoToHabit={()=>setPage('habit')} calHeaderColor={calHeaderColor} setCalHeaderColor={setCalHeaderColor} />}
-      {page==='monthly' && <MonthlyCalendar weekData={weekData} setWeekData={setWeekData} />}
-      {page==='habit' && <HabitTracker onGoToPlanner={()=>setPage('planner')} />}
+      {page==='monthly' && <MonthlyCalendar weekData={weekData} setWeekData={setWeekData} monthlyGoals={monthlyGoals} setMonthlyGoals={setMonthlyGoals} />}
+      {page==='habit' && <HabitTracker
+        goals={habitGoals} setGoals={setHabitGoals}
+        completions={habitCompletions} setCompletions={setHabitCompletions}
+        onGoToPlanner={()=>setPage('planner')} />}
       {page==='pages' && <PagesView pagesData={pagesData} setPagesData={setPagesData} weekData={weekData} setWeekData={setWeekData} />}
 
       {/* Mobile bottom nav — only visible on phones via CSS */}
