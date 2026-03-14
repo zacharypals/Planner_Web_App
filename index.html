@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/svg+xml" href="icon.svg">
-<link rel="apple-touch-icon" href="icon.svg">
+<link rel="apple-touch-icon" href="icon-512.png">
 <meta name="theme-color" content="#3b1f5e">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -690,13 +690,15 @@
     .save-status { font-size: 10px; }
     .auth-btn.sync { display: none; } /* hide sync btn — use mobile sync in bottom sheet */
 
-    /* Hide desktop sidebar entirely on mobile */
+    /* Hide desktop sidebar on mobile (weekly wrap + monthly/habit plain sidebar) */
     .sidebar-wrap { display: none !important; }
+    .sidebar { display: none !important; }
     .week-review { display: none !important; }
 
     /* Main content stacks */
-    .main-content { flex-direction: column; overflow: visible; }
-    .main-panel { display: none !important; } /* hidden on mobile — replaced by mobile-day-view */
+    .main-content { flex-direction: column; overflow: visible; padding-bottom: 64px; }
+    /* main-panel hidden only on weekly planner — monthly/habit need it */
+    .main-panel { overflow: visible; }
 
     /* ── Mobile day view ── */
     .mobile-day-view { display: flex; flex-direction: column; flex: 1; min-height: 0; }
@@ -797,9 +799,6 @@
     .nav-tabs { display: none; }
 
 
-
-    /* extra bottom padding so content isn't behind bottom nav */
-    .main-panel { padding-bottom: 64px; }
 
     /* cal grid hidden on mobile — replaced by day view */
     .weekly-calendar { display: none; }
