@@ -804,6 +804,59 @@
     .weekly-calendar { display: none; }
   }
 
+  /* Monthly habit checklist below calendar */
+  .monthly-habit-checklist {
+    border-top: 1px solid var(--border); padding: 12px 16px 8px;
+    background: var(--paper); flex-shrink: 0;
+  }
+  .monthly-habit-checklist-title {
+    font-family: 'DM Mono', monospace; font-size: 11px; color: var(--ink-light);
+    text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px;
+  }
+  .monthly-habit-checklist-items { display: flex; flex-direction: column; gap: 6px; }
+  .monthly-habit-check-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 10px; border-radius: 6px; cursor: pointer;
+    background: var(--cream); transition: all 0.15s;
+    padding-left: 12px;
+  }
+  .monthly-habit-check-row:hover { opacity: 0.85; }
+  .monthly-habit-check-row.done { opacity: 0.75; }
+  .mhc-check {
+    width: 20px; height: 20px; border-radius: 50%; border: 2px solid;
+    flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+  }
+  .mhc-name {
+    font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500;
+  }
+
+  /* Monthly habit checklist below calendar */
+  .monthly-habit-checklist {
+    border-top: 1px solid var(--border); padding: 12px 16px 8px;
+    background: var(--paper); flex-shrink: 0;
+  }
+  .monthly-habit-checklist-title {
+    font-family: 'DM Mono', monospace; font-size: 11px; color: var(--ink-light);
+    text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px;
+  }
+  .monthly-habit-checklist-items { display: flex; flex-direction: column; gap: 6px; }
+  .monthly-habit-check-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 12px; border-radius: 6px; cursor: pointer;
+    background: var(--cream); transition: all 0.15s;
+  }
+  .monthly-habit-check-row:hover { opacity: 0.85; }
+  .monthly-habit-check-row.done { opacity: 0.75; }
+  .mhc-check {
+    width: 20px; height: 20px; border-radius: 50%; border: 2px solid;
+    flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+  }
+  .mhc-name {
+    font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500;
+  }
+
   /* Desktop sidebar toggle shows on all non-mobile */
   @media (min-width: 768px) {
     .mobile-day-view, .mobile-sheet, .mobile-sheet-overlay,
@@ -822,6 +875,18 @@ const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
 // ── HELPERS ──
+function useSwipe(onSwipeLeft, onSwipeRight) {
+  const touchStartX = React.useRef(null);
+  function onTouchStart(e) { touchStartX.current = e.touches[0].clientX; }
+  function onTouchEnd(e) {
+    if (touchStartX.current === null) return;
+    const dx = e.changedTouches[0].clientX - touchStartX.current;
+    if (Math.abs(dx) > 50) { dx < 0 ? onSwipeLeft() : onSwipeRight(); }
+    touchStartX.current = null;
+  }
+  return { onTouchStart, onTouchEnd };
+}
+
 function getWeekStart(date) {
   const d = new Date(date);
   d.setHours(0,0,0,0);
@@ -1511,7 +1576,13 @@ function WeeklyPlanner({ weekData, setWeekData, onGoToHabit, calHeaderColor, set
       </div>
 
       {/* MOBILE: Day view */}
-      <div className="mobile-day-view">
+      {(() => {
+        const swipe = useSwipe(
+          () => setMobileDayIndex(i => { if(i===6){setWeekStart(ws=>addDays(ws,7));return 0;} return i+1; }),
+          () => setMobileDayIndex(i => { if(i===0){setWeekStart(ws=>addDays(ws,-7));return 6;} return i-1; })
+        );
+        return (
+      <div className="mobile-day-view" {...swipe}>
         <div className="mobile-day-nav">
           <button className="nav-arrow" onClick={()=>setMobileDayIndex(i=>{
             if(i===0){setWeekStart(ws=>addDays(ws,-7));return 6;}
@@ -1547,6 +1618,8 @@ function WeeklyPlanner({ weekData, setWeekData, onGoToHabit, calHeaderColor, set
           ))}
         </div>
       </div>
+
+      );})()}
 
       {/* MOBILE: Bottom sheet overlay */}
       <div className={`mobile-sheet-overlay ${sheetOpen?'open':''}`} onClick={()=>setSheetOpen(false)} />
@@ -1829,7 +1902,13 @@ function HabitTracker({ onGoToPlanner }) {
       </div>
 
       {/* MAIN */}
-      <div className="habit-main">
+      {(() => {
+        const habitSwipe = useSwipe(
+          () => setSelectedDate(d => addDays(d, view==='daily'?1:view==='weekly'?7:view==='monthly'?31:365)),
+          () => setSelectedDate(d => addDays(d, view==='daily'?-1:view==='weekly'?-7:view==='monthly'?-31:-365))
+        );
+        return (
+      <div className="habit-main" {...habitSwipe}>
         <div className="habit-header-row">
           <div className="view-tabs">
             {['daily','weekly','monthly','yearly'].map(v=>(
@@ -1858,13 +1937,41 @@ function HabitTracker({ onGoToPlanner }) {
           ))}
         </div>
 
-        {view==='monthly' && <MonthlyView date={selectedDate} selected={selectedDate} goals={displayGoals} completions={completions}
-          onDayClick={setSelectedDate} today={today} />}
+        {view==='monthly' && <>
+          <MonthlyView date={selectedDate} selected={selectedDate} goals={displayGoals} completions={completions}
+            onDayClick={setSelectedDate} today={today} />
+          <div className="monthly-habit-checklist">
+            <div className="monthly-habit-checklist-title">
+              {DAYS[selectedDate.getDay()]}, {MONTHS[selectedDate.getMonth()].slice(0,3)} {selectedDate.getDate()}
+            </div>
+            <div className="monthly-habit-checklist-items">
+              {displayGoals.map(g => {
+                const done = isCompleted(g.id, fmt(selectedDate));
+                return (
+                  <div key={g.id}
+                    className={`monthly-habit-check-row ${done?'done':''}`}
+                    onClick={()=>toggleCompletion(g.id, fmt(selectedDate))}
+                    style={{borderLeft: `3px solid ${g.color}`}}>
+                    <div className="mhc-check" style={{
+                      background: done ? g.color : 'transparent',
+                      borderColor: g.color
+                    }}>
+                      {done && <span style={{color:'white',fontSize:11,lineHeight:1}}>✓</span>}
+                    </div>
+                    <span className="mhc-name" style={{color: done ? g.color : 'var(--ink)'}}>{g.name}</span>
+                    {done && <span style={{marginLeft:'auto',fontSize:10,color:g.color,fontFamily:"'DM Mono',monospace"}}>done</span>}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </>}
         {view==='weekly' && <WeeklyHabitView date={selectedDate} selected={selectedDate} goals={displayGoals} completions={completions} today={today} onDayClick={setSelectedDate} />}
         {view==='yearly' && <YearlyView date={selectedDate} selected={selectedDate} goals={displayGoals} completions={completions} today={today} onDayClick={setSelectedDate} />}
         {view==='daily' && <DailyView date={selectedDate} goals={displayGoals} completions={completions}
           onToggle={(gid)=>toggleCompletion(gid,fmt(selectedDate))} />}
       </div>
+      );})()}
     </div>
   );
 }
