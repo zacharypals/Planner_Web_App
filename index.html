@@ -619,23 +619,27 @@
   /* ── SIDEBAR COLLAPSE ── */
   .sidebar-wrap {
     display: flex; flex-direction: row; flex-shrink: 0;
+    overflow: hidden;
     transition: width 0.25s ease;
     width: 312px; /* 280px sidebar + 32px strip */
   }
   .sidebar-wrap.collapsed { width: 32px; }
   .sidebar {
-    flex: 1; background: var(--paper); border-right: none;
+    width: 280px; min-width: 280px; /* fixed, never shrinks */
+    background: var(--paper);
     display: flex; flex-direction: column; overflow-y: auto; overflow-x: hidden;
-    padding: 16px; transition: opacity 0.2s, width 0.25s;
-    width: 280px;
+    padding: 16px; transition: opacity 0.2s;
   }
-  .sidebar-wrap.collapsed .sidebar { opacity: 0; pointer-events: none; width: 0; padding: 0; }
+  .sidebar-wrap.collapsed .sidebar { opacity: 0; pointer-events: none; }
   .sidebar::-webkit-scrollbar { width: 4px; }
   .sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
   .sidebar-toggle-strip {
-    width: 32px; flex-shrink: 0; display: flex; flex-direction: column;
+    width: 32px; min-width: 32px; flex-shrink: 0;
+    display: flex; flex-direction: column;
     align-items: center; padding-top: 14px; gap: 8px;
-    border-right: 1px solid var(--border); background: var(--paper);
+    border-left: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+    background: var(--paper);
     cursor: pointer; transition: background 0.15s;
   }
   .sidebar-toggle-strip:hover { background: var(--cream); }
@@ -655,8 +659,8 @@
 
   /* ── TABLET (768–1024px) ── */
   @media (max-width: 1024px) and (min-width: 768px) {
-    .sidebar-inner { width: 240px; }
-    .sidebar:not(.collapsed) { width: 240px; }
+    .sidebar-wrap { width: 272px; }
+    .sidebar { width: 240px; min-width: 240px; }
     .cal-grid { min-width: 560px; }
     .task-card { padding: 6px 8px; }
     .task-title-input { font-size: 12px; }
@@ -780,8 +784,8 @@
     /* hide top nav tabs on mobile — use bottom nav instead */
     .nav-tabs { display: none; }
 
-    /* week-review in mobile */
-    .week-review { grid-template-columns: 1fr; padding: 12px; }
+    /* week-review hidden on mobile — proud/story are in the bottom sheet */
+    .week-review { display: none; }
 
     /* extra bottom padding so content isn't behind bottom nav */
     .main-panel { padding-bottom: 64px; }
