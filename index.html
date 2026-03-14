@@ -411,7 +411,7 @@
   }
 
   /* HABIT CALENDAR */
-  .habit-main { flex: 1; display: flex; flex-direction: column; overflow: hidden; padding: 16px 20px; background: var(--paper); }
+  .habit-main { flex: 1; display: flex; flex-direction: column; overflow-y: auto; padding: 16px 20px; background: var(--paper); }
   .habit-header { display: flex; align-items: center; justify-between: space-between; margin-bottom: 16px; gap: 16px; }
   .view-tabs { display: flex; gap: 4px; }
   .view-tab {
@@ -802,33 +802,6 @@
 
     /* cal grid hidden on mobile — replaced by day view */
     .weekly-calendar { display: none; }
-  }
-
-  /* Monthly habit checklist below calendar */
-  .monthly-habit-checklist {
-    border-top: 1px solid var(--border); padding: 12px 16px 8px;
-    background: var(--paper); flex-shrink: 0;
-  }
-  .monthly-habit-checklist-title {
-    font-family: 'DM Mono', monospace; font-size: 11px; color: var(--ink-light);
-    text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px;
-  }
-  .monthly-habit-checklist-items { display: flex; flex-direction: column; gap: 6px; }
-  .monthly-habit-check-row {
-    display: flex; align-items: center; gap: 10px;
-    padding: 8px 10px; border-radius: 6px; cursor: pointer;
-    background: var(--cream); transition: all 0.15s;
-    padding-left: 12px;
-  }
-  .monthly-habit-check-row:hover { opacity: 0.85; }
-  .monthly-habit-check-row.done { opacity: 0.75; }
-  .mhc-check {
-    width: 20px; height: 20px; border-radius: 50%; border: 2px solid;
-    flex-shrink: 0; display: flex; align-items: center; justify-content: center;
-    transition: all 0.15s;
-  }
-  .mhc-name {
-    font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500;
   }
 
   /* Monthly habit checklist below calendar */
@@ -2040,8 +2013,8 @@ function MonthlyView({date, selected, goals, completions, onDayClick, today}) {
   while(cells.length%7!==0) cells.push({day:null,date:null});
 
   return (
-    <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
-      <div style={{flex:1,display:'grid',gridTemplateColumns:'repeat(7,1fr)',gridTemplateRows:'auto',gap:2,overflow:'auto',alignContent:'start'}}>
+    <div style={{display:'flex',flexDirection:'column'}}>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gridTemplateRows:'auto',gap:2,alignContent:'start'}}>
         {DAYS.map(d=><div key={d} className="month-day-header">{d}</div>)}
         {cells.map((c,i)=>{
           if(!c.date) return <div key={i} style={{background:'var(--cream)',borderRadius:6,minHeight:70}}/>;
