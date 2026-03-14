@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v1.0.2 -->
+<!-- LP Planner v1.1.0 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -833,6 +833,187 @@
     font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500;
   }
 
+  /* ── PAGES VIEW ── */
+  .pages-layout { display: flex; flex: 1; overflow: hidden; }
+  .pages-sidebar {
+    width: 260px; min-width: 260px; background: var(--paper);
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  .pages-sidebar-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 16px 10px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+  }
+  .pages-sidebar-title {
+    font-family: 'Playfair Display', serif; font-size: 15px; font-weight: 700; color: var(--ink);
+  }
+  .pages-list { flex: 1; overflow-y: auto; padding: 8px 0; }
+  .pages-list-item {
+    padding: 10px 16px; cursor: pointer; border-left: 3px solid transparent;
+    transition: all 0.15s; border-bottom: 1px solid var(--border);
+  }
+  .pages-list-item:hover { background: var(--cream); }
+  .pages-list-item.active { border-left-color: var(--accent); background: var(--accent-light); }
+  .pages-list-item-title {
+    font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500;
+    color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .pages-list-item-date {
+    font-family: 'DM Mono', monospace; font-size: 10px; color: var(--ink-faint); margin-top: 2px;
+  }
+  .pages-list-item-taskcount {
+    font-family: 'DM Mono', monospace; font-size: 10px; color: var(--accent); margin-top: 2px;
+  }
+  .pages-main {
+    flex: 1; display: flex; flex-direction: column; overflow: hidden; background: var(--cream);
+  }
+  .pages-empty {
+    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    color: var(--ink-faint); gap: 12px;
+  }
+  .pages-empty-icon { font-size: 48px; opacity: 0.3; }
+  .pages-empty-text { font-family: 'DM Sans', sans-serif; font-size: 14px; }
+  .pages-editor {
+    flex: 1; display: flex; flex-direction: column; overflow-y: auto; padding: 24px 32px;
+  }
+  .pages-title-input {
+    font-family: 'Playfair Display', serif; font-size: 26px; font-weight: 700;
+    color: var(--ink); border: none; background: transparent; outline: none;
+    width: 100%; margin-bottom: 8px; line-height: 1.3;
+  }
+  .pages-title-input::placeholder { color: var(--ink-faint); }
+  .pages-doc-meta {
+    font-family: 'DM Mono', monospace; font-size: 10px; color: var(--ink-faint);
+    margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border);
+  }
+  /* Rich text editor toolbar */
+  .pages-toolbar {
+    display: flex; gap: 2px; flex-wrap: wrap;
+    padding: 6px 8px; background: var(--paper);
+    border: 1px solid var(--border); border-radius: 8px 8px 0 0;
+    margin-bottom: 0;
+  }
+  .pages-toolbar-btn {
+    padding: 4px 8px; border-radius: 4px; border: none; background: none;
+    cursor: pointer; font-size: 13px; color: var(--ink-light);
+    transition: all 0.15s; min-width: 28px; text-align: center;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .pages-toolbar-btn:hover { background: var(--cream); color: var(--ink); }
+  .pages-toolbar-btn.active { background: var(--accent); color: white; }
+  .pages-toolbar-sep { width: 1px; background: var(--border); margin: 2px 4px; align-self: stretch; }
+  .pages-body {
+    flex: 1; min-height: 200px; padding: 14px 16px;
+    border: 1px solid var(--border); border-top: none; border-radius: 0 0 8px 8px;
+    background: white; outline: none; font-family: 'DM Sans', sans-serif;
+    font-size: 14px; line-height: 1.7; color: var(--ink); overflow-y: auto;
+  }
+  .pages-body:focus { border-color: var(--accent); }
+  .pages-body h1 { font-family: 'Playfair Display',serif; font-size:20px; font-weight:700; margin:12px 0 6px; }
+  .pages-body h2 { font-family: 'Playfair Display',serif; font-size:17px; font-weight:600; margin:10px 0 5px; }
+  .pages-body h3 { font-family: 'Playfair Display',serif; font-size:14px; font-weight:600; margin:8px 0 4px; }
+  .pages-body ul, .pages-body ol { padding-left: 22px; margin: 6px 0; }
+  .pages-body li { margin: 3px 0; }
+  .pages-body a { color: var(--accent); text-decoration: underline; }
+  .pages-body blockquote { border-left:3px solid var(--gold); padding:6px 12px; margin:8px 0; color:var(--ink-light); font-style:italic; }
+  .pages-body p { margin: 4px 0; }
+  /* Project tasks section */
+  .pages-tasks-section {
+    flex-shrink: 0; border-top: 2px solid var(--border);
+    padding: 16px 32px 24px; background: var(--paper);
+  }
+  .pages-tasks-header {
+    display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;
+  }
+  .pages-tasks-title {
+    font-family: 'Playfair Display', serif; font-size: 14px; font-weight: 700; color: var(--ink);
+  }
+  .pages-task-item {
+    display: flex; align-items: flex-start; gap: 8px;
+    padding: 8px 10px; border-radius: 6px; margin-bottom: 6px;
+    background: var(--cream); border: 1px solid var(--border);
+    transition: border-color 0.15s;
+  }
+  .pages-task-item:hover { border-color: var(--accent); }
+  .pages-task-check {
+    width: 16px; height: 16px; border: 1.5px solid var(--border); border-radius: 3px;
+    flex-shrink: 0; background: white; cursor: pointer; margin-top: 2px;
+    display: flex; align-items: center; justify-content: center; transition: all 0.15s;
+  }
+  .pages-task-check.done { background: var(--accent); border-color: var(--accent); }
+  .pages-task-check.done::after { content: '✓'; color: white; font-size: 9px; }
+  .pages-task-body { flex: 1; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .pages-task-title-input {
+    border: none; background: transparent; outline: none; width: 100%;
+    font-family: 'DM Sans', sans-serif; font-size: 13px; color: var(--ink);
+  }
+  .pages-task-title-input.done { text-decoration: line-through; opacity: 0.5; }
+  .pages-task-date-row {
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  }
+  .pages-task-date-input {
+    font-family: 'DM Mono', monospace; font-size: 11px; color: var(--ink-light);
+    border: 1px solid var(--border); border-radius: 4px; padding: 2px 6px;
+    background: white; cursor: pointer;
+  }
+  .pages-task-date-input:focus { outline: none; border-color: var(--accent); }
+  .pages-task-date-badge {
+    font-family: 'DM Mono', monospace; font-size: 10px;
+    background: var(--accent-light); color: var(--accent);
+    padding: 1px 6px; border-radius: 10px;
+  }
+  .pages-task-delete {
+    background: none; border: none; color: var(--ink-faint); cursor: pointer;
+    font-size: 14px; padding: 0 2px; opacity: 0; transition: opacity 0.15s;
+    flex-shrink: 0;
+  }
+  .pages-task-item:hover .pages-task-delete { opacity: 1; }
+  /* Project task badge in weekly planner */
+  .project-task-badge {
+    font-family: 'DM Mono', monospace; font-size: 9px;
+    color: var(--accent); background: var(--accent-light);
+    padding: 1px 5px; border-radius: 8px; display: inline-flex; align-items: center; gap: 3px;
+    margin-top: 2px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  /* Pages sidebar collapse (same pattern as weekly) */
+  .pages-sidebar-wrap {
+    display: flex; flex-direction: row; flex-shrink: 0;
+    transition: width 0.25s ease; width: 292px;
+  }
+  .pages-sidebar-wrap.collapsed { width: 32px; }
+  .pages-sidebar-wrap > .pages-sidebar {
+    width: 260px; min-width: 260px; transition: opacity 0.2s;
+  }
+  .pages-sidebar-wrap.collapsed > .pages-sidebar { opacity: 0; pointer-events: none; width: 0; min-width: 0; padding: 0; overflow: hidden; }
+  .pages-toggle-strip {
+    width: 32px; min-width: 32px; flex-shrink: 0;
+    display: flex; flex-direction: column; align-items: center; padding-top: 14px; gap: 8px;
+    border-right: 1px solid var(--border); background: var(--paper);
+    cursor: pointer; transition: background 0.15s;
+  }
+  .pages-toggle-strip:hover { background: var(--cream); }
+  .pages-toggle-btn {
+    display: flex; align-items: center; justify-content: center;
+    width: 20px; height: 20px; border-radius: 4px; border: 1.5px solid var(--border);
+    background: var(--paper); color: var(--ink-light); font-size: 12px; pointer-events: none;
+  }
+  .pages-toggle-strip:hover .pages-toggle-btn { background: var(--accent); color: white; border-color: var(--accent); }
+
+  /* Mobile pages */
+  @media (max-width: 767px) {
+    .pages-sidebar-wrap { display: none !important; }
+    .pages-toggle-strip { display: none !important; }
+    .pages-editor { padding: 16px; }
+    .pages-tasks-section { padding: 12px 16px 80px; }
+    .pages-mobile-back { display: block; }
+    .pages-mobile-list { display: flex; flex-direction: column; flex: 1; overflow-y: auto; }
+  }
+  @media (min-width: 768px) {
+    .pages-mobile-back { display: none !important; }
+    .pages-mobile-list { display: none !important; }
+    .pages-empty { display: flex; }
+  }
+
   /* Desktop sidebar toggle shows on all non-mobile */
   @media (min-width: 768px) {
     .mobile-day-view, .mobile-sheet, .mobile-sheet-overlay,
@@ -1281,7 +1462,7 @@ function ColorPicker({ value, onChange }) {
 // ─────────────────────────────────────────────
 // WEEKLY PLANNER
 // ─────────────────────────────────────────────
-function WeeklyPlanner({ weekData, setWeekData, onGoToHabit, calHeaderColor, setCalHeaderColor }) {
+function WeeklyPlanner({ weekData, setWeekData, pagesData, onGoToHabit, calHeaderColor, setCalHeaderColor }) {
   const today = new Date(); today.setHours(0,0,0,0);
   const [weekStart, setWeekStart] = useState(getWeekStart(today));
   const weekKey = fmt(weekStart);
@@ -1709,7 +1890,15 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onDragStart, onDragOve
           placeholder={task.isEvent ? 'Event…' : 'Task…'}
           value={task.title} onChange={e=>onUpdate({title:e.target.value})}
           onBlur={()=>onBlurSync && task.isEvent && onBlurSync()}
-          onClick={e=>e.stopPropagation()} />
+          onClick={e=>e.stopPropagation()}
+          readOnly={!!task.isProjectTask}
+          style={task.isProjectTask ? {cursor:'default'} : {}}
+        />
+        {task.isProjectTask && task.projectTitle && (
+          <div className="project-task-badge" title={`From: ${task.projectTitle}`}>
+            📝 {task.projectTitle}
+          </div>
+        )}
         <button className="task-expand-btn" onClick={()=>onUpdate({expanded:!task.expanded})}>
           {task.expanded ? '▲' : '▼'}
         </button>
@@ -2675,13 +2864,14 @@ function ColorPickerPopover({ color, onChange }) {
 // ─────────────────────────────────────────────
 // APP ROOT
 // ─────────────────────────────────────────────
-const ALL_STORAGE_KEYS = ['weekData','habitGoals','habitCompletions','monthlyGoals','navColor','calHeaderColor'];
+const ALL_STORAGE_KEYS = ['weekData','habitGoals','habitCompletions','monthlyGoals','navColor','calHeaderColor','pagesData'];
 
 function App() {
   const [page, setPage] = useState('planner');
   const [navColor, setNavColor] = useStorage('navColor', '#1e3d29');
   const [calHeaderColor, setCalHeaderColor] = useStorage('calHeaderColor', '#2d5a3d');
   const [weekData, setWeekData] = useStorage('weekData', {});
+  const [pagesData, setPagesData] = useStorage('pagesData', []); // [{id,title,body,createdAt,tasks:[]}]
 
   // Auth state
   const [authUser, setAuthUser] = useState(null); // {name, email, picture}
@@ -2840,13 +3030,14 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.0.2</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.1.0</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
           <button className={`nav-tab ${page==='planner'?'active':''}`} onClick={()=>setPage('planner')}>Weekly Planner</button>
           <button className={`nav-tab ${page==='monthly'?'active':''}`} onClick={()=>setPage('monthly')}>Monthly Calendar</button>
           <button className={`nav-tab ${page==='habit'?'active':''}`} onClick={()=>setPage('habit')}>Habit Tracker</button>
+          <button className={`nav-tab ${page==='pages'?'active':''}`} onClick={()=>setPage('pages')}>Pages</button>
         </div>
         <div className="auth-area">
           {saveLabel && <span className={`save-status ${saveClass || saveStatus}`}>{saveLabel}</span>}
@@ -2863,9 +3054,10 @@ function App() {
           )}
         </div>
       </div>
-      {page==='planner' && <WeeklyPlanner weekData={weekData} setWeekData={setWeekData} onGoToHabit={()=>setPage('habit')} calHeaderColor={calHeaderColor} setCalHeaderColor={setCalHeaderColor} />}
+      {page==='planner' && <WeeklyPlanner weekData={weekData} setWeekData={setWeekData} pagesData={pagesData} onGoToHabit={()=>setPage('habit')} calHeaderColor={calHeaderColor} setCalHeaderColor={setCalHeaderColor} />}
       {page==='monthly' && <MonthlyCalendar weekData={weekData} setWeekData={setWeekData} />}
       {page==='habit' && <HabitTracker onGoToPlanner={()=>setPage('planner')} />}
+      {page==='pages' && <PagesView pagesData={pagesData} setPagesData={setPagesData} weekData={weekData} setWeekData={setWeekData} />}
 
       {/* Mobile bottom nav — only visible on phones via CSS */}
       <div className="mobile-bottom-nav">
@@ -2878,11 +3070,337 @@ function App() {
         <button className={`mobile-bottom-nav-btn ${page==='habit'?'active':''}`} onClick={()=>setPage('habit')}>
           <span className="icon">✓</span>Habits
         </button>
+        <button className={`mobile-bottom-nav-btn ${page==='pages'?'active':''}`} onClick={()=>setPage('pages')}>
+          <span className="icon">📝</span>Pages
+        </button>
         {authUser && (
           <button className="mobile-bottom-nav-btn" onClick={handleSyncCalendar} disabled={syncing}>
             <span className="icon">{syncing?'↻':'↓'}</span>Sync
           </button>
         )}
+      </div>
+    </div>
+  );
+}
+
+
+// ─────────────────────────────────────────────
+// PAGES VIEW
+// ─────────────────────────────────────────────
+function PagesView({ pagesData, setPagesData, weekData, setWeekData }) {
+  const [selectedId, setSelectedId] = useState(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileView, setMobileView] = useState('list'); // 'list' | 'editor'
+  const bodyRef = useRef(null);
+  const titleRef = useRef(null);
+  const debounceRef = useRef(null);
+
+  const selectedDoc = pagesData.find(d => d.id === selectedId) || null;
+
+  function createDoc() {
+    const id = 'doc_' + Date.now();
+    const now = new Date().toISOString();
+    const newDoc = { id, title: '', body: '', createdAt: now, tasks: [] };
+    setPagesData(p => [newDoc, ...p]);
+    setSelectedId(id);
+    setMobileView('editor');
+    setTimeout(() => titleRef.current?.focus(), 50);
+  }
+
+  function updateDoc(id, patch) {
+    setPagesData(p => p.map(d => d.id === id ? { ...d, ...patch } : d));
+  }
+
+  function deleteDoc(id) {
+    if (!window.confirm('Delete this document?')) return;
+    // Remove any scheduled tasks from weekData
+    const doc = pagesData.find(d => d.id === id);
+    if (doc) {
+      doc.tasks.filter(t => t.scheduledDate).forEach(t => {
+        removeTaskFromWeek(t.id, t.scheduledDate);
+      });
+    }
+    setPagesData(p => p.filter(d => d.id !== id));
+    if (selectedId === id) { setSelectedId(null); setMobileView('list'); }
+  }
+
+  function addTask(docId) {
+    const taskId = 'ptask_' + Date.now();
+    const newTask = { id: taskId, title: '', done: false, scheduledDate: '', colorIndex: 0 };
+    setPagesData(p => p.map(d => d.id === docId
+      ? { ...d, tasks: [...(d.tasks||[]), newTask] }
+      : d
+    ));
+  }
+
+  function updateTask(docId, taskId, patch) {
+    setPagesData(p => p.map(d => {
+      if (d.id !== docId) return d;
+      const oldTask = (d.tasks||[]).find(t => t.id === taskId);
+      const updatedTask = { ...oldTask, ...patch };
+      // Handle date scheduling changes
+      if (patch.scheduledDate !== undefined) {
+        const oldDate = oldTask?.scheduledDate;
+        const newDate = patch.scheduledDate;
+        if (oldDate && oldDate !== newDate) removeTaskFromWeek(taskId, oldDate);
+        if (newDate) scheduleTaskToWeek(updatedTask, d.title || 'Untitled', newDate);
+      }
+      return { ...d, tasks: (d.tasks||[]).map(t => t.id === taskId ? updatedTask : t) };
+    }));
+  }
+
+  function deleteTask(docId, taskId) {
+    const doc = pagesData.find(d => d.id === docId);
+    const task = doc?.tasks?.find(t => t.id === taskId);
+    if (task?.scheduledDate) removeTaskFromWeek(taskId, task.scheduledDate);
+    setPagesData(p => p.map(d => d.id === docId
+      ? { ...d, tasks: (d.tasks||[]).filter(t => t.id !== taskId) }
+      : d
+    ));
+  }
+
+  function scheduleTaskToWeek(task, docTitle, dateStr) {
+    const dateObj = new Date(dateStr + 'T00:00:00');
+    const weekKey = fmt(getWeekStart(dateObj));
+    setWeekData(wd => {
+      const wk = wd[weekKey] || { proverb:'',toCreate:[],weekGoals:[],people:[],beWord:'',proud:'',story:'',tasks:{} };
+      const dayTasks = (wk.tasks||{})[dateStr] || [];
+      // Remove existing entry for this task id first
+      const filtered = dayTasks.filter(t => t.id !== task.id);
+      const newEntry = {
+        id: task.id, title: task.title, done: task.done,
+        details: '', expanded: false, colorIndex: task.colorIndex || 0,
+        isProjectTask: true, projectDocId: task.projectDocId || '',
+        projectTitle: docTitle,
+      };
+      return { ...wd, [weekKey]: { ...wk, tasks: { ...(wk.tasks||{}), [dateStr]: [...filtered, newEntry] } } };
+    });
+  }
+
+  function removeTaskFromWeek(taskId, dateStr) {
+    const dateObj = new Date(dateStr + 'T00:00:00');
+    const weekKey = fmt(getWeekStart(dateObj));
+    setWeekData(wd => {
+      if (!(wd[weekKey]?.tasks?.[dateStr])) return wd;
+      return { ...wd, [weekKey]: { ...wd[weekKey], tasks: { ...wd[weekKey].tasks,
+        [dateStr]: wd[weekKey].tasks[dateStr].filter(t => t.id !== taskId)
+      }}};
+    });
+  }
+
+  // Rich text exec command helper
+  function exec(cmd, val) {
+    bodyRef.current?.focus();
+    document.execCommand(cmd, false, val || null);
+  }
+
+  function isActive(cmd) {
+    try { return document.queryCommandState(cmd); } catch { return false; }
+  }
+
+  // Sync contentEditable body back to state (debounced)
+  function onBodyInput() {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      if (bodyRef.current && selectedId) {
+        updateDoc(selectedId, { body: bodyRef.current.innerHTML });
+      }
+    }, 800);
+  }
+
+  // When selectedDoc changes, sync body innerHTML
+  useEffect(() => {
+    if (bodyRef.current && selectedDoc) {
+      if (bodyRef.current.innerHTML !== selectedDoc.body) {
+        bodyRef.current.innerHTML = selectedDoc.body || '';
+      }
+    }
+  }, [selectedId]);
+
+  const fmtDocDate = (iso) => {
+    const d = new Date(iso);
+    return `${MONTHS[d.getMonth()].slice(0,3)} ${d.getDate()}, ${d.getFullYear()}`;
+  };
+
+  const sidebarContent = (
+    <div className="pages-sidebar">
+      <div className="pages-sidebar-header">
+        <span className="pages-sidebar-title">Pages</span>
+        <button className="add-btn" onClick={createDoc} title="New document">+</button>
+      </div>
+      <div className="pages-list">
+        {pagesData.length === 0 && (
+          <div style={{padding:'16px',fontSize:12,color:'var(--ink-faint)',fontFamily:"'DM Sans',sans-serif"}}>
+            No pages yet — tap + to create one
+          </div>
+        )}
+        {pagesData.map(doc => (
+          <div key={doc.id}
+            className={`pages-list-item ${selectedId===doc.id?'active':''}`}
+            onClick={()=>{ setSelectedId(doc.id); setMobileView('editor'); }}>
+            <div className="pages-list-item-title">{doc.title || 'Untitled'}</div>
+            <div className="pages-list-item-date">{fmtDocDate(doc.createdAt)}</div>
+            {(doc.tasks||[]).length > 0 && (
+              <div className="pages-list-item-taskcount">
+                {(doc.tasks||[]).filter(t=>t.done).length}/{(doc.tasks||[]).length} tasks
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="main-content" style={{overflow:'hidden'}}>
+
+      {/* DESKTOP/TABLET: collapsible sidebar */}
+      <div className={`pages-sidebar-wrap ${sidebarCollapsed?'collapsed':''}`}>
+        {sidebarContent}
+        <div className="pages-toggle-strip" onClick={()=>setSidebarCollapsed(c=>!c)}>
+          <div className="pages-toggle-btn">{sidebarCollapsed?'›':'‹'}</div>
+        </div>
+      </div>
+
+      {/* MAIN EDITOR AREA */}
+      <div className="pages-main">
+
+        {/* MOBILE: list view */}
+        {mobileView === 'list' && (
+          <div className="pages-mobile-list">
+            <div className="pages-sidebar-header" style={{padding:'14px 16px 10px',borderBottom:'1px solid var(--border)',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+              <span className="pages-sidebar-title">Pages</span>
+              <button className="add-btn" onClick={createDoc} title="New document">+</button>
+            </div>
+            <div className="pages-list" style={{flex:1,overflowY:'auto'}}>
+              {pagesData.length === 0 && (
+                <div style={{padding:'24px 16px',fontSize:13,color:'var(--ink-faint)',fontFamily:"'DM Sans',sans-serif",textAlign:'center'}}>
+                  No pages yet — tap + to create one
+                </div>
+              )}
+              {pagesData.map(doc => (
+                <div key={doc.id}
+                  className="pages-list-item"
+                  onClick={()=>{ setSelectedId(doc.id); setMobileView('editor'); }}>
+                  <div className="pages-list-item-title">{doc.title || 'Untitled'}</div>
+                  <div className="pages-list-item-date">{fmtDocDate(doc.createdAt)}</div>
+                  {(doc.tasks||[]).length > 0 && (
+                    <div className="pages-list-item-taskcount">
+                      {(doc.tasks||[]).filter(t=>t.done).length}/{(doc.tasks||[]).length} tasks
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* EDITOR (desktop always shown; mobile shown when mobileView==='editor') */}
+        {(!selectedDoc && mobileView !== 'list') && (
+          <div className="pages-empty">
+            <div className="pages-empty-icon">📝</div>
+            <div className="pages-empty-text">Select a page or create a new one</div>
+            <button className="add-btn" style={{width:32,height:32,fontSize:18}} onClick={createDoc}>+</button>
+          </div>
+        )}
+        {!selectedDoc && mobileView === 'list' && null}
+        {!selectedDoc && mobileView !== 'list' && null}
+
+        {selectedDoc && (
+          <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
+            {/* Mobile back button */}
+            <div className="pages-mobile-back">
+              <button onClick={()=>setMobileView('list')} style={{background:'none',border:'none',color:'var(--accent)',cursor:'pointer',padding:'10px 16px 0',fontFamily:"'DM Sans',sans-serif",fontSize:13,display:'flex',alignItems:'center',gap:4}}>
+                ‹ All Pages
+              </button>
+            </div>
+
+            <div className="pages-editor">
+              <div style={{display:'flex',alignItems:'flex-start',gap:8,marginBottom:4}}>
+                <input ref={titleRef} className="pages-title-input"
+                  placeholder="Untitled"
+                  value={selectedDoc.title}
+                  onChange={e=>updateDoc(selectedDoc.id, {title: e.target.value})}
+                />
+                <button onClick={()=>deleteDoc(selectedDoc.id)}
+                  style={{background:'none',border:'none',color:'var(--ink-faint)',cursor:'pointer',fontSize:16,padding:'4px',flexShrink:0,marginTop:6}}
+                  title="Delete document">🗑</button>
+              </div>
+              <div className="pages-doc-meta">
+                Created {fmtDocDate(selectedDoc.createdAt)}
+              </div>
+
+              {/* Toolbar */}
+              <div className="pages-toolbar">
+                <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();exec('bold');}} title="Bold"><b>B</b></button>
+                <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();exec('italic');}} title="Italic"><i>I</i></button>
+                <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();exec('underline');}} title="Underline"><u>U</u></button>
+                <div className="pages-toolbar-sep"/>
+                <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();exec('formatBlock','h1');}} title="Heading 1">H1</button>
+                <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();exec('formatBlock','h2');}} title="Heading 2">H2</button>
+                <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();exec('formatBlock','h3');}} title="Heading 3">H3</button>
+                <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();exec('formatBlock','p');}} title="Normal text">¶</button>
+                <div className="pages-toolbar-sep"/>
+                <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();exec('insertUnorderedList');}} title="Bullet list">• —</button>
+                <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();exec('insertOrderedList');}} title="Numbered list">1.</button>
+                <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();exec('formatBlock','blockquote');}} title="Quote">"</button>
+                <div className="pages-toolbar-sep"/>
+                <button className="pages-toolbar-btn" onMouseDown={e=>{
+                  e.preventDefault();
+                  const url = prompt('Enter URL:');
+                  if (url) exec('createLink', url);
+                }} title="Link">🔗</button>
+                <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();exec('removeFormat');}} title="Clear formatting">✕</button>
+              </div>
+
+              {/* Content editable body */}
+              <div ref={bodyRef} className="pages-body" contentEditable suppressContentEditableWarning
+                onInput={onBodyInput}
+                data-placeholder="Start writing…"
+                style={{minHeight:180}}
+              />
+            </div>
+
+            {/* Tasks section */}
+            <div className="pages-tasks-section">
+              <div className="pages-tasks-header">
+                <span className="pages-tasks-title">Tasks</span>
+                <button className="add-btn" onClick={()=>addTask(selectedDoc.id)} title="Add task">+</button>
+              </div>
+              {(selectedDoc.tasks||[]).length === 0 && (
+                <div style={{fontSize:12,color:'var(--ink-faint)',fontFamily:"'DM Sans',sans-serif",padding:'4px 0'}}>
+                  No tasks yet — add one to schedule it on the weekly planner
+                </div>
+              )}
+              {(selectedDoc.tasks||[]).map(task => (
+                <div key={task.id} className="pages-task-item">
+                  <div className={`pages-task-check ${task.done?'done':''}`}
+                    onClick={()=>updateTask(selectedDoc.id, task.id, {done:!task.done})} />
+                  <div className="pages-task-body">
+                    <input className={`pages-task-title-input ${task.done?'done':''}`}
+                      placeholder="Task…"
+                      value={task.title}
+                      onChange={e=>updateTask(selectedDoc.id, task.id, {title:e.target.value})}
+                    />
+                    <div className="pages-task-date-row">
+                      <span style={{fontSize:10,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace"}}>📅</span>
+                      <input type="date" className="pages-task-date-input"
+                        value={task.scheduledDate||''}
+                        onChange={e=>updateTask(selectedDoc.id, task.id, {scheduledDate:e.target.value, projectDocId:selectedDoc.id})}
+                      />
+                      {task.scheduledDate && (
+                        <span className="pages-task-date-badge">{task.scheduledDate}</span>
+                      )}
+                    </div>
+                  </div>
+                  <button className="pages-task-delete"
+                    onClick={()=>deleteTask(selectedDoc.id, task.id)}>✕</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
       </div>
     </div>
   );
