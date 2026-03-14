@@ -616,19 +616,42 @@
   .modal-btn.danger:hover { background: #c0392b; color: white; }
 
 
-  /* ── SIDEBAR COLLAPSE (all sizes) ── */
+  /* ── SIDEBAR COLLAPSE ── */
+  .sidebar-wrap {
+    display: flex; flex-direction: row; flex-shrink: 0;
+    transition: width 0.25s ease;
+    width: 312px; /* 280px sidebar + 32px strip */
+  }
+  .sidebar-wrap.collapsed { width: 32px; }
+  .sidebar {
+    flex: 1; background: var(--paper); border-right: none;
+    display: flex; flex-direction: column; overflow-y: auto; overflow-x: hidden;
+    padding: 16px; transition: opacity 0.2s, width 0.25s;
+    width: 280px;
+  }
+  .sidebar-wrap.collapsed .sidebar { opacity: 0; pointer-events: none; width: 0; padding: 0; }
+  .sidebar::-webkit-scrollbar { width: 4px; }
+  .sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  .sidebar-toggle-strip {
+    width: 32px; flex-shrink: 0; display: flex; flex-direction: column;
+    align-items: center; padding-top: 14px; gap: 8px;
+    border-right: 1px solid var(--border); background: var(--paper);
+    cursor: pointer; transition: background 0.15s;
+  }
+  .sidebar-toggle-strip:hover { background: var(--cream); }
   .sidebar-toggle-btn {
     display: flex; align-items: center; justify-content: center;
-    width: 28px; height: 28px; border-radius: 50%; border: 1.5px solid var(--border);
-    background: var(--paper); color: var(--ink-light); cursor: pointer;
-    font-size: 14px; transition: all 0.2s; flex-shrink: 0;
-    position: absolute; right: -14px; top: 18px; z-index: 10;
-    box-shadow: 0 1px 4px var(--shadow);
+    width: 20px; height: 20px; border-radius: 4px; border: 1.5px solid var(--border);
+    background: var(--paper); color: var(--ink-light); font-size: 12px;
+    transition: all 0.15s; pointer-events: none;
   }
-  .sidebar-toggle-btn:hover { background: var(--accent); color: white; border-color: var(--accent); }
-  .sidebar.collapsed { width: 0; padding: 0; overflow: hidden; border-right: none; }
-  .sidebar-inner { display: flex; flex-direction: column; height: 100%; width: 280px; }
-  .sidebar { position: relative; transition: width 0.25s ease, padding 0.25s ease; }
+  .sidebar-toggle-strip:hover .sidebar-toggle-btn { background: var(--accent); color: white; border-color: var(--accent); }
+  .sidebar-collapsed-label {
+    writing-mode: vertical-rl; font-family: 'DM Mono', monospace; font-size: 9px;
+    color: var(--ink-faint); letter-spacing: 0.1em; text-transform: uppercase;
+    opacity: 0; transition: opacity 0.2s 0.15s;
+  }
+  .sidebar-wrap.collapsed .sidebar-collapsed-label { opacity: 1; }
 
   /* ── TABLET (768–1024px) ── */
   @media (max-width: 1024px) and (min-width: 768px) {
@@ -1364,20 +1387,7 @@ function WeeklyPlanner({ weekData, setWeekData, onGoToHabit, calHeaderColor, set
           </div>
         ))}
       </div>
-      <div className="sidebar-section">
-        <div className="checklist-header">
-          <div className="sidebar-section-title">To Create This Week</div>
-          <button className="add-btn" onClick={addCreate}>+</button>
-        </div>
-        {(Array.isArray(wd.toCreate)?wd.toCreate:[]).map(c=>(
-          <div key={c.id} className={`checklist-item ${c.done?'checked':''}`}>
-            <div className={`check-box ${c.done?'checked':''}`} onClick={()=>updateCreate(c.id,{done:!c.done})} />
-            <input className="checklist-input" placeholder="What to create…" value={c.name}
-              onChange={e=>updateCreate(c.id,{name:e.target.value})} />
-            <button className="delete-item-btn" onClick={()=>deleteCreate(c.id)}>✕</button>
-          </div>
-        ))}
-      </div>
+
       <div className="sidebar-section">
         <div className="checklist-header">
           <div className="sidebar-section-title">People to Connect With</div>
@@ -1403,13 +1413,12 @@ function WeeklyPlanner({ weekData, setWeekData, onGoToHabit, calHeaderColor, set
   return (
     <div className="main-content">
       {/* DESKTOP SIDEBAR */}
-      <div className={`sidebar ${sidebarCollapsed ? 'collapsed' : ''}`}>
-        <button className="sidebar-toggle-btn" onClick={()=>setSidebarCollapsed(c=>!c)}
+      <div className={`sidebar-wrap ${sidebarCollapsed ? 'collapsed' : ''}`}>
+        <div className="sidebar">{sidebarContent}</div>
+        <div className="sidebar-toggle-strip" onClick={()=>setSidebarCollapsed(c=>!c)}
           title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
-          {sidebarCollapsed ? '›' : '‹'}
-        </button>
-        <div className="sidebar-inner">
-          {sidebarContent}
+          <div className="sidebar-toggle-btn">{sidebarCollapsed ? '›' : '‹'}</div>
+          <span className="sidebar-collapsed-label">Weekly</span>
         </div>
       </div>
 
@@ -1533,7 +1542,19 @@ function WeeklyPlanner({ weekData, setWeekData, onGoToHabit, calHeaderColor, set
           <span className="mobile-sheet-title">This Week</span>
           <button className="mobile-sheet-close" onClick={()=>setSheetOpen(false)}>✕</button>
         </div>
-        <div className="mobile-sheet-body">{sidebarContent}</div>
+        <div className="mobile-sheet-body">
+          {sidebarContent}
+          <div className="sidebar-section">
+            <div className="sidebar-section-title">This week, I was proud that I:</div>
+            <textarea className="sidebar-textarea" placeholder="Write about your proudest moment…"
+              value={wd.proud||''} onChange={e=>setWD(w=>({...w,proud:e.target.value}))} rows={3} />
+          </div>
+          <div className="sidebar-section">
+            <div className="sidebar-section-title">Best Story This Week</div>
+            <textarea className="sidebar-textarea" placeholder="What's the best story from this week?"
+              value={wd.story||''} onChange={e=>setWD(w=>({...w,story:e.target.value}))} rows={3} />
+          </div>
+        </div>
       </div>
 
       {/* MOBILE: FAB to open sheet */}
