@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v1.2.2 -->
+<!-- LP Planner v1.2.3 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -1501,17 +1501,20 @@ function ColorPicker({ value, onChange }) {
 function SortableChecklist({ items, onUpdate, onAdd, onDelete, onReorder, placeholder }) {
   const [dragId, setDragId] = useState(null);
   const [dragOverId, setDragOverId] = useState(null);
+  const [pendingFocusId, setPendingFocusId] = useState(null);
   const inputRefs = useRef({});
 
   function handleKeyDown(e, item, idx) {
     if (e.key === 'Enter') {
       e.preventDefault();
-      onAdd(item.id); // add after this item
+      // Generate the new id here so we can focus it after render
+      const newId = Date.now().toString();
+      setPendingFocusId(newId);
+      onAdd(item.id, newId);
     }
   }
 
   function handleBlur(item) {
-    // Remove row if empty and it was auto-created (name is blank)
     if (!item.name.trim()) {
       onDelete(item.id);
     }
@@ -1532,15 +1535,13 @@ function SortableChecklist({ items, onUpdate, onAdd, onDelete, onReorder, placeh
   }
   function handleDragEnd() { setDragId(null); setDragOverId(null); }
 
-  // Focus newly added item
+  // Focus the newly added item once its ref is registered
   useEffect(() => {
-    if (items.length > 0) {
-      const last = items[items.length - 1];
-      if (last.name === '' && inputRefs.current[last.id]) {
-        inputRefs.current[last.id].focus();
-      }
+    if (pendingFocusId && inputRefs.current[pendingFocusId]) {
+      inputRefs.current[pendingFocusId].focus();
+      setPendingFocusId(null);
     }
-  }, [items.length]);
+  });
 
   return (
     <>
@@ -1681,8 +1682,8 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
   const weekLabel = `${fmtDisplay(weekDays[0])} – ${fmtDisplay(weekDays[6])}`;
 
   // People checklist
-  function addPerson(afterId) {
-    const newItem = {id:Date.now().toString(),name:'',done:false};
+  function addPerson(afterId, newId) {
+    const newItem = {id: newId || Date.now().toString(), name:'', done:false};
     setWD(w=>{
       const list = w.people||[];
       if (!afterId) return {...w, people:[...list, newItem]};
@@ -1710,8 +1711,8 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
   function updateCreate(id,patch) { setWD(w=>({...w, toCreate:(Array.isArray(w.toCreate)?w.toCreate:[]).map(c=>c.id===id?{...c,...patch}:c)})); }
   function deleteCreate(id) { setWD(w=>({...w, toCreate:(Array.isArray(w.toCreate)?w.toCreate:[]).filter(c=>c.id!==id)})); }
 
-  function addGoal(afterId) {
-    const newItem = {id:Date.now().toString(),name:'',done:false};
+  function addGoal(afterId, newId) {
+    const newItem = {id: newId || Date.now().toString(), name:'', done:false};
     setWD(w=>{
       const list = w.goals||[];
       if (!afterId) return {...w, goals:[...list, newItem]};
@@ -3276,7 +3277,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.2.2</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.2.3</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
