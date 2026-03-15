@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v1.1.6 -->
+<!-- LP Planner v1.2.0 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -175,8 +175,18 @@
   .checklist-item {
     display: flex; align-items: center; gap: 8px; padding: 5px 4px;
     border-radius: 4px; transition: background 0.1s;
+    cursor: default;
   }
   .checklist-item:hover { background: var(--cream); }
+  .checklist-item.drag-over { outline: 2px dashed var(--accent); outline-offset: -2px; background: var(--accent-light); }
+  .checklist-item.dragging { opacity: 0.4; }
+  .checklist-drag-handle {
+    font-size: 12px; color: var(--ink-faint); cursor: grab; opacity: 0;
+    transition: opacity 0.15s; flex-shrink: 0; padding: 0 2px;
+    user-select: none;
+  }
+  .checklist-item:hover .checklist-drag-handle { opacity: 0.5; }
+  .checklist-drag-handle:active { cursor: grabbing; }
   .checklist-item.checked .checklist-label { text-decoration: line-through; color: var(--ink-faint); }
   .check-box {
     width: 16px; height: 16px; border: 1.5px solid var(--border); border-radius: 3px;
@@ -1486,6 +1496,78 @@ function ColorPicker({ value, onChange }) {
 // ─────────────────────────────────────────────
 // WEEKLY PLANNER
 // ─────────────────────────────────────────────
+function SortableChecklist({ items, onUpdate, onAdd, onDelete, onReorder, placeholder }) {
+  const [dragId, setDragId] = useState(null);
+  const [dragOverId, setDragOverId] = useState(null);
+  const inputRefs = useRef({});
+
+  function handleKeyDown(e, item, idx) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      onAdd(item.id); // add after this item
+    }
+  }
+
+  function handleBlur(item) {
+    // Remove row if empty and it was auto-created (name is blank)
+    if (!item.name.trim()) {
+      onDelete(item.id);
+    }
+  }
+
+  function handleDragStart(e, id) {
+    setDragId(id);
+    e.dataTransfer.effectAllowed = 'move';
+  }
+  function handleDragOver(e, id) {
+    e.preventDefault();
+    if (id !== dragId) setDragOverId(id);
+  }
+  function handleDrop(e, id) {
+    e.preventDefault();
+    if (dragId && id !== dragId) onReorder(dragId, id);
+    setDragId(null); setDragOverId(null);
+  }
+  function handleDragEnd() { setDragId(null); setDragOverId(null); }
+
+  // Focus newly added item
+  useEffect(() => {
+    if (items.length > 0) {
+      const last = items[items.length - 1];
+      if (last.name === '' && inputRefs.current[last.id]) {
+        inputRefs.current[last.id].focus();
+      }
+    }
+  }, [items.length]);
+
+  return (
+    <>
+      {items.map((item, idx) => (
+        <div key={item.id}
+          className={`checklist-item ${item.done?'checked':''} ${dragOverId===item.id?'drag-over':''} ${dragId===item.id?'dragging':''}`}
+          draggable
+          onDragStart={e=>handleDragStart(e,item.id)}
+          onDragOver={e=>handleDragOver(e,item.id)}
+          onDrop={e=>handleDrop(e,item.id)}
+          onDragEnd={handleDragEnd}>
+          <span className="checklist-drag-handle">⣿</span>
+          <div className={`check-box ${item.done?'checked':''}`} onClick={()=>onUpdate(item.id,{done:!item.done})} />
+          <input
+            ref={el=>inputRefs.current[item.id]=el}
+            className="checklist-input"
+            placeholder={placeholder}
+            value={item.name}
+            onChange={e=>onUpdate(item.id,{name:e.target.value})}
+            onKeyDown={e=>handleKeyDown(e,item,idx)}
+            onBlur={()=>handleBlur(item)}
+          />
+          <button className="delete-item-btn" onClick={()=>onDelete(item.id)}>✕</button>
+        </div>
+      ))}
+    </>
+  );
+}
+
 function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToHabit, calHeaderColor, setCalHeaderColor }) {
   const today = new Date(); today.setHours(0,0,0,0);
   const [weekStart, setWeekStart] = useState(getWeekStart(today));
@@ -1592,17 +1674,59 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
   const weekLabel = `${fmtDisplay(weekDays[0])} – ${fmtDisplay(weekDays[6])}`;
 
   // People checklist
-  function addPerson() { setWD(w=>({...w, people:[...(w.people||[]),{id:Date.now().toString(),name:'',done:false}]})); }
+  function addPerson(afterId) {
+    const newItem = {id:Date.now().toString(),name:'',done:false};
+    setWD(w=>{
+      const list = w.people||[];
+      if (!afterId) return {...w, people:[...list, newItem]};
+      const idx = list.findIndex(p=>p.id===afterId);
+      const next = [...list];
+      next.splice(idx+1, 0, newItem);
+      return {...w, people:next};
+    });
+  }
   function updatePerson(id,patch) { setWD(w=>({...w, people:(w.people||[]).map(p=>p.id===id?{...p,...patch}:p)})); }
   function deletePerson(id) { setWD(w=>({...w, people:(w.people||[]).filter(p=>p.id!==id)})); }
+  function reorderPeople(fromId, toId) {
+    setWD(w=>{
+      const list = [...(w.people||[])];
+      const from = list.findIndex(p=>p.id===fromId);
+      const to = list.findIndex(p=>p.id===toId);
+      if (from===-1||to===-1) return w;
+      const [item] = list.splice(from,1);
+      list.splice(to,0,item);
+      return {...w, people:list};
+    });
+  }
 
   function addCreate() { setWD(w=>({...w, toCreate:[...(Array.isArray(w.toCreate)?w.toCreate:[]),{id:Date.now().toString(),name:'',done:false}]})); }
   function updateCreate(id,patch) { setWD(w=>({...w, toCreate:(Array.isArray(w.toCreate)?w.toCreate:[]).map(c=>c.id===id?{...c,...patch}:c)})); }
   function deleteCreate(id) { setWD(w=>({...w, toCreate:(Array.isArray(w.toCreate)?w.toCreate:[]).filter(c=>c.id!==id)})); }
 
-  function addGoal() { setWD(w=>({...w, goals:[...(w.goals||[]),{id:Date.now().toString(),name:'',done:false}]})); }
+  function addGoal(afterId) {
+    const newItem = {id:Date.now().toString(),name:'',done:false};
+    setWD(w=>{
+      const list = w.goals||[];
+      if (!afterId) return {...w, goals:[...list, newItem]};
+      const idx = list.findIndex(g=>g.id===afterId);
+      const next = [...list];
+      next.splice(idx+1, 0, newItem);
+      return {...w, goals:next};
+    });
+  }
   function updateGoal(id,patch) { setWD(w=>({...w, goals:(w.goals||[]).map(g=>g.id===id?{...g,...patch}:g)})); }
   function deleteGoal(id) { setWD(w=>({...w, goals:(w.goals||[]).filter(g=>g.id!==id)})); }
+  function reorderGoals(fromId, toId) {
+    setWD(w=>{
+      const list = [...(w.goals||[])];
+      const from = list.findIndex(g=>g.id===fromId);
+      const to = list.findIndex(g=>g.id===toId);
+      if (from===-1||to===-1) return w;
+      const [item] = list.splice(from,1);
+      list.splice(to,0,item);
+      return {...w, goals:list};
+    });
+  }
 
   const [dragging, setDragging] = useState(null); // {dayKey, id}
   const [dragOver, setDragOver] = useState(null);  // {dayKey, id}
@@ -1658,31 +1782,31 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
       <div className="sidebar-section">
         <div className="checklist-header">
           <div className="sidebar-section-title">Weekly Goals:</div>
-          <button className="add-btn" onClick={addGoal}>+</button>
+          <button className="add-btn" onClick={()=>addGoal(null)}>+</button>
         </div>
-        {(wd.goals||[]).map(g=>(
-          <div key={g.id} className={`checklist-item ${g.done?'checked':''}`}>
-            <div className={`check-box ${g.done?'checked':''}`} onClick={()=>updateGoal(g.id,{done:!g.done})} />
-            <input className="checklist-input" placeholder="Goal…" value={g.name}
-              onChange={e=>updateGoal(g.id,{name:e.target.value})} />
-            <button className="delete-item-btn" onClick={()=>deleteGoal(g.id)}>✕</button>
-          </div>
-        ))}
+        <SortableChecklist
+          items={wd.goals||[]}
+          onUpdate={updateGoal}
+          onAdd={addGoal}
+          onDelete={deleteGoal}
+          onReorder={reorderGoals}
+          placeholder="Goal…"
+        />
       </div>
 
       <div className="sidebar-section">
         <div className="checklist-header">
           <div className="sidebar-section-title">People to Connect With</div>
-          <button className="add-btn" onClick={addPerson}>+</button>
+          <button className="add-btn" onClick={()=>addPerson(null)}>+</button>
         </div>
-        {(wd.people||[]).map(p=>(
-          <div key={p.id} className={`checklist-item ${p.done?'checked':''}`}>
-            <div className={`check-box ${p.done?'checked':''}`} onClick={()=>updatePerson(p.id,{done:!p.done})} />
-            <input className="checklist-input" placeholder="Name…" value={p.name}
-              onChange={e=>updatePerson(p.id,{name:e.target.value})} />
-            <button className="delete-item-btn" onClick={()=>deletePerson(p.id)}>✕</button>
-          </div>
-        ))}
+        <SortableChecklist
+          items={wd.people||[]}
+          onUpdate={updatePerson}
+          onAdd={addPerson}
+          onDelete={deletePerson}
+          onReorder={reorderPeople}
+          placeholder="Name…"
+        />
       </div>
       <div className="sidebar-section">
         <div className="sidebar-section-title">Be-Word of the Week</div>
@@ -3145,7 +3269,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.1.6</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.2.0</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
