@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v1.1.4 -->
+<!-- LP Planner v1.1.5 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -1535,7 +1535,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
     // Sync back to pagesData if this is a project task
     const task = getTasks(dayKey).find(t => t.id===id);
     if (task?.isProjectTask && task?.projectDocId && setPagesData) {
-      const syncFields = ['done','title','details'];
+      const syncFields = ['done','title','details','priority'];
       if (Object.keys(patch).some(k => syncFields.includes(k))) {
         setPagesData(p => p.map(doc => doc.id !== task.projectDocId ? doc : {
           ...doc, tasks: (doc.tasks||[]).map(t => t.id===id ? {...t,...patch} : t)
@@ -1577,6 +1577,12 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
   function deleteTask(dayKey, id) {
     const task = getTasks(dayKey).find(t => t.id===id);
     if (task && task.gcalId && getToken()) deleteEventFromCalendar(task.gcalId).catch(()=>{});
+    // If this is a project task, clear its scheduledDate in pagesData (removes from planner but keeps in doc)
+    if (task?.isProjectTask && task?.projectDocId && setPagesData) {
+      setPagesData(p => p.map(doc => doc.id !== task.projectDocId ? doc : {
+        ...doc, tasks: (doc.tasks||[]).map(t => t.id===id ? {...t, scheduledDate:''} : t)
+      }));
+    }
     setTasks(dayKey, t => t.filter(x=>x.id!==id));
   }
 
@@ -1942,7 +1948,13 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onDragStart, onDragOve
 
   return (
     <div className={`task-card ${task.done?'done':''} ${isDragOver?'drag-over':''} ${task.isEvent?'is-event':''}`}
-      style={{background: (task.isEvent ? EVENT_COLORS : TASK_COLORS)[(task.colorIndex ?? 0) % (task.isEvent ? EVENT_COLORS : TASK_COLORS).length], opacity: isDragOver ? 0.5 : 1}}
+      style={{
+        background: task.isProjectTask && task.priority
+          ? '#fee2e2'
+          : (task.isEvent ? EVENT_COLORS : TASK_COLORS)[(task.colorIndex ?? 0) % (task.isEvent ? EVENT_COLORS : TASK_COLORS).length],
+        opacity: isDragOver ? 0.5 : 1,
+        borderLeft: task.isProjectTask && task.priority ? '3px solid #dc2626' : undefined,
+      }}
       draggable
       onDragStart={onDragStart}
       onDragOver={e=>{e.preventDefault();onDragOver();}}
@@ -1984,6 +1996,18 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onDragStart, onDragOve
             </div>
           )}
         </div>
+        {task.isProjectTask && (
+          <button
+            onClick={e=>{e.stopPropagation();onUpdate({priority:!task.priority});}}
+            title={task.priority ? 'Mark normal priority' : 'Mark as priority'}
+            style={{
+              background:'none', border:'none', cursor:'pointer', fontSize:14,
+              color: task.priority ? '#dc2626' : 'var(--ink-faint)',
+              padding:'0 2px', transition:'color 0.15s', flexShrink:0,
+            }}>
+            {task.priority ? '★' : '☆'}
+          </button>
+        )}
         <button className="task-expand-btn" onClick={()=>onUpdate({expanded:!task.expanded})}>
           {task.expanded ? '▲' : '▼'}
         </button>
@@ -3119,7 +3143,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.1.4</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.1.5</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -3481,15 +3505,26 @@ function PagesView({ pagesData, setPagesData, weekData, setWeekData, selectedId,
                 </div>
               )}
               {(selectedDoc.tasks||[]).map(task => (
-                <div key={task.id} className="pages-task-item">
+                <div key={task.id} className="pages-task-item"
+                  style={task.priority ? {background:'#fee2e2', borderColor:'#fca5a5'} : {}}>
                   <div className={`pages-task-check ${task.done?'done':''}`}
                     onClick={()=>updateTask(selectedDoc.id, task.id, {done:!task.done})} />
                   <div className="pages-task-body">
-                    <input className={`pages-task-title-input ${task.done?'done':''}`}
-                      placeholder="Task…"
-                      value={task.title}
-                      onChange={e=>updateTask(selectedDoc.id, task.id, {title:e.target.value})}
-                    />
+                    <div style={{display:'flex',alignItems:'center',gap:4}}>
+                      <input className={`pages-task-title-input ${task.done?'done':''}`}
+                        placeholder="Task…"
+                        value={task.title}
+                        onChange={e=>updateTask(selectedDoc.id, task.id, {title:e.target.value})}
+                        style={{flex:1}}
+                      />
+                      <button
+                        onClick={e=>{e.stopPropagation();updateTask(selectedDoc.id,task.id,{priority:!task.priority});}}
+                        title={task.priority?'Remove priority':'Mark as priority'}
+                        style={{background:'none',border:'none',cursor:'pointer',fontSize:14,
+                          color:task.priority?'#dc2626':'var(--ink-faint)',padding:'0 2px',flexShrink:0}}>
+                        {task.priority?'★':'☆'}
+                      </button>
+                    </div>
                     <textarea className="pages-task-details-input"
                       placeholder="Details (optional)…"
                       value={task.details||''}
