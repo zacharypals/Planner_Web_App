@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v1.2.3 -->
+<!-- LP Planner v1.2.4 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -1542,6 +1542,13 @@ function SortableChecklist({ items, onUpdate, onAdd, onDelete, onReorder, placeh
       setPendingFocusId(null);
     }
   });
+
+  // Auto-size all textareas on mount and whenever items change
+  useEffect(() => {
+    Object.values(inputRefs.current).forEach(el => {
+      if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }
+    });
+  }, [items]);
 
   return (
     <>
@@ -3277,7 +3284,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.2.3</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.2.4</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
