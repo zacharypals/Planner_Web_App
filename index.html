@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v1.1.5 -->
+<!-- LP Planner v1.1.6 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -1533,7 +1533,9 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
     // Pure state update — no calendar sync, safe to call on every keystroke
     setTasks(dayKey, t => t.map(x => x.id===id ? {...x,...patch} : x));
     // Sync back to pagesData if this is a project task
-    const task = getTasks(dayKey).find(t => t.id===id);
+    // Read from weekDataRef (always current) rather than getTasks (stale at call time)
+    const allDayTasks = ((weekDataRef.current[weekKey]||{}).tasks||{})[dayKey] || [];
+    const task = allDayTasks.find(t => t.id===id);
     if (task?.isProjectTask && task?.projectDocId && setPagesData) {
       const syncFields = ['done','title','details','priority'];
       if (Object.keys(patch).some(k => syncFields.includes(k))) {
@@ -3143,7 +3145,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.1.5</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.1.6</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -3263,10 +3265,10 @@ function PagesView({ pagesData, setPagesData, weekData, setWeekData, selectedId,
         const oldDate = oldTask?.scheduledDate;
         const newDate = patch.scheduledDate;
         if (oldDate && oldDate !== newDate) removeTaskFromWeek(taskId, oldDate);
-        if (newDate) scheduleTaskToWeek(updatedTask, d.title || 'Untitled', newDate);
+        if (newDate) scheduleTaskToWeek({...updatedTask, projectDocId: d.id}, d.title || 'Untitled', newDate);
       } else if (oldTask?.scheduledDate) {
         // Non-date field changed (title, done, details) — re-sync to week
-        scheduleTaskToWeek(updatedTask, d.title || 'Untitled', oldTask.scheduledDate);
+        scheduleTaskToWeek({...updatedTask, projectDocId: d.id}, d.title || 'Untitled', oldTask.scheduledDate);
       }
       return { ...d, tasks: (d.tasks||[]).map(t => t.id === taskId ? updatedTask : t) };
     }));
@@ -3288,12 +3290,19 @@ function PagesView({ pagesData, setPagesData, weekData, setWeekData, selectedId,
     setWeekData(wd => {
       const wk = wd[weekKey] || { proverb:'',toCreate:[],weekGoals:[],people:[],beWord:'',proud:'',story:'',tasks:{} };
       const dayTasks = (wk.tasks||{})[dateStr] || [];
-      // Remove existing entry for this task id first
+      // Preserve any extra fields already on the weekly entry (e.g. expanded state)
+      const existing = dayTasks.find(t => t.id === task.id) || {};
       const filtered = dayTasks.filter(t => t.id !== task.id);
       const newEntry = {
-        id: task.id, title: task.title, done: task.done,
-        details: '', expanded: false, colorIndex: task.colorIndex || 0,
-        isProjectTask: true, projectDocId: task.projectDocId || '',
+        ...existing,
+        id: task.id,
+        title: task.title,
+        done: task.done,
+        details: task.details || '',
+        priority: task.priority || false,
+        colorIndex: task.colorIndex || 0,
+        isProjectTask: true,
+        projectDocId: task.id && task.projectDocId ? task.projectDocId : (task.id || ''),
         projectTitle: docTitle,
       };
       return { ...wd, [weekKey]: { ...wk, tasks: { ...(wk.tasks||{}), [dateStr]: [...filtered, newEntry] } } };
