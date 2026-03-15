@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v1.2.0 -->
+<!-- LP Planner v1.2.1 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -173,7 +173,7 @@
   }
   .add-btn:hover { background: var(--accent); color: white; }
   .checklist-item {
-    display: flex; align-items: center; gap: 8px; padding: 5px 4px;
+    display: flex; align-items: flex-start; gap: 8px; padding: 5px 4px;
     border-radius: 4px; transition: background 0.1s;
     cursor: default;
   }
@@ -183,7 +183,7 @@
   .checklist-drag-handle {
     font-size: 12px; color: var(--ink-faint); cursor: grab; opacity: 0;
     transition: opacity 0.15s; flex-shrink: 0; padding: 0 2px;
-    user-select: none;
+    user-select: none; margin-top: 3px;
   }
   .checklist-item:hover .checklist-drag-handle { opacity: 0.5; }
   .checklist-drag-handle:active { cursor: grabbing; }
@@ -191,18 +191,19 @@
   .check-box {
     width: 16px; height: 16px; border: 1.5px solid var(--border); border-radius: 3px;
     cursor: pointer; flex-shrink: 0; background: white; display: flex; align-items: center; justify-content: center;
-    transition: all 0.15s;
+    transition: all 0.15s; margin-top: 2px;
   }
   .check-box.checked { background: var(--accent); border-color: var(--accent); }
   .check-box.checked::after { content: '✓'; color: white; font-size: 10px; }
   .checklist-input {
     flex: 1; border: none; background: transparent; font-size: 12.5px;
     font-family: 'DM Sans', sans-serif; color: var(--ink); outline: none;
+    word-break: break-word; white-space: normal; min-width: 0;
   }
   .checklist-input::placeholder { color: var(--ink-faint); }
   .delete-item-btn {
     opacity: 0; background: none; border: none; cursor: pointer; color: var(--ink-faint);
-    font-size: 14px; padding: 0 2px; transition: opacity 0.15s;
+    font-size: 14px; padding: 0 2px; transition: opacity 0.15s; margin-top: 1px; flex-shrink: 0;
   }
   .checklist-item:hover .delete-item-btn { opacity: 1; }
 
@@ -3269,7 +3270,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.2.0</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.2.1</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
