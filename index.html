@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v1.2.1 -->
+<!-- LP Planner v1.2.2 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -198,7 +198,8 @@
   .checklist-input {
     flex: 1; border: none; background: transparent; font-size: 12.5px;
     font-family: 'DM Sans', sans-serif; color: var(--ink); outline: none;
-    word-break: break-word; white-space: normal; min-width: 0;
+    resize: none; overflow: hidden; min-width: 0; line-height: 1.4;
+    padding: 0; min-height: 18px;
   }
   .checklist-input::placeholder { color: var(--ink-faint); }
   .delete-item-btn {
@@ -1553,12 +1554,17 @@ function SortableChecklist({ items, onUpdate, onAdd, onDelete, onReorder, placeh
           onDragEnd={handleDragEnd}>
           <span className="checklist-drag-handle">⣿</span>
           <div className={`check-box ${item.done?'checked':''}`} onClick={()=>onUpdate(item.id,{done:!item.done})} />
-          <input
+          <textarea
             ref={el=>inputRefs.current[item.id]=el}
             className="checklist-input"
             placeholder={placeholder}
             value={item.name}
-            onChange={e=>onUpdate(item.id,{name:e.target.value})}
+            rows={1}
+            onChange={e=>{
+              onUpdate(item.id,{name:e.target.value});
+              e.target.style.height='auto';
+              e.target.style.height=e.target.scrollHeight+'px';
+            }}
             onKeyDown={e=>handleKeyDown(e,item,idx)}
             onBlur={()=>handleBlur(item)}
           />
@@ -3270,7 +3276,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.2.1</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.2.2</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
