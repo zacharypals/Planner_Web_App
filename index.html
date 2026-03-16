@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v1.4.1 -->
+<!-- LP Planner v1.4.2 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -1668,7 +1668,17 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
     if (pendingTaskFocus.current) {
       const {id, dayKey} = pendingTaskFocus.current;
       const el = taskTitleRefs.current[id];
-      if (el) { el.focus(); pendingTaskFocus.current = null; }
+      if (el) {
+        el.focus();
+        pendingTaskFocus.current = null;
+      } else {
+        // Ref not ready yet (happens on today's column due to extra render logic)
+        // Retry after one tick
+        setTimeout(() => {
+          const el2 = taskTitleRefs.current[id];
+          if (el2) { el2.focus(); pendingTaskFocus.current = null; }
+        }, 50);
+      }
     }
   });
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -3445,7 +3455,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.4.1</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.4.2</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
