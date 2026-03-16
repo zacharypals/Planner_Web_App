@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v1.4.8 -->
+<!-- LP Planner v1.4.9 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -3500,7 +3500,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.4.8</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.4.9</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -3720,29 +3720,19 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
   // Helper: place cursor at the start of the text span inside an li
   function placeCursorInLi(li, sel) {
     const r = document.createRange();
-    // Find the text span (second span); fall back to any text node or li itself
     const textSpan = li.querySelector('.pages-chk-text-span');
-    if (textSpan) {
-      // Place cursor at start of text span content
-      const textNode = textSpan.firstChild;
-      if (textNode && textNode.nodeType === 3) {
-        r.setStart(textNode, 0);
-      } else {
-        r.setStart(textSpan, 0);
-      }
-    } else {
-      // Fallback: find first non-contenteditable child
-      let target = li.firstChild;
-      while (target && target.contentEditable === 'false') target = target.nextSibling;
-      if (target) {
-        r.setStart(target.nodeType === 3 ? target : target, 0);
-      } else {
-        r.setStart(li, li.childNodes.length);
-      }
+    const target = textSpan || li;
+    // Ensure there is a real text node to anchor the cursor to
+    if (!target.firstChild || target.firstChild.nodeType !== 3) {
+      target.appendChild(document.createTextNode(''));
     }
+    r.setStart(target.firstChild, 0);
     r.collapse(true);
     sel.removeAllRanges();
     sel.addRange(r);
+    // Force the body to re-acknowledge focus so cursor renders
+    bodyRef.current?.blur();
+    bodyRef.current?.focus();
   }
 
   function insertChecklistItem() {
@@ -3755,7 +3745,7 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
     }
     // Insert a new checklist ul with one empty li (use <br> not ZWS for cursor visibility)
     document.execCommand('insertHTML', false,
-      '<ul class="pages-checklist"><li class="pages-chk-li" data-checked="false"><span class="pages-chk-box-span" contenteditable="false"> </span><span class="pages-chk-text-span"> </span></li></ul><p><br></p>'
+      '<ul class="pages-checklist"><li class="pages-chk-li" data-checked="false"><span class="pages-chk-box-span" contenteditable="false"> </span><span class="pages-chk-text-span"></span></li></ul>'
     );
     // Place cursor inside the new li
     requestAnimationFrame(() => {
@@ -3801,7 +3791,7 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
       const newLi = document.createElement('li');
       newLi.className = 'pages-chk-li';
       newLi.setAttribute('data-checked', 'false');
-      newLi.innerHTML = '<span class="pages-chk-box-span" contenteditable="false"> </span><span class="pages-chk-text-span"> </span>';
+      newLi.innerHTML = '<span class="pages-chk-box-span" contenteditable="false"> </span><span class="pages-chk-text-span"></span>';
       li.parentNode.insertBefore(newLi, li.nextSibling);
       placeCursorInLi(newLi, sel);
     }
