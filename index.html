@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v1.6.3 -->
+<!-- LP Planner v1.6.4 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -3545,7 +3545,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.6.3</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.6.4</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -4110,8 +4110,8 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
     // Subtle depth tint: each level adds a touch of warm beige
     // Each depth level gets a distinct pale hue (matches folder row tints below)
     const depthBg = depth === 0 ? 'transparent'
-      : depth === 1 ? 'rgba(45,90,61,0.07)'    // pale green (accent)
-      : depth === 2 ? 'rgba(37,113,163,0.07)'  // pale blue
+      : depth === 1 ? 'rgba(45,90,61,0.13)'    // pale green
+      : depth === 2 ? 'rgba(37,113,163,0.13)'  // pale blue
       : depth === 3 ? 'rgba(180,100,0,0.07)'   // pale amber
       : 'rgba(125,60,152,0.07)';               // pale purple
     return (
@@ -4166,8 +4166,8 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
           style={{
             paddingLeft: 6 + indentPx,
             background: depth === 0 ? 'var(--cream)'
-              : depth === 1 ? 'rgba(45,90,61,0.12)'    // pale green
-              : depth === 2 ? 'rgba(37,113,163,0.12)'  // pale blue
+              : depth === 1 ? 'rgba(45,90,61,0.20)'    // pale green
+              : depth === 2 ? 'rgba(37,113,163,0.20)'  // pale blue
               : depth === 3 ? 'rgba(180,100,0,0.12)'   // pale amber
               : 'rgba(125,60,152,0.12)',                // pale purple
           }}
