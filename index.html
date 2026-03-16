@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v1.4.5 -->
+<!-- LP Planner v1.4.6 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -1022,19 +1022,33 @@
   .pages-body blockquote { border-left:3px solid var(--gold); padding:6px 12px; margin:8px 0; color:var(--ink-light); font-style:italic; }
   .pages-body p { margin: 4px 0; }
   .pages-body s { text-decoration: line-through; opacity: 0.6; }
-  /* Inline checklist items in body */
-  .pages-chk-item {
-    display: flex; align-items: baseline; gap: 6px; margin: 3px 0;
-    line-height: 1.6;
+  /* Checklist list in rich text body */
+  .pages-body ul.pages-checklist {
+    list-style: none; padding-left: 4px; margin: 4px 0;
   }
-  .pages-chk-item[data-chk="true"] .pages-chk-text {
+  .pages-body ul.pages-checklist ul.pages-checklist {
+    padding-left: 24px;
+  }
+  .pages-body li.pages-chk-li {
+    display: flex; align-items: flex-start; gap: 0;
+    padding: 1px 0; min-height: 22px; position: relative;
+    padding-left: 28px; cursor: text;
+  }
+  .pages-body li.pages-chk-li::before {
+    content: ''; position: absolute; left: 2px; top: 4px;
+    width: 14px; height: 14px; border: 1.5px solid #aaa;
+    border-radius: 3px; background: white; cursor: pointer;
+    flex-shrink: 0; transition: all 0.12s;
+  }
+  .pages-body li.pages-chk-li:hover::before { border-color: var(--accent); }
+  .pages-body li.pages-chk-li[data-checked="true"]::before {
+    background: var(--accent); border-color: var(--accent);
+    content: '✓'; color: white; font-size: 10px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .pages-body li.pages-chk-li[data-checked="true"] {
     text-decoration: line-through; opacity: 0.5;
   }
-  .pages-chk-box {
-    cursor: pointer; font-size: 15px; user-select: none; flex-shrink: 0;
-    color: var(--accent);
-  }
-  .pages-chk-box:hover { opacity: 0.7; }
   /* Project tasks section */
   .pages-tasks-section {
     border-top: 2px solid var(--border);
@@ -3487,7 +3501,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.4.5</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.4.6</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -3692,6 +3706,113 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
   function exec(cmd, val) {
     bodyRef.current?.focus();
     document.execCommand(cmd, false, val || null);
+  }
+
+  // ── Checklist helpers ────────────────────────────────────────────────────
+  function insertChecklistItem() {
+    bodyRef.current?.focus();
+    // Check if cursor is already inside a checklist item
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0) {
+      const li = sel.getRangeAt(0).startContainer.parentElement?.closest('li.pages-chk-li');
+      if (li) {
+        // Already in a checklist — just insert a new item via Enter logic
+        document.execCommand('insertParagraph');
+        return;
+      }
+    }
+    // Insert a new checklist <ul> with one item
+    document.execCommand('insertHTML',false,
+      '<ul class="pages-checklist"><li class="pages-chk-li" data-checked="false">&#8203;</li></ul><p><br></p>'
+    );
+    // Move cursor inside the new li
+    const ul = bodyRef.current?.querySelector('.pages-checklist:last-of-type li');
+    if (ul) {
+      const r = document.createRange();
+      r.selectNodeContents(ul);
+      r.collapse(false);
+      const s = window.getSelection();
+      s.removeAllRanges();
+      s.addRange(r);
+    }
+    setTimeout(() => onBodyInput(), 0);
+  }
+
+  function toggleChecklistItem(li) {
+    const checked = li.getAttribute('data-checked') === 'true';
+    li.setAttribute('data-checked', String(!checked));
+    setTimeout(() => onBodyInput(), 0);
+  }
+
+  function handleBodyKeyDown(e) {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    const range = sel.getRangeAt(0);
+    const li = range.startContainer.parentElement?.closest('li.pages-chk-li');
+
+    if (!li) return; // Not in a checklist item — let browser handle normally
+
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const text = li.textContent.replace(/​/g, '').trim();
+      if (text === '') {
+        // Empty item — Exit the list, insert a paragraph after the <ul>
+        const ul = li.closest('ul.pages-checklist');
+        if (ul) {
+          const p = document.createElement('p');
+          p.innerHTML = '<br>';
+          ul.parentNode.insertBefore(p, ul.nextSibling);
+          // Remove the empty li
+          li.remove();
+          if (ul.children.length === 0) ul.remove();
+          // Move cursor to the new p
+          const r = document.createRange();
+          r.setStart(p, 0);
+          r.collapse(true);
+          sel.removeAllRanges();
+          sel.addRange(r);
+        }
+      } else {
+        // Add a new checklist item after this one
+        const newLi = document.createElement('li');
+        newLi.className = 'pages-chk-li';
+        newLi.setAttribute('data-checked', 'false');
+        newLi.innerHTML = '&#8203;';
+        li.parentNode.insertBefore(newLi, li.nextSibling);
+        const r = document.createRange();
+        r.selectNodeContents(newLi);
+        r.collapse(false);
+        sel.removeAllRanges();
+        sel.addRange(r);
+      }
+      setTimeout(() => onBodyInput(), 0);
+    } else if (e.key === 'Tab') {
+      e.preventDefault();
+      if (e.shiftKey) {
+        document.execCommand('outdent');
+      } else {
+        document.execCommand('indent');
+      }
+      setTimeout(() => onBodyInput(), 0);
+    } else if (e.key === 'Backspace') {
+      const text = li.textContent.replace(/​/g, '').trim();
+      if (text === '') {
+        e.preventDefault();
+        const ul = li.closest('ul.pages-checklist');
+        const prev = li.previousElementSibling || (ul ? ul.previousSibling : null);
+        li.remove();
+        if (ul && ul.children.length === 0) ul.remove();
+        // Move cursor to previous element
+        if (prev) {
+          const r = document.createRange();
+          r.selectNodeContents(prev);
+          r.collapse(false);
+          sel.removeAllRanges();
+          sel.addRange(r);
+        }
+        setTimeout(() => onBodyInput(), 0);
+      }
+    }
   }
 
   function onBodyInput() {
@@ -4086,6 +4207,7 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
                 <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();exec('bold');}} title="Bold"><b>B</b></button>
                 <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();exec('italic');}} title="Italic"><i>I</i></button>
                 <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();exec('underline');}} title="Underline"><u>U</u></button>
+                <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();exec('strikeThrough');}} title="Strikethrough"><s>S</s></button>
                 <div className="pages-toolbar-sep"/>
                 <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();exec('formatBlock','h1');}} title="Heading 1">H1</button>
                 <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();exec('formatBlock','h2');}} title="Heading 2">H2</button>
@@ -4094,13 +4216,11 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
                 <div className="pages-toolbar-sep"/>
                 <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();exec('insertUnorderedList');}} title="Bullet list">• —</button>
                 <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();exec('insertOrderedList');}} title="Numbered list">1.</button>
-                <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();exec('formatBlock','blockquote');}} title="Quote">"</button>
-                <div className="pages-toolbar-sep"/>
-                <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();exec('strikeThrough');}} title="Strikethrough"><s>S</s></button>
                 <button className="pages-toolbar-btn" onMouseDown={e=>{
                   e.preventDefault();
-                  exec('insertHTML', '<div class="pages-chk-item" data-chk="false"><span class="pages-chk-box" contenteditable="false">☐</span> <span class="pages-chk-text">List item</span></div><p><br></p>');
+                  insertChecklistItem();
                 }} title="Checklist">☑</button>
+                <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();exec('formatBlock','blockquote');}} title="Quote">"</button>
                 <div className="pages-toolbar-sep"/>
                 <button className="pages-toolbar-btn" onMouseDown={e=>{
                   e.preventDefault();
@@ -4112,16 +4232,15 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
 
               <div ref={bodyRef} className="pages-body" contentEditable suppressContentEditableWarning
                 onInput={e=>{onBodyInput();setWordCount(countWords(bodyRef.current?.innerText||''));}}
+                onKeyDown={e=>handleBodyKeyDown(e)}
                 onClick={e=>{
-                  // Toggle checklist checkboxes
-                  if(e.target.classList.contains('pages-chk-box')){
-                    e.preventDefault();
-                    const item = e.target.closest('.pages-chk-item');
-                    if(item){
-                      const checked = item.getAttribute('data-chk') === 'true';
-                      item.setAttribute('data-chk', !checked);
-                      e.target.textContent = !checked ? '☑' : '☐';
-                      setTimeout(()=>onBodyInput(), 0);
+                  const li = e.target.closest('li.pages-chk-li');
+                  // Only toggle if click was on the checkbox pseudo-area (left 28px)
+                  if(li){
+                    const rect = li.getBoundingClientRect();
+                    if(e.clientX < rect.left + 28){
+                      e.preventDefault();
+                      toggleChecklistItem(li);
                     }
                   }
                 }}
