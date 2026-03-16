@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v1.2.4 -->
+<!-- LP Planner v1.3.0 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -381,6 +381,19 @@
   }
   .task-color-swatch:hover { transform: scale(1.25); }
   .task-color-swatch.active { border-color: var(--ink); transform: scale(1.15); }
+
+  /* CONTEXT MENU */
+  .task-ctx-menu {
+    display: none; position: fixed; z-index: 9999;
+    background: var(--paper); border: 1px solid var(--border); border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15); overflow: hidden; min-width: 140px;
+  }
+  .task-ctx-btn {
+    display: block; width: 100%; padding: 9px 14px; border: none; background: none;
+    text-align: left; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 13px;
+    color: var(--ink); transition: background 0.1s;
+  }
+  .task-ctx-btn:hover { background: var(--cream); }
 
   /* DRAG HANDLE */
   .drag-handle { cursor: grab; opacity: 0.3; font-size: 11px; padding: 0 2px; }
@@ -1482,13 +1495,20 @@ function ColorPicker({ value, onChange }) {
   return (
     <div ref={ref} style={{position:'relative', display:'inline-block'}}>
       <div className="goal-color-dot" style={{background: value, cursor:'pointer', border:'2px solid rgba(0,0,0,0.1)'}}
-        onClick={()=>setOpen(o=>!o)} />
+        onClick={e=>{e.stopPropagation();setOpen(o=>!o);}} />
       {open && (
-        <div className="color-picker-popup">
+        <div className="color-picker-popup" onClick={e=>e.stopPropagation()}>
           {GOAL_COLORS.map(c=>(
             <div key={c} className={`color-swatch ${value===c?'selected':''}`}
               style={{background:c}} onClick={()=>{onChange(c);setOpen(false);}} />
           ))}
+          <div style={{display:'flex',alignItems:'center',gap:4,width:'100%',marginTop:4,paddingTop:4,borderTop:'1px solid rgba(0,0,0,0.1)'}}>
+            <span style={{fontSize:9,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace",flexShrink:0}}>Custom</span>
+            <input type="color" value={value}
+              onChange={e=>{onChange(e.target.value);}}
+              style={{width:28,height:22,border:'none',borderRadius:4,cursor:'pointer',padding:0,background:'none'}}
+            />
+          </div>
         </div>
       )}
     </div>
@@ -1589,9 +1609,21 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
   const weekKey = fmt(weekStart);
   const weekDataRef = useRef(weekData);
   useEffect(() => { weekDataRef.current = weekData; }, [weekData]);
+
+  // Auto-focus newly created task title
+  useEffect(() => {
+    if (pendingTaskFocus.current) {
+      const {id, dayKey} = pendingTaskFocus.current;
+      const el = taskTitleRefs.current[id];
+      if (el) { el.focus(); pendingTaskFocus.current = null; }
+    }
+  });
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileDayIndex, setMobileDayIndex] = useState(today.getDay()); // 0=Sun
   const [sheetOpen, setSheetOpen] = useState(false);
+  const pendingTaskFocus = useRef(null); // {id, dayKey} — task to focus after render
+  const taskTitleRefs = useRef({}); // id -> input ref
+  const [taskClipboard, setTaskClipboard] = useState(null); // copied task object
 
   // Per-week data — now uses shared weekData prop
 
@@ -1622,9 +1654,19 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
     });
   }
 
-  function addTask(dayKey) {
+  function addTask(dayKey, afterId) {
     const id = Date.now().toString();
-    setTasks(dayKey, t => [...t, {id, title:'', details:'', done:false, expanded:false, colorIndex: t.length}]);
+    pendingTaskFocus.current = {id, dayKey};
+    if (afterId) {
+      setTasks(dayKey, t => {
+        const idx = t.findIndex(x=>x.id===afterId);
+        const next = [...t];
+        next.splice(idx+1, 0, {id, title:'', details:'', done:false, expanded:false, colorIndex: idx+1});
+        return next;
+      });
+    } else {
+      setTasks(dayKey, t => [...t, {id, title:'', details:'', done:false, expanded:false, colorIndex: t.length}]);
+    }
   }
   function updateTask(dayKey, id, patch) {
     // Pure state update — no calendar sync, safe to call on every keystroke
@@ -1882,6 +1924,22 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
                         onUpdate={p=>updateTask(dk,task.id,p)}
                         onBlurSync={()=>syncTaskToCalendar(dk,task.id)}
                         onDelete={()=>deleteTask(dk,task.id)}
+                        onEnterKey={()=>addTask(dk,task.id)}
+                        titleRef={el=>taskTitleRefs.current[task.id]=el}
+                        deleteIfEmpty={()=>{if(!task.title.trim())deleteTask(dk,task.id);}}
+                        onCopy={()=>setTaskClipboard({...task, gcalId:null, id:null})}
+                        hasCopied={!!taskClipboard}
+                        onPasteBelow={()=>{
+                          if(!taskClipboard) return;
+                          addTask(dk, task.id);
+                          setTimeout(()=>{
+                            if(pendingTaskFocus.current) {
+                              const newId = pendingTaskFocus.current.id;
+                              const copy = {...taskClipboard, id:newId};
+                              updateTask(dk, newId, {title:copy.title,details:copy.details,colorIndex:copy.colorIndex,isEvent:copy.isEvent,eventTime:copy.eventTime});
+                            }
+                          }, 0);
+                        }}
                         isDragOver={dragOver?.dayKey===dk && dragOver?.id===task.id}
                         onDragStart={()=>setDragging({dayKey:dk, id:task.id})}
                         onDragOver={()=>setDragOver({dayKey:dk, id:task.id})}
@@ -1946,6 +2004,9 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
               onUpdate={p=>updateTask(mobileDayKey,task.id,p)}
               onBlurSync={()=>syncTaskToCalendar(mobileDayKey,task.id)}
               onDelete={()=>deleteTask(mobileDayKey,task.id)}
+              onEnterKey={()=>addTask(mobileDayKey,task.id)}
+              titleRef={el=>taskTitleRefs.current[task.id]=el}
+              deleteIfEmpty={()=>{if(!task.title.trim())deleteTask(mobileDayKey,task.id);}}
               isDragOver={false} onDragStart={()=>{}} onDragOver={()=>{}} onDrop={()=>{}} />
           ))}
           <button className="mobile-add-btn" onClick={()=>addTask(mobileDayKey)}>+ Add task</button>
@@ -2061,7 +2122,7 @@ const EVENT_COLORS = [
   '#ffe4e6', // blush
   '#ecfdf5', // aqua mist
 ];
-function TaskCard({ task, onUpdate, onBlurSync, onDelete, onDragStart, onDragOver, onDrop, isDragOver }) {
+function TaskCard({ task, onUpdate, onBlurSync, onDelete, onEnterKey, titleRef, deleteIfEmpty, onCopy, hasCopied, onPasteBelow, onDragStart, onDragOver, onDrop, isDragOver }) {
   const titleRef = useRef();
   const textareaRef = useRef();
   const [confirming, setConfirming] = useState(false);
@@ -2092,9 +2153,29 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onDragStart, onDragOve
       style={{
         background: task.isProjectTask && task.priority
           ? '#fee2e2'
-          : (task.isEvent ? EVENT_COLORS : TASK_COLORS)[(task.colorIndex ?? 0) % (task.isEvent ? EVENT_COLORS : TASK_COLORS).length],
+          : task.customColor
+            ? task.customColor + '55'
+            : (task.isEvent ? EVENT_COLORS : TASK_COLORS)[(task.colorIndex ?? 0) % (task.isEvent ? EVENT_COLORS : TASK_COLORS).length],
         opacity: isDragOver ? 0.5 : 1,
         borderLeft: task.isProjectTask && task.priority ? '3px solid #dc2626' : undefined,
+      }}
+      onContextMenu={e=>{
+        e.preventDefault(); e.stopPropagation();
+        // Show mini context menu
+        const menu = document.getElementById('task-ctx-menu');
+        if(menu){
+          menu.style.display='block';
+          menu.style.left=e.clientX+'px';
+          menu.style.top=e.clientY+'px';
+          menu.dataset.mode = 'task';
+          window._ctxCopy = onCopy;
+          window._ctxPaste = onPasteBelow;
+          window._ctxHasCopied = hasCopied;
+          const copyBtn = menu.querySelector('#ctx-copy');
+          const pasteBtn = menu.querySelector('#ctx-paste');
+          if(copyBtn) copyBtn.style.display='block';
+          if(pasteBtn) pasteBtn.style.display = hasCopied ? 'block' : 'none';
+        }
       }}
       draggable
       onDragStart={onDragStart}
@@ -2123,10 +2204,22 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onDragStart, onDragOve
           style={{borderColor: task.done ? '#2d5a3d' : undefined, color: task.done ? '#2d5a3d' : undefined, background: task.done ? '#e8f0eb' : undefined}}
           onClick={()=>onUpdate({done:!task.done})} />
         <div style={{flex:1,minWidth:0}}>
-          <input ref={titleRef} className="task-title-input"
+          <input
+            ref={el=>{if(titleRef)titleRef(el);}}
+            className="task-title-input"
             placeholder={task.isEvent ? 'Event…' : 'Task…'}
-            value={task.title} onChange={e=>onUpdate({title:e.target.value})}
-            onBlur={()=>onBlurSync && task.isEvent && onBlurSync()}
+            value={task.title}
+            onChange={e=>onUpdate({title:e.target.value})}
+            onBlur={()=>{
+              if(onBlurSync && task.isEvent) onBlurSync();
+              if(deleteIfEmpty) deleteIfEmpty();
+            }}
+            onKeyDown={e=>{
+              if(e.key==='Enter' && !task.isEvent && !task.isProjectTask){
+                e.preventDefault();
+                if(onEnterKey) onEnterKey();
+              }
+            }}
             onClick={e=>e.stopPropagation()}
             readOnly={!!task.isProjectTask}
             style={{...(task.isProjectTask ? {cursor:'default'} : {}), width:'100%'}}
@@ -2176,13 +2269,22 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onDragStart, onDragOve
             </button>
           </div>
           {showColors && (
-            <div className="task-color-picker">
+            <div className="task-color-picker" onClick={e=>e.stopPropagation()}>
               {(task.isEvent?EVENT_COLORS:TASK_COLORS).map((c,i)=>(
                 <div key={i} className={`task-color-swatch ${(task.colorIndex??0)===i?'active':''}`}
                   style={{background:c}}
-                  onClick={e=>{e.stopPropagation();onUpdate({colorIndex:i});setShowColors(false);}}
+                  onClick={e=>{e.stopPropagation();onUpdate({colorIndex:i,customColor:undefined});setShowColors(false);}}
                   title={`Color ${i+1}`} />
               ))}
+              <div style={{display:'flex',alignItems:'center',gap:4,width:'100%',marginTop:4,paddingTop:4,borderTop:'1px solid rgba(0,0,0,0.07)'}}>
+                <span style={{fontSize:10,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace",flexShrink:0}}>Custom:</span>
+                <input type="color"
+                  value={task.customColor || (task.isEvent?EVENT_COLORS:TASK_COLORS)[task.colorIndex??0]}
+                  onChange={e=>{e.stopPropagation();onUpdate({customColor:e.target.value,colorIndex:-1});}}
+                  style={{width:28,height:22,border:'none',borderRadius:4,cursor:'pointer',padding:0,background:'none'}}
+                  onClick={e=>e.stopPropagation()}
+                />
+              </div>
             </div>
           )}
         </div>
@@ -3284,7 +3386,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.2.4</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.3.0</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -3701,9 +3803,26 @@ function PagesView({ pagesData, setPagesData, weekData, setWeekData, selectedId,
         )}
 
       </div>
+      {/* Global context menu for task copy/paste */}
+      <div id="task-ctx-menu" className="task-ctx-menu">
+        <button id="ctx-copy" className="task-ctx-btn" onClick={()=>{
+          if(window._ctxCopy) window._ctxCopy();
+          document.getElementById('task-ctx-menu').style.display='none';
+        }}>📋 Copy task</button>
+        <button id="ctx-paste" className="task-ctx-btn" onClick={()=>{
+          if(window._ctxPaste) window._ctxPaste();
+          document.getElementById('task-ctx-menu').style.display='none';
+        }}>📌 Paste below</button>
+      </div>
     </div>
   );
 }
+
+// Close context menu on click outside
+document.addEventListener('click', () => {
+  const m = document.getElementById('task-ctx-menu');
+  if(m) m.style.display='none';
+});
 
 ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
 </script>
