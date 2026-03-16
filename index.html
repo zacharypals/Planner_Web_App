@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v1.4.7 -->
+<!-- LP Planner v1.4.8 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -1030,23 +1030,22 @@
     padding-left: 24px;
   }
   .pages-body li.pages-chk-li {
-    display: flex; align-items: flex-start; gap: 0;
-    padding: 1px 0; min-height: 22px; position: relative;
-    padding-left: 28px; cursor: text;
+    display: flex; align-items: baseline; gap: 6px;
+    padding: 1px 0; min-height: 22px; cursor: text;
   }
-  .pages-body li.pages-chk-li::before {
-    content: ''; position: absolute; left: 2px; top: 4px;
-    width: 14px; height: 14px; border: 1.5px solid #aaa;
+  /* The inline checkbox span — not contenteditable so cursor always lands after it */
+  .pages-chk-box-span {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 14px; height: 14px; min-width: 14px; border: 1.5px solid #aaa;
     border-radius: 3px; background: white; cursor: pointer;
-    flex-shrink: 0; transition: all 0.12s;
+    flex-shrink: 0; transition: all 0.12s; margin-top: 3px;
+    font-size: 10px; font-weight: 700; user-select: none;
   }
-  .pages-body li.pages-chk-li:hover::before { border-color: var(--accent); }
-  .pages-body li.pages-chk-li[data-checked="true"]::before {
-    background: var(--accent); border-color: var(--accent);
-    content: '✓'; color: white; font-size: 10px; font-weight: 700;
-    display: flex; align-items: center; justify-content: center;
+  .pages-chk-box-span:hover { border-color: var(--accent); }
+  li.pages-chk-li[data-checked="true"] .pages-chk-box-span {
+    background: var(--accent); border-color: var(--accent); color: white;
   }
-  .pages-body li.pages-chk-li[data-checked="true"] {
+  li.pages-chk-li[data-checked="true"] .pages-chk-text-span {
     text-decoration: line-through; opacity: 0.5;
   }
   /* Project tasks section */
@@ -3501,7 +3500,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.4.7</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.4.8</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -3718,15 +3717,28 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
     return el ? el.closest('li.pages-chk-li') : null;
   }
 
-  // Helper: place cursor at the start of an li (before any content)
+  // Helper: place cursor at the start of the text span inside an li
   function placeCursorInLi(li, sel) {
     const r = document.createRange();
-    // Use the first text node if present, else the li itself
-    const target = li.firstChild && li.firstChild.nodeType === 3 ? li.firstChild : li;
-    if (target.nodeType === 3) {
-      r.setStart(target, 0);
+    // Find the text span (second span); fall back to any text node or li itself
+    const textSpan = li.querySelector('.pages-chk-text-span');
+    if (textSpan) {
+      // Place cursor at start of text span content
+      const textNode = textSpan.firstChild;
+      if (textNode && textNode.nodeType === 3) {
+        r.setStart(textNode, 0);
+      } else {
+        r.setStart(textSpan, 0);
+      }
     } else {
-      r.setStart(li, 0);
+      // Fallback: find first non-contenteditable child
+      let target = li.firstChild;
+      while (target && target.contentEditable === 'false') target = target.nextSibling;
+      if (target) {
+        r.setStart(target.nodeType === 3 ? target : target, 0);
+      } else {
+        r.setStart(li, li.childNodes.length);
+      }
     }
     r.collapse(true);
     sel.removeAllRanges();
@@ -3743,7 +3755,7 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
     }
     // Insert a new checklist ul with one empty li (use <br> not ZWS for cursor visibility)
     document.execCommand('insertHTML', false,
-      '<ul class="pages-checklist"><li class="pages-chk-li" data-checked="false"><br></li></ul><p><br></p>'
+      '<ul class="pages-checklist"><li class="pages-chk-li" data-checked="false"><span class="pages-chk-box-span" contenteditable="false"> </span><span class="pages-chk-text-span"> </span></li></ul><p><br></p>'
     );
     // Place cursor inside the new li
     requestAnimationFrame(() => {
@@ -3759,7 +3771,10 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
 
   function toggleChecklistItem(li) {
     const checked = li.getAttribute('data-checked') === 'true';
-    li.setAttribute('data-checked', String(!checked));
+    const nowChecked = !checked;
+    li.setAttribute('data-checked', String(nowChecked));
+    const box = li.querySelector('.pages-chk-box-span');
+    if (box) box.textContent = nowChecked ? '✓' : ' ';
     setTimeout(() => onBodyInput(), 0);
   }
 
@@ -3786,7 +3801,7 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
       const newLi = document.createElement('li');
       newLi.className = 'pages-chk-li';
       newLi.setAttribute('data-checked', 'false');
-      newLi.innerHTML = '<br>';
+      newLi.innerHTML = '<span class="pages-chk-box-span" contenteditable="false"> </span><span class="pages-chk-text-span"> </span>';
       li.parentNode.insertBefore(newLi, li.nextSibling);
       placeCursorInLi(newLi, sel);
     }
@@ -4259,14 +4274,11 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
                 onInput={e=>{onBodyInput();setWordCount(countWords(bodyRef.current?.innerText||''));}}
                 onKeyDown={e=>handleBodyKeyDown(e)}
                 onClick={e=>{
-                  const li = e.target.closest('li.pages-chk-li');
-                  // Only toggle if click was on the checkbox pseudo-area (left 28px)
-                  if(li){
-                    const rect = li.getBoundingClientRect();
-                    if(e.clientX < rect.left + 28){
-                      e.preventDefault();
-                      toggleChecklistItem(li);
-                    }
+                  // Toggle if clicking the checkbox span directly
+                  if(e.target.classList.contains('pages-chk-box-span')){
+                    e.preventDefault();
+                    const li = e.target.closest('li.pages-chk-li');
+                    if(li) toggleChecklistItem(li);
                   }
                 }}
                 data-placeholder="Start writing…"
