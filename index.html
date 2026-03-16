@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<!-- LP Planner v1.5.0 -->
+<!-- LP Planner v1.5.1 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-512.png">
@@ -39,7 +39,7 @@
     --teal: #148f77; --teal-light: #e8f8f5;
     --pink: #c0392b;
   }
-  html, body { height: 100%; font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--ink); }
+  html, body { height: 100%; font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--ink); overflow-x: hidden; }
   #root { height: 100%; }
 
   /* LAYOUT */
@@ -582,6 +582,7 @@
   }
   .goal-filter-chip.active { border-color: var(--ink); background: var(--ink); color: white; }
   .habit-header-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+  .habit-nav-mobile { display: none; } /* shown only on mobile */
 
   /* TOOLTIP */
   [data-tooltip] { position: relative; }
@@ -718,7 +719,27 @@
     .sidebar { width: 240px; min-width: 240px; }
     .cal-grid { min-width: 560px; }
     .task-card { padding: 6px 8px; }
-    .task-title-input { font-size: 12px; }
+    .task-title-input { font-size: 16px; } /* 16px prevents iOS auto-zoom */
+
+    /* Prevent horizontal overflow on all mobile views */
+    .app { overflow-x: hidden; max-width: 100vw; }
+    .main-content { overflow-x: hidden; max-width: 100vw; }
+    .habit-main { overflow-x: hidden; max-width: 100vw; }
+
+    /* Move habit nav arrows below filter chips on mobile */
+    .habit-nav-desktop { display: none !important; }
+    .habit-nav-mobile {
+      display: flex; justify-content: center; align-items: center;
+      padding: 4px 0 8px; border-bottom: 1px solid var(--border); margin-bottom: 8px;
+    }
+
+    /* Set all inputs/textareas to 16px on mobile to prevent iOS zoom */
+    input[type="text"], input[type="date"], input[type="color"], textarea,
+    .task-title-input, .task-details-input, .checklist-input,
+    .pages-title-input, .pages-body, .pages-task-title-input,
+    .pages-task-details-input, .sidebar-textarea, .review-textarea {
+      font-size: 16px !important;
+    }
     .week-review { grid-template-columns: 1fr; }
   }
 
@@ -2533,7 +2554,9 @@ function HabitTracker({ onGoToPlanner, goals, setGoals, completions, setCompleti
             ))}
           </div>
           <div style={{flex:1}}/>
-          <HabitNavArrows view={view} date={selectedDate} onChange={setSelectedDate}/>
+          <div className="habit-nav-desktop">
+            <HabitNavArrows view={view} date={selectedDate} onChange={setSelectedDate}/>
+          </div>
         </div>
 
         {/* GOAL FILTER CHIPS */}
@@ -2549,6 +2572,11 @@ function HabitTracker({ onGoToPlanner, goals, setGoals, completions, setCompleti
               {g.name}
             </div>
           ))}
+        </div>
+
+        {/* Habit nav arrows — shown below filter chips on mobile only */}
+        <div className="habit-nav-mobile">
+          <HabitNavArrows view={view} date={selectedDate} onChange={setSelectedDate}/>
         </div>
 
         {view==='monthly' && <>
@@ -3522,7 +3550,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.5.0</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.5.1</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
