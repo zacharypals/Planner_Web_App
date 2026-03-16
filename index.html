@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v1.5.3 -->
+<!-- LP Planner v1.5.4 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -739,7 +739,7 @@
   /* ── MOBILE (< 768px) ── */
   @media (max-width: 767px) {
     /* Nav bar */
-    .nav-bar { flex-wrap: nowrap; gap: 4px; padding: 6px 10px; }
+    .nav-bar { flex-wrap: nowrap; gap: 4px; padding: 6px 10px; position: sticky; top: 0; z-index: 200; }
     .nav-tabs { display: none; } /* hidden — use bottom nav */
     .hdr-color-area { flex: 1; min-width: 0; }
     .nav-brand { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -3540,7 +3540,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.5.3</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.5.4</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
