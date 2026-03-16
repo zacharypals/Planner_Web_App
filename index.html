@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v1.5.1 -->
+<!-- LP Planner v1.5.2 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -730,6 +730,7 @@
     .habit-nav-desktop { display: none !important; }
     .habit-nav-mobile {
       display: flex; justify-content: center; align-items: center;
+      width: 100%; box-sizing: border-box;
       padding: 4px 0 8px; border-bottom: 1px solid var(--border); margin-bottom: 8px;
     }
 
@@ -764,7 +765,7 @@
     .app { height: auto; min-height: 100vh; overflow: visible; }
     .main-content { flex-direction: column; overflow: visible; padding-bottom: 64px; }
     .main-panel { overflow: visible; }
-    .habit-main { overflow: visible; height: auto; }
+    .habit-main { overflow-x: hidden; overflow-y: auto; height: auto; }
     /* Hide weekly desktop panel on mobile — replaced by mobile-day-view */
     .weekly-main-panel { display: none !important; }
 
@@ -3550,7 +3551,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.5.1</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.5.2</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
