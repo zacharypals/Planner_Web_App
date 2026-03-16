@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v1.6.0 -->
+<!-- LP Planner v1.6.1 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -966,6 +966,11 @@
   }
   .pages-folder-row:hover .pages-folder-del-btn { opacity: 0.5; }
   .pages-folder-del-btn:hover { opacity: 1 !important; }
+  /* On touch devices, always show delete btn and swipe reveal */
+  @media (hover: none) {
+    .pages-folder-del-btn { opacity: 0.45; }
+    .pages-folder-row.swipe-reveal { background: #fee2e2; }
+  }
   .pages-doc-delete-btn {
     background: none; border: none; cursor: pointer; font-size: 11px;
     color: var(--ink-faint); padding: 2px 4px; opacity: 0; flex-shrink: 0;
@@ -3540,7 +3545,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.6.0</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.6.1</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -3646,6 +3651,9 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
 
   // Drag state — use ref for dragItem so it's always fresh in event handlers
   const dragItemRef = useRef(null); // {type:'doc'|'folder', id}
+  const [swipeDeleteId, setSwipeDeleteId] = useState(null); // folder id being swiped to delete
+  const swipeTouchStart = useRef(null); // {x, y} of touch start
+  const longPressTimer = useRef(null); // timer for long-press rename
   const [dragOverId, setDragOverId] = useState(null);
   const [folderHoverTarget, setFolderHoverTarget] = useState(null);
   const folderHoverTimer = useRef(null);
@@ -4145,13 +4153,34 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
     return (
       <div key={folder.id}>
         <div
-          className={`pages-folder-row ${isOver ? 'drag-over' : ''} ${isHoverTarget ? 'folder-hover-target' : ''}`}
+          className={`pages-folder-row ${isOver ? 'drag-over' : ''} ${isHoverTarget ? 'folder-hover-target' : ''} ${swipeDeleteId === folder.id ? 'swipe-reveal' : ''}`}
           style={{paddingLeft: 6 + indentPx}}
           draggable
           onDragStart={e => { e.stopPropagation(); handleDragStartPages(e, 'folder', folder.id); }}
           onDragEnd={handleDragEndPages}
           onDragOver={e => handleDragOverPages(e, 'folder', folder.id)}
           onDrop={e => handleDropPages(e, 'folder', folder.id)}
+          onTouchStart={e => {
+            swipeTouchStart.current = {x: e.touches[0].clientX, y: e.touches[0].clientY};
+            // Long-press to rename (500ms)
+            longPressTimer.current = setTimeout(() => {
+              setEditingFolderId(folder.id);
+              setEditingFolderName(folder.name);
+              longPressTimer.current = null;
+            }, 500);
+          }}
+          onTouchMove={e => {
+            if (!swipeTouchStart.current) return;
+            const dx = e.touches[0].clientX - swipeTouchStart.current.x;
+            const dy = Math.abs(e.touches[0].clientY - swipeTouchStart.current.y);
+            if (dy > 10) { clearTimeout(longPressTimer.current); return; } // vertical scroll, cancel
+            if (dx < -50) { clearTimeout(longPressTimer.current); setSwipeDeleteId(folder.id); }
+            else if (dx > 10) { clearTimeout(longPressTimer.current); setSwipeDeleteId(null); }
+          }}
+          onTouchEnd={() => {
+            clearTimeout(longPressTimer.current);
+            swipeTouchStart.current = null;
+          }}
         >
           <button className="pages-folder-toggle"
             onClick={e => { e.stopPropagation(); setExpandedFolders(ex => ({...ex, [folder.id]: !isExpanded})); }}>
@@ -4196,7 +4225,14 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
               </>
             )}
             <button className="pages-folder-del-btn" title="Delete folder"
-              onClick={e => { e.stopPropagation(); deleteFolder(folder.id); }}>🗑</button>
+              onClick={e => { e.stopPropagation(); setSwipeDeleteId(null); deleteFolder(folder.id); }}>🗑</button>
+            {swipeDeleteId === folder.id && (
+              <button onClick={e => { e.stopPropagation(); setSwipeDeleteId(null); deleteFolder(folder.id); }}
+                style={{background:'#dc2626',color:'white',border:'none',borderRadius:6,padding:'2px 10px',
+                  fontSize:12,fontFamily:"'DM Sans',sans-serif",cursor:'pointer',fontWeight:600,flexShrink:0}}>
+                Delete
+              </button>
+            )}
           </div>
           {isHoverTarget && (
             <div style={{position:'absolute',right:8,top:'50%',transform:'translateY(-50%)',fontSize:10,color:'var(--accent)',fontFamily:"'DM Mono',monospace",pointerEvents:'none',background:'var(--accent-light)',padding:'1px 4px',borderRadius:3}}>
@@ -4292,7 +4328,7 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
                 {renderNewMenu()}
               </div>
             </div>
-            <div className="pages-list" style={{flex:1,overflowY:'auto'}}>
+            <div className="pages-list" style={{flex:1,overflowY:'auto'}} onClick={e => { if(swipeDeleteId && !e.target.closest('.pages-folder-row')) setSwipeDeleteId(null); }}>
               {pagesData.length === 0 && foldersData.length === 0 && (
                 <div style={{padding:'24px 16px',fontSize:13,color:'var(--ink-faint)',fontFamily:"'DM Sans',sans-serif",textAlign:'center'}}>
                   No pages yet — tap + to create one
@@ -4313,23 +4349,7 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
                 </div>
               ))}
               {(pagesData.length > 0 || foldersData.length > 0) && <div className="pages-section-label">All Pages</div>}
-              {sortedFolders.map(folder => {
-                const isExp = expandedFolders[folder.id] ?? false;
-                const docsIn = pagesData.filter(d => d.folderId === folder.id).sort((a,b) => (a.order??0)-(b.order??0));
-                return (
-                  <div key={folder.id}>
-                    <div className="pages-folder-row" onClick={() => setExpandedFolders(ex => ({...ex, [folder.id]: !isExp}))}>
-                      <button className="pages-folder-toggle" onClick={e=>e.stopPropagation()}>{isExp ? '▾' : '▸'}</button>
-                      <span style={{fontSize:13, marginRight:4}}>📁</span>
-                      <span className="pages-folder-name">{folder.name}</span>
-                      <span style={{fontSize:10,color:'var(--ink-faint)',marginLeft:4,fontFamily:"'DM Mono',monospace"}}>({docsIn.length})</span>
-                      <button className="pages-folder-add-btn" style={{marginLeft:'auto'}} title="New doc in folder"
-                        onClick={e=>{e.stopPropagation();createDoc(folder.id);}}>+</button>
-                    </div>
-                    {isExp && docsIn.map(doc => renderDocRow(doc, true))}
-                  </div>
-                );
-              })}
+              {sortedFolders.map(folder => renderFolderRow(folder, 0))}
               {unfolderedDocs.map(doc => renderDocRow(doc, false))}
             </div>
           </div>
