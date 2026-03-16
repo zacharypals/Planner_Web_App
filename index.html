@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v1.4.10 -->
+<!-- LP Planner v1.4.11 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -3492,7 +3492,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.4.10</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.4.11</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -3761,23 +3761,29 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
   function handleEnterInChecklist(li, sel) {
     const textContent = Array.from(li.childNodes)
       .filter(n => n.nodeType === 3).map(n => n.textContent)
-      .join('').replace(/ /g, '').trim();
+      .join('').replace(/ /g, '').replace(/ /g, '').trim();
     if (textContent === '') {
-      // Empty — exit the list
-      const ul = li.closest('ul.pages-checklist');
-      if (ul) {
-        const p = document.createElement('p');
-        p.appendChild(document.createTextNode(' '));
-        ul.parentNode.insertBefore(p, ul.nextSibling);
-        li.remove();
-        if (ul.children.length === 0) ul.remove();
-        const r = document.createRange();
-        r.setStart(p.firstChild, 0);
-        r.collapse(true);
-        sel.removeAllRanges();
-        sel.addRange(r);
+      // Empty item — exit the checklist
+      // Walk up to find the topmost ul in case we're nested after an outdent
+      let ul = li.parentNode;
+      while (ul && ul.tagName === 'UL') {
+        const parent = ul.parentNode;
+        if (!parent || parent === bodyRef.current || parent.tagName !== 'UL') break;
+        ul = parent;
       }
+      const insertAfter = (ul && ul !== li) ? ul : li;
+      const p = document.createElement('p');
+      p.appendChild(document.createTextNode(' '));
+      insertAfter.parentNode.insertBefore(p, insertAfter.nextSibling);
+      li.remove();
+      if (ul && ul !== li && ul.children.length === 0) ul.remove();
+      const r = document.createRange();
+      r.setStart(p.firstChild, 0);
+      r.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(r);
     } else {
+      // Add new checklist item right after this one
       const newLi = makeChkLi();
       li.parentNode.insertBefore(newLi, li.nextSibling);
       const textNode = newLi.lastChild;
