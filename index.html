@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v1.4.11 -->
+<!-- LP Planner v1.4.12 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -3492,7 +3492,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.4.11</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.4.12</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -3810,7 +3810,21 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
       } else {
         document.execCommand('indent');
       }
-      setTimeout(() => onBodyInput(), 0);
+      // After indent/outdent the browser may recreate the <li> without our class.
+      // Re-apply it so getChkLi() keeps working for subsequent Enter/Tab/Backspace.
+      requestAnimationFrame(() => {
+        const s = window.getSelection();
+        if (s && s.rangeCount > 0) {
+          const node = s.getRangeAt(0).startContainer;
+          const el = node.nodeType === 3 ? node.parentElement : node;
+          const currentLi = el?.closest('li');
+          if (currentLi && !currentLi.classList.contains('pages-chk-li')) {
+            currentLi.classList.add('pages-chk-li');
+            currentLi.setAttribute('data-checked', 'false');
+          }
+        }
+        onBodyInput();
+      });
     } else if (e.key === 'Backspace') {
       const textContent = Array.from(li.childNodes)
         .filter(n => n.nodeType === 3).map(n => n.textContent)
@@ -4251,10 +4265,27 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
               <div ref={bodyRef} className="pages-body" contentEditable suppressContentEditableWarning
                 onInput={e=>{onBodyInput();setWordCount(countWords(bodyRef.current?.innerText||''));}}
                 onKeyDown={e=>handleBodyKeyDown(e)}
-                onClick={e=>{
-                  // Checkbox inputs handle their own change event; just stop propagation
+                onMouseDown={e=>{
                   if(e.target.classList.contains('pages-chk-input')){
-                    e.stopPropagation();
+                    // Native checkbox — let it handle normally
+                    return;
+                  }
+                  const li = e.target.closest('li.pages-chk-li');
+                  if(li){
+                    // Prevent browser from placing cursor (it defaults to before the checkbox)
+                    e.preventDefault();
+                    bodyRef.current?.focus();
+                    // Place cursor at end of the text content in this li
+                    const textNodes = Array.from(li.childNodes).filter(n => n.nodeType === 3);
+                    const lastText = textNodes[textNodes.length - 1];
+                    if(lastText){
+                      const r = document.createRange();
+                      r.setStart(lastText, lastText.length);
+                      r.collapse(true);
+                      const s = window.getSelection();
+                      s.removeAllRanges();
+                      s.addRange(r);
+                    }
                   }
                 }}
                 data-placeholder="Start writing…"
