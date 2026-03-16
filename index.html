@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v1.4.6 -->
+<!-- LP Planner v1.4.7 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -3501,7 +3501,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.4.6</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.4.7</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -3709,33 +3709,52 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
   }
 
   // ── Checklist helpers ────────────────────────────────────────────────────
+  // Helper: get the closest pages-chk-li from a selection, handling both
+  // text nodes and element nodes as startContainer
+  function getChkLi(sel) {
+    if (!sel || sel.rangeCount === 0) return null;
+    const node = sel.getRangeAt(0).startContainer;
+    const el = node.nodeType === 3 ? node.parentElement : node;
+    return el ? el.closest('li.pages-chk-li') : null;
+  }
+
+  // Helper: place cursor at the start of an li (before any content)
+  function placeCursorInLi(li, sel) {
+    const r = document.createRange();
+    // Use the first text node if present, else the li itself
+    const target = li.firstChild && li.firstChild.nodeType === 3 ? li.firstChild : li;
+    if (target.nodeType === 3) {
+      r.setStart(target, 0);
+    } else {
+      r.setStart(li, 0);
+    }
+    r.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(r);
+  }
+
   function insertChecklistItem() {
     bodyRef.current?.focus();
-    // Check if cursor is already inside a checklist item
     const sel = window.getSelection();
-    if (sel && sel.rangeCount > 0) {
-      const li = sel.getRangeAt(0).startContainer.parentElement?.closest('li.pages-chk-li');
-      if (li) {
-        // Already in a checklist — just insert a new item via Enter logic
-        document.execCommand('insertParagraph');
-        return;
-      }
+    // If already in a checklist, let Enter handler add a new item
+    if (getChkLi(sel)) {
+      handleEnterInChecklist(getChkLi(sel), sel);
+      return;
     }
-    // Insert a new checklist <ul> with one item
-    document.execCommand('insertHTML',false,
-      '<ul class="pages-checklist"><li class="pages-chk-li" data-checked="false">&#8203;</li></ul><p><br></p>'
+    // Insert a new checklist ul with one empty li (use <br> not ZWS for cursor visibility)
+    document.execCommand('insertHTML', false,
+      '<ul class="pages-checklist"><li class="pages-chk-li" data-checked="false"><br></li></ul><p><br></p>'
     );
-    // Move cursor inside the new li
-    const ul = bodyRef.current?.querySelector('.pages-checklist:last-of-type li');
-    if (ul) {
-      const r = document.createRange();
-      r.selectNodeContents(ul);
-      r.collapse(false);
-      const s = window.getSelection();
-      s.removeAllRanges();
-      s.addRange(r);
-    }
-    setTimeout(() => onBodyInput(), 0);
+    // Place cursor inside the new li
+    requestAnimationFrame(() => {
+      const lis = bodyRef.current?.querySelectorAll('li.pages-chk-li');
+      const newLi = lis?.[lis.length - 1];
+      if (newLi) {
+        const s = window.getSelection();
+        placeCursorInLi(newLi, s);
+      }
+      onBodyInput();
+    });
   }
 
   function toggleChecklistItem(li) {
@@ -3744,48 +3763,45 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
     setTimeout(() => onBodyInput(), 0);
   }
 
-  function handleBodyKeyDown(e) {
-    const sel = window.getSelection();
-    if (!sel || sel.rangeCount === 0) return;
-    const range = sel.getRangeAt(0);
-    const li = range.startContainer.parentElement?.closest('li.pages-chk-li');
-
-    if (!li) return; // Not in a checklist item — let browser handle normally
-
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      const text = li.textContent.replace(/​/g, '').trim();
-      if (text === '') {
-        // Empty item — Exit the list, insert a paragraph after the <ul>
-        const ul = li.closest('ul.pages-checklist');
-        if (ul) {
-          const p = document.createElement('p');
-          p.innerHTML = '<br>';
-          ul.parentNode.insertBefore(p, ul.nextSibling);
-          // Remove the empty li
-          li.remove();
-          if (ul.children.length === 0) ul.remove();
-          // Move cursor to the new p
-          const r = document.createRange();
-          r.setStart(p, 0);
-          r.collapse(true);
-          sel.removeAllRanges();
-          sel.addRange(r);
-        }
-      } else {
-        // Add a new checklist item after this one
-        const newLi = document.createElement('li');
-        newLi.className = 'pages-chk-li';
-        newLi.setAttribute('data-checked', 'false');
-        newLi.innerHTML = '&#8203;';
-        li.parentNode.insertBefore(newLi, li.nextSibling);
+  function handleEnterInChecklist(li, sel) {
+    // Check if item is empty (only has <br> or whitespace)
+    const text = (li.innerText || li.textContent || '').replace(/​/g, '').trim();
+    if (text === '') {
+      // Empty item — exit the list
+      const ul = li.closest('ul.pages-checklist');
+      if (ul) {
+        const p = document.createElement('p');
+        p.innerHTML = '<br>';
+        ul.parentNode.insertBefore(p, ul.nextSibling);
+        li.remove();
+        if (ul.children.length === 0) ul.remove();
         const r = document.createRange();
-        r.selectNodeContents(newLi);
-        r.collapse(false);
+        r.setStart(p, 0);
+        r.collapse(true);
         sel.removeAllRanges();
         sel.addRange(r);
       }
-      setTimeout(() => onBodyInput(), 0);
+    } else {
+      // Add new empty checklist item after this one
+      const newLi = document.createElement('li');
+      newLi.className = 'pages-chk-li';
+      newLi.setAttribute('data-checked', 'false');
+      newLi.innerHTML = '<br>';
+      li.parentNode.insertBefore(newLi, li.nextSibling);
+      placeCursorInLi(newLi, sel);
+    }
+    setTimeout(() => onBodyInput(), 0);
+  }
+
+  function handleBodyKeyDown(e) {
+    const sel = window.getSelection();
+    const li = getChkLi(sel);
+
+    if (!li) return; // Not in a checklist — browser handles normally
+
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleEnterInChecklist(li, sel);
     } else if (e.key === 'Tab') {
       e.preventDefault();
       if (e.shiftKey) {
@@ -3793,16 +3809,25 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
       } else {
         document.execCommand('indent');
       }
-      setTimeout(() => onBodyInput(), 0);
+      // Re-apply class to indented li (browser may create a new ul without our class)
+      requestAnimationFrame(() => {
+        const s = window.getSelection();
+        const newLi = getChkLi(s);
+        if (newLi && !newLi.classList.contains('pages-chk-li')) {
+          newLi.classList.add('pages-chk-li');
+          newLi.setAttribute('data-checked', 'false');
+        }
+        if (newLi) placeCursorInLi(newLi, s);
+        onBodyInput();
+      });
     } else if (e.key === 'Backspace') {
-      const text = li.textContent.replace(/​/g, '').trim();
+      const text = (li.innerText || li.textContent || '').replace(/​/g, '').trim();
       if (text === '') {
         e.preventDefault();
         const ul = li.closest('ul.pages-checklist');
         const prev = li.previousElementSibling || (ul ? ul.previousSibling : null);
         li.remove();
         if (ul && ul.children.length === 0) ul.remove();
-        // Move cursor to previous element
         if (prev) {
           const r = document.createRange();
           r.selectNodeContents(prev);
