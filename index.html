@@ -1932,13 +1932,14 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
                         hasCopied={!!taskClipboard}
                         onPasteBelow={()=>{
                           if(!taskClipboard) return;
-                          addTask(dk, task.id);
-                          setTimeout(()=>{
-                            if(pendingTaskFocus.current) {
-                              const newId = pendingTaskFocus.current.id;
-                              updateTask(dk, newId, {title:taskClipboard.title,details:taskClipboard.details,colorIndex:taskClipboard.colorIndex,isEvent:taskClipboard.isEvent,eventTime:taskClipboard.eventTime,customColor:taskClipboard.customColor});
-                            }
-                          }, 0);
+                          const newId = Date.now().toString();
+                          setTasks(dk, t => {
+                            const idx = t.findIndex(x=>x.id===task.id);
+                            const cloned = {...taskClipboard, id:newId, gcalId:null};
+                            const next = [...t];
+                            next.splice(idx+1, 0, cloned);
+                            return next;
+                          });
                         }}
                         onShowCtxMenu={(x,y,cp,pp,hp)=>setCtxMenu({x,y,onCopy:cp,onPaste:pp,hasCopied:hp})}
                         isDragOver={dragOver?.dayKey===dk && dragOver?.id===task.id}
