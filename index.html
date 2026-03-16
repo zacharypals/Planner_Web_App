@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v1.4.12 -->
+<!-- LP Planner v1.5.0 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -3334,6 +3334,7 @@ function App() {
   const [authUser, setAuthUser] = useState(null); // {name, email, picture}
   const [driveFileId, setDriveFileId] = useState(null);
   const [saveStatus, setSaveStatus] = useState(''); // '', 'saving', 'saved', 'error'
+  const [authError, setAuthError] = useState(false); // true when session expired and silent refresh failed
   const [syncing, setSyncing] = useState(false);
   const saveTimerRef = useRef(null);
 
@@ -3357,6 +3358,7 @@ function App() {
       if (data.pagesData) setPagesData(data.pagesData);
       if (data.foldersData) setFoldersData(data.foldersData);
       setDriveFileId(fileId); // set last to arm the save effect
+      setAuthError(false);
       setSaveStatus('saved');
       setTimeout(() => { setSaveStatus(''); _loadingFromDrive = false; }, 2000);
     } catch (e) {
@@ -3368,7 +3370,7 @@ function App() {
     }
   }
 
-  // Debounced save to Drive whenever data changes
+  // Debounced save to Drive whenever data changes, with automatic token refresh on 401
   const scheduleSave = useCallback((fid) => {
     if (!fid || _loadingFromDrive) return;
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
@@ -3380,12 +3382,40 @@ function App() {
       });
       try {
         await saveToDrive(fid, allData);
+        setAuthError(false);
         setSaveStatus('saved');
         setTimeout(() => setSaveStatus(''), 2000);
       } catch (e) {
         const msg = e?.message || 'Save failed';
-        setSaveStatus('ERR:' + msg);
-        setTimeout(() => setSaveStatus(''), 8000);
+        const is401 = msg.includes('401') || msg.toLowerCase().includes('unauthorized') || msg.toLowerCase().includes('not authenticated');
+        if (is401) {
+          // Token expired — attempt silent refresh then retry save
+          setSaveStatus('saving');
+          requestTokenSilent(
+            async () => {
+              // Silent refresh succeeded — retry the save immediately
+              try {
+                await saveToDrive(fid, allData);
+                setAuthError(false);
+                setSaveStatus('saved');
+                setTimeout(() => setSaveStatus(''), 2000);
+              } catch (e2) {
+                setSaveStatus('ERR:' + (e2?.message || 'Save failed'));
+                setTimeout(() => setSaveStatus(''), 8000);
+              }
+            },
+            () => {
+              // Silent refresh failed — refresh token also expired, need full re-login
+              clearToken();
+              setAuthError(true);
+              setSaveStatus('ERR:Session expired');
+              // Don't auto-clear this one — user needs to act
+            }
+          );
+        } else {
+          setSaveStatus('ERR:' + msg);
+          setTimeout(() => setSaveStatus(''), 8000);
+        }
       }
     }, 2500);
   }, []);
@@ -3492,7 +3522,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.4.12</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.5.0</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -3503,6 +3533,38 @@ function App() {
         </div>
         <div className="auth-area">
           {saveLabel && <span className={`save-status ${saveClass || saveStatus}`}>{saveLabel}</span>}
+          {authError && (
+            <div style={{
+              position:'fixed', top:0, left:0, right:0, zIndex:9999,
+              background:'#7f1d1d', color:'white', padding:'10px 16px',
+              fontFamily:"'DM Sans',sans-serif", fontSize:13,
+              display:'flex', alignItems:'center', justifyContent:'space-between', gap:12,
+              boxShadow:'0 2px 8px rgba(0,0,0,0.3)',
+            }}>
+              <span>⚠️ Your session has expired. Recent unsaved changes may be lost. Please sign in again to continue saving.</span>
+              <button onClick={()=>{
+                setAuthError(false);
+                requestToken(
+                  async (data) => {
+                    try {
+                      const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', { headers: { Authorization: `Bearer ${getToken()}` } });
+                      const user = await res.json();
+                      if (user.email) {
+                        setAuthUser({ name: user.name, email: user.email, picture: user.picture });
+                        saveEmail(user.email);
+                      }
+                    } catch {}
+                    if (driveFileId) scheduleSave(driveFileId);
+                  },
+                  (err) => { setAuthError(true); setSaveStatus('ERR:Sign-in failed'); }
+                );
+              }} style={{
+                background:'white', color:'#7f1d1d', border:'none', borderRadius:6,
+                padding:'4px 12px', cursor:'pointer', fontWeight:600, fontSize:12,
+                fontFamily:"'DM Sans',sans-serif", whiteSpace:'nowrap', flexShrink:0,
+              }}>Sign in again</button>
+            </div>
+          )}
           {authUser ? (
             <>
               <button className="auth-btn sync" onClick={handleSyncCalendar} disabled={syncing} title="Pull new events from Google Calendar">
