@@ -2124,7 +2124,6 @@ const EVENT_COLORS = [
   '#ecfdf5', // aqua mist
 ];
 function TaskCard({ task, onUpdate, onBlurSync, onDelete, onEnterKey, titleRef, deleteIfEmpty, onCopy, hasCopied, onPasteBelow, onShowCtxMenu, onDragStart, onDragOver, onDrop, isDragOver }) {
-  const titleRef = useRef();
   const textareaRef = useRef();
   const [confirming, setConfirming] = useState(false);
   const [showColors, setShowColors] = useState(false);
