@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v1.5.4 -->
+<!-- LP Planner v1.6.0 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -3540,7 +3540,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.5.4</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.6.0</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -3639,7 +3639,7 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
   const titleRef = useRef(null);
   const debounceRef = useRef(null);
   const [wordCount, setWordCount] = useState(0);
-  const [showNewMenu, setShowNewMenu] = useState(false);
+  const [showNewMenu, setShowNewMenu] = useState(null); // null=closed, 'top'=top-level, folderId=folder menu
   const [expandedFolders, setExpandedFolders] = useState({});
   const [editingFolderId, setEditingFolderId] = useState(null);
   const [editingFolderName, setEditingFolderName] = useState('');
@@ -3657,14 +3657,15 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
   const selectedDoc = pagesData.find(d => d.id === selectedId) || null;
 
   // ── Folder helpers ───────────────────────────────────────
-  function createFolder() {
+  function createFolder(parentFolderId) {
     const id = 'folder_' + Date.now();
-    const maxOrder = foldersData.reduce((m, f) => Math.max(m, f.order ?? 0), -1);
-    setFoldersData(f => [...f, { id, name: 'New Folder', order: maxOrder + 1 }]);
-    setExpandedFolders(e => ({...e, [id]: true}));
+    const siblings = foldersData.filter(f => (f.parentFolderId || null) === (parentFolderId || null));
+    const maxOrder = siblings.reduce((m, f) => Math.max(m, f.order ?? 0), -1);
+    setFoldersData(f => [...f, { id, name: 'New Folder', parentFolderId: parentFolderId || null, order: maxOrder + 1 }]);
+    setExpandedFolders(e => ({...e, [id]: true, ...(parentFolderId ? {[parentFolderId]: true} : {})}));
     setEditingFolderId(id);
     setEditingFolderName('New Folder');
-    setShowNewMenu(false);
+    setShowNewMenu(null);
   }
 
   function updateFolder(id, patch) {
@@ -3672,9 +3673,17 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
   }
 
   function deleteFolder(id) {
-    if (!window.confirm('Delete folder? Documents inside will become unfoldered.')) return;
-    setPagesData(p => p.map(d => d.folderId === id ? {...d, folderId: null} : d));
-    setFoldersData(f => f.filter(folder => folder.id !== id));
+    const folder = foldersData.find(f => f.id === id);
+    if (!folder) return;
+    const parentId = folder.parentFolderId || null;
+    if (!window.confirm('Delete folder? Contents will move to the parent level.')) return;
+    // Move docs inside this folder up to parent
+    setPagesData(p => p.map(d => d.folderId === id ? {...d, folderId: parentId} : d));
+    // Move child folders up to parent, then remove this folder
+    setFoldersData(f => f
+      .map(f2 => f2.parentFolderId === id ? {...f2, parentFolderId: parentId} : f2)
+      .filter(f2 => f2.id !== id)
+    );
   }
 
   // ── Doc helpers ──────────────────────────────────────────
@@ -3688,7 +3697,7 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
     setSelectedId(id);
     setMobileView('editor');
     if (folderId) setExpandedFolders(e => ({...e, [folderId]: true}));
-    setShowNewMenu(false);
+    setShowNewMenu(null);
     setTimeout(() => titleRef.current?.focus(), 50);
   }
 
@@ -3978,12 +3987,27 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
     if (!item) return;
     setDragOverId(targetId);
     // Folder hover: doc dragged over a folder for 1.5s → move into folder
-    if (item.type === 'doc' && targetType === 'folder') {
+    if ((item.type === 'doc' || item.type === 'folder') && targetType === 'folder' && item.id !== targetId) {
       if (folderHoverTarget !== targetId) {
         setFolderHoverTarget(targetId);
         clearFolderTimer();
         folderHoverTimer.current = setTimeout(() => {
-          setPagesData(p => p.map(d => d.id === item.id ? {...d, folderId: targetId} : d));
+          if (item.type === 'doc') {
+            setPagesData(p => p.map(d => d.id === item.id ? {...d, folderId: targetId} : d));
+          } else {
+            // Prevent circular nesting: don't nest a folder into its own descendant
+            const isDescendant = (checkId, ancestorId) => {
+              let f = foldersData.find(x => x.id === checkId);
+              while (f) {
+                if (f.parentFolderId === ancestorId) return true;
+                f = foldersData.find(x => x.id === f.parentFolderId);
+              }
+              return false;
+            };
+            if (!isDescendant(targetId, item.id)) {
+              setFoldersData(fs => fs.map(f => f.id === item.id ? {...f, parentFolderId: targetId} : f));
+            }
+          }
           setExpandedFolders(ex => ({...ex, [targetId]: true}));
           setFolderHoverTarget(null);
           setDragOverId(null);
@@ -4036,9 +4060,23 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
         setFoldersData(reordered.map((f, i) => ({...f, order: i})));
       }
     } else if (item.type === 'doc' && targetType === 'folder') {
-      // Drop directly on folder header = move into folder
+      // Drop doc onto folder header = move into folder
       setPagesData(p => p.map(d => d.id === item.id ? {...d, folderId: targetId} : d));
       setExpandedFolders(ex => ({...ex, [targetId]: true}));
+    } else if (item.type === 'folder' && targetType === 'folder') {
+      // Drop folder onto another folder = nest it (if not creating a cycle)
+      const isDescendant = (checkId, ancestorId) => {
+        let f = foldersData.find(x => x.id === checkId);
+        while (f) {
+          if (f.parentFolderId === ancestorId) return true;
+          f = foldersData.find(x => x.id === f.parentFolderId);
+        }
+        return false;
+      };
+      if (!isDescendant(targetId, item.id)) {
+        setFoldersData(fs => fs.map(f => f.id === item.id ? {...f, parentFolderId: targetId} : f));
+        setExpandedFolders(ex => ({...ex, [targetId]: true}));
+      }
     }
     handleDragEndPages();
   }
@@ -4048,7 +4086,9 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
     .sort((a, b) => new Date(b.lastModified || b.createdAt) - new Date(a.lastModified || a.createdAt))
     .slice(0, 6);
 
-  const sortedFolders = [...foldersData].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  const sortedFolders = [...foldersData]
+    .filter(f => !f.parentFolderId)
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   const unfolderedDocs = pagesData
     .filter(d => !d.folderId)
     .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
@@ -4087,19 +4127,26 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
     );
   }
 
-  function renderFolderRow(folder) {
+  function renderFolderRow(folder, depth) {
+    depth = depth || 0;
     const isExpanded = expandedFolders[folder.id] ?? false;
     const isOver = dragOverId === folder.id;
     const isHoverTarget = folderHoverTarget === folder.id;
     const docsInFolder = pagesData
       .filter(d => d.folderId === folder.id)
       .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    const childFolders = foldersData
+      .filter(f => f.parentFolderId === folder.id)
+      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
     const isEditingName = editingFolderId === folder.id;
+    const isFolderMenuOpen = showNewMenu === folder.id;
+    const indentPx = depth * 14;
 
     return (
       <div key={folder.id}>
         <div
           className={`pages-folder-row ${isOver ? 'drag-over' : ''} ${isHoverTarget ? 'folder-hover-target' : ''}`}
+          style={{paddingLeft: 6 + indentPx}}
           draggable
           onDragStart={e => { e.stopPropagation(); handleDragStartPages(e, 'folder', folder.id); }}
           onDragEnd={handleDragEndPages}
@@ -4131,10 +4178,23 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
               {folder.name}
             </span>
           )}
-          <span style={{fontSize:10, color:'var(--ink-faint)', marginLeft:4, fontFamily:"'DM Mono',monospace", flexShrink:0}}>({docsInFolder.length})</span>
-          <div style={{marginLeft:'auto', display:'flex', gap:2, flexShrink:0}}>
-            <button className="pages-folder-add-btn" title="New doc in folder"
-              onClick={e => { e.stopPropagation(); createDoc(folder.id); }}>+</button>
+          <span style={{fontSize:10, color:'var(--ink-faint)', marginLeft:4, fontFamily:"'DM Mono',monospace", flexShrink:0}}>({docsInFolder.length + childFolders.length})</span>
+          <div style={{marginLeft:'auto', display:'flex', gap:2, flexShrink:0, position:'relative'}}>
+            <button className="pages-folder-add-btn" title="New item in folder"
+              onClick={e => { e.stopPropagation(); setShowNewMenu(isFolderMenuOpen ? null : folder.id); }}>+</button>
+            {isFolderMenuOpen && (
+              <>
+                <div style={{position:'fixed',inset:0,zIndex:99}} onClick={() => setShowNewMenu(null)} />
+                <div style={{
+                  position:'absolute', top:'calc(100% + 4px)', right:0, zIndex:100,
+                  background:'var(--paper)', border:'1px solid var(--border)', borderRadius:8,
+                  boxShadow:'0 4px 16px rgba(0,0,0,0.12)', overflow:'hidden', minWidth:150,
+                }}>
+                  <button className="task-ctx-btn" onClick={e => { e.stopPropagation(); createDoc(folder.id); }}>📄 New Document</button>
+                  <button className="task-ctx-btn" onClick={e => { e.stopPropagation(); createFolder(folder.id); }}>📁 New Folder</button>
+                </div>
+              </>
+            )}
             <button className="pages-folder-del-btn" title="Delete folder"
               onClick={e => { e.stopPropagation(); deleteFolder(folder.id); }}>🗑</button>
           </div>
@@ -4144,24 +4204,25 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
             </div>
           )}
         </div>
-        {isExpanded && docsInFolder.map(doc => renderDocRow(doc, true))}
+        {isExpanded && childFolders.map(child => renderFolderRow(child, depth + 1))}
+        {isExpanded && docsInFolder.map(doc => renderDocRow(doc, depth + 1))}
       </div>
     );
   }
 
   // ── New menu dropdown (shared) ───────────────────────────
   function renderNewMenu() {
-    if (!showNewMenu) return null;
+    if (showNewMenu !== 'top') return null;
     return (
       <>
-        <div style={{position:'fixed',inset:0,zIndex:99}} onClick={() => setShowNewMenu(false)} />
+        <div style={{position:'fixed',inset:0,zIndex:99}} onClick={() => setShowNewMenu(null)} />
         <div style={{
           position:'absolute', top:'calc(100% + 4px)', right:0, zIndex:100,
           background:'var(--paper)', border:'1px solid var(--border)', borderRadius:8,
           boxShadow:'0 4px 16px rgba(0,0,0,0.12)', overflow:'hidden', minWidth:150,
         }}>
           <button className="task-ctx-btn" onClick={() => createDoc(null)}>📄 New Document</button>
-          <button className="task-ctx-btn" onClick={createFolder}>📁 New Folder</button>
+          <button className="task-ctx-btn" onClick={() => createFolder(null)}>📁 New Folder</button>
         </div>
       </>
     );
@@ -4173,7 +4234,7 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
       <div className="pages-sidebar-header">
         <span className="pages-sidebar-title">Pages</span>
         <div style={{position:'relative'}}>
-          <button className="add-btn" onClick={() => setShowNewMenu(m => !m)} title="New…">+</button>
+          <button className="add-btn" onClick={() => setShowNewMenu(s => s === 'top' ? null : 'top')} title="New…">+</button>
           {renderNewMenu()}
         </div>
       </div>
@@ -4227,7 +4288,7 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
             <div className="pages-sidebar-header" style={{padding:'14px 16px 10px',borderBottom:'1px solid var(--border)',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
               <span className="pages-sidebar-title">Pages</span>
               <div style={{position:'relative'}}>
-                <button className="add-btn" onClick={() => setShowNewMenu(m => !m)} title="New…">+</button>
+                <button className="add-btn" onClick={() => setShowNewMenu(s => s === 'top' ? null : 'top')} title="New…">+</button>
                 {renderNewMenu()}
               </div>
             </div>
@@ -4305,8 +4366,16 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
               <div className="pages-doc-meta">
                 Created {fmtDocDate(selectedDoc.createdAt)}
                 {selectedDoc.folderId && (() => {
-                  const folder = foldersData.find(f => f.id === selectedDoc.folderId);
-                  return folder ? <span style={{marginLeft:8,opacity:0.6}}>· 📁 {folder.name}</span> : null;
+                  // Build full path e.g. "Parent > Child"
+                  const path = [];
+                  let fid = selectedDoc.folderId;
+                  while (fid) {
+                    const f = foldersData.find(x => x.id === fid);
+                    if (!f) break;
+                    path.unshift(f.name);
+                    fid = f.parentFolderId;
+                  }
+                  return path.length > 0 ? <span style={{marginLeft:8,opacity:0.6}}>· 📁 {path.join(' › ')}</span> : null;
                 })()}
               </div>
             </div>
