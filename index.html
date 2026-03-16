@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v1.3.0 -->
+<!-- LP Planner v1.3.1 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -384,7 +384,7 @@
 
   /* CONTEXT MENU */
   .task-ctx-menu {
-    display: none; position: fixed; z-index: 9999;
+    position: fixed; z-index: 9999;
     background: var(--paper); border: 1px solid var(--border); border-radius: 8px;
     box-shadow: 0 4px 16px rgba(0,0,0,0.15); overflow: hidden; min-width: 140px;
   }
@@ -2052,6 +2052,23 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
       {/* MOBILE: FAB to open sheet */}
       <button className="mobile-fab" onClick={()=>setSheetOpen(o=>!o)} title="Weekly notes & goals">☰</button>
 
+      {/* CONTEXT MENU for copy/paste */}
+      {ctxMenu && (
+        <>
+          <div style={{position:'fixed',inset:0,zIndex:9998}} onClick={()=>setCtxMenu(null)} onContextMenu={e=>{e.preventDefault();setCtxMenu(null);}} />
+          <div className="task-ctx-menu" style={{top:ctxMenu.y, left:ctxMenu.x}}>
+            <button className="task-ctx-btn" onClick={()=>{ctxMenu.onCopy();setCtxMenu(null);}}>
+              📋 Copy task
+            </button>
+            {ctxMenu.hasCopied && (
+              <button className="task-ctx-btn" onClick={()=>{ctxMenu.onPaste();setCtxMenu(null);}}>
+                📌 Paste below
+              </button>
+            )}
+          </div>
+        </>
+      )}
+
     </div>
   );
 }
@@ -3372,7 +3389,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.3.0</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.3.1</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
