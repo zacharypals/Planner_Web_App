@@ -1624,6 +1624,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
   const pendingTaskFocus = useRef(null); // {id, dayKey} — task to focus after render
   const taskTitleRefs = useRef({}); // id -> input ref
   const [taskClipboard, setTaskClipboard] = useState(null); // copied task object
+  const [ctxMenu, setCtxMenu] = useState(null); // {x,y,onCopy,onPaste,hasCopied}
 
   // Per-week data — now uses shared weekData prop
 
@@ -1935,11 +1936,11 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
                           setTimeout(()=>{
                             if(pendingTaskFocus.current) {
                               const newId = pendingTaskFocus.current.id;
-                              const copy = {...taskClipboard, id:newId};
-                              updateTask(dk, newId, {title:copy.title,details:copy.details,colorIndex:copy.colorIndex,isEvent:copy.isEvent,eventTime:copy.eventTime});
+                              updateTask(dk, newId, {title:taskClipboard.title,details:taskClipboard.details,colorIndex:taskClipboard.colorIndex,isEvent:taskClipboard.isEvent,eventTime:taskClipboard.eventTime,customColor:taskClipboard.customColor});
                             }
                           }, 0);
                         }}
+                        onShowCtxMenu={(x,y,cp,pp,hp)=>setCtxMenu({x,y,onCopy:cp,onPaste:pp,hasCopied:hp})}
                         isDragOver={dragOver?.dayKey===dk && dragOver?.id===task.id}
                         onDragStart={()=>setDragging({dayKey:dk, id:task.id})}
                         onDragOver={()=>setDragOver({dayKey:dk, id:task.id})}
@@ -2122,7 +2123,7 @@ const EVENT_COLORS = [
   '#ffe4e6', // blush
   '#ecfdf5', // aqua mist
 ];
-function TaskCard({ task, onUpdate, onBlurSync, onDelete, onEnterKey, titleRef, deleteIfEmpty, onCopy, hasCopied, onPasteBelow, onDragStart, onDragOver, onDrop, isDragOver }) {
+function TaskCard({ task, onUpdate, onBlurSync, onDelete, onEnterKey, titleRef, deleteIfEmpty, onCopy, hasCopied, onPasteBelow, onShowCtxMenu, onDragStart, onDragOver, onDrop, isDragOver }) {
   const titleRef = useRef();
   const textareaRef = useRef();
   const [confirming, setConfirming] = useState(false);
@@ -2161,21 +2162,7 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onEnterKey, titleRef, 
       }}
       onContextMenu={e=>{
         e.preventDefault(); e.stopPropagation();
-        // Show mini context menu
-        const menu = document.getElementById('task-ctx-menu');
-        if(menu){
-          menu.style.display='block';
-          menu.style.left=e.clientX+'px';
-          menu.style.top=e.clientY+'px';
-          menu.dataset.mode = 'task';
-          window._ctxCopy = onCopy;
-          window._ctxPaste = onPasteBelow;
-          window._ctxHasCopied = hasCopied;
-          const copyBtn = menu.querySelector('#ctx-copy');
-          const pasteBtn = menu.querySelector('#ctx-paste');
-          if(copyBtn) copyBtn.style.display='block';
-          if(pasteBtn) pasteBtn.style.display = hasCopied ? 'block' : 'none';
-        }
+        if(onShowCtxMenu) onShowCtxMenu(e.clientX, e.clientY, onCopy, onPasteBelow, hasCopied);
       }}
       draggable
       onDragStart={onDragStart}
@@ -3803,26 +3790,10 @@ function PagesView({ pagesData, setPagesData, weekData, setWeekData, selectedId,
         )}
 
       </div>
-      {/* Global context menu for task copy/paste */}
-      <div id="task-ctx-menu" className="task-ctx-menu">
-        <button id="ctx-copy" className="task-ctx-btn" onClick={()=>{
-          if(window._ctxCopy) window._ctxCopy();
-          document.getElementById('task-ctx-menu').style.display='none';
-        }}>📋 Copy task</button>
-        <button id="ctx-paste" className="task-ctx-btn" onClick={()=>{
-          if(window._ctxPaste) window._ctxPaste();
-          document.getElementById('task-ctx-menu').style.display='none';
-        }}>📌 Paste below</button>
-      </div>
+
     </div>
   );
 }
-
-// Close context menu on click outside
-document.addEventListener('click', () => {
-  const m = document.getElementById('task-ctx-menu');
-  if(m) m.style.display='none';
-});
 
 ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
 </script>
