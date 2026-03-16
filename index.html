@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v1.4.9 -->
+<!-- LP Planner v1.4.10 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -1031,22 +1031,14 @@
   }
   .pages-body li.pages-chk-li {
     display: flex; align-items: baseline; gap: 6px;
-    padding: 1px 0; min-height: 22px; cursor: text;
+    padding: 1px 0; min-height: 22px; cursor: text; line-height: 1.6;
   }
-  /* The inline checkbox span — not contenteditable so cursor always lands after it */
-  .pages-chk-box-span {
-    display: inline-flex; align-items: center; justify-content: center;
-    width: 14px; height: 14px; min-width: 14px; border: 1.5px solid #aaa;
-    border-radius: 3px; background: white; cursor: pointer;
-    flex-shrink: 0; transition: all 0.12s; margin-top: 3px;
-    font-size: 10px; font-weight: 700; user-select: none;
+  .pages-chk-input {
+    flex-shrink: 0; width: 14px; height: 14px; margin: 0; margin-top: 3px;
+    cursor: pointer; accent-color: var(--accent);
   }
-  .pages-chk-box-span:hover { border-color: var(--accent); }
-  li.pages-chk-li[data-checked="true"] .pages-chk-box-span {
-    background: var(--accent); border-color: var(--accent); color: white;
-  }
-  li.pages-chk-li[data-checked="true"] .pages-chk-text-span {
-    text-decoration: line-through; opacity: 0.5;
+  li.pages-chk-li.checked {
+    text-decoration: line-through; opacity: 0.55;
   }
   /* Project tasks section */
   .pages-tasks-section {
@@ -3500,7 +3492,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.4.9</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.4.10</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -3708,8 +3700,7 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
   }
 
   // ── Checklist helpers ────────────────────────────────────────────────────
-  // Helper: get the closest pages-chk-li from a selection, handling both
-  // text nodes and element nodes as startContainer
+  // Helper: get the closest pages-chk-li ancestor of the current selection
   function getChkLi(sel) {
     if (!sel || sel.rangeCount === 0) return null;
     const node = sel.getRangeAt(0).startContainer;
@@ -3717,83 +3708,84 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
     return el ? el.closest('li.pages-chk-li') : null;
   }
 
-  // Helper: place cursor at the start of the text span inside an li
-  function placeCursorInLi(li, sel) {
-    const r = document.createRange();
-    const textSpan = li.querySelector('.pages-chk-text-span');
-    const target = textSpan || li;
-    // Ensure there is a real text node to anchor the cursor to
-    if (!target.firstChild || target.firstChild.nodeType !== 3) {
-      target.appendChild(document.createTextNode(''));
-    }
-    r.setStart(target.firstChild, 0);
-    r.collapse(true);
-    sel.removeAllRanges();
-    sel.addRange(r);
-    // Force the body to re-acknowledge focus so cursor renders
-    bodyRef.current?.blur();
-    bodyRef.current?.focus();
+  // Build a fresh checklist li with a native checkbox
+  function makeChkLi() {
+    const li = document.createElement('li');
+    li.className = 'pages-chk-li';
+    li.setAttribute('data-checked', 'false');
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.className = 'pages-chk-input';
+    cb.setAttribute('contenteditable', 'false');
+    cb.addEventListener('change', () => {
+      li.setAttribute('data-checked', String(cb.checked));
+      if (cb.checked) li.classList.add('checked'); else li.classList.remove('checked');
+      setTimeout(() => onBodyInput(), 0);
+    });
+    li.appendChild(cb);
+    li.appendChild(document.createTextNode(' '));
+    return li;
   }
 
   function insertChecklistItem() {
     bodyRef.current?.focus();
     const sel = window.getSelection();
-    // If already in a checklist, let Enter handler add a new item
     if (getChkLi(sel)) {
       handleEnterInChecklist(getChkLi(sel), sel);
       return;
     }
-    // Insert a new checklist ul with one empty li (use <br> not ZWS for cursor visibility)
-    document.execCommand('insertHTML', false,
-      '<ul class="pages-checklist"><li class="pages-chk-li" data-checked="false"><span class="pages-chk-box-span" contenteditable="false"> </span><span class="pages-chk-text-span"></span></li></ul>'
-    );
-    // Place cursor inside the new li
-    requestAnimationFrame(() => {
-      const lis = bodyRef.current?.querySelectorAll('li.pages-chk-li');
-      const newLi = lis?.[lis.length - 1];
-      if (newLi) {
-        const s = window.getSelection();
-        placeCursorInLi(newLi, s);
-      }
-      onBodyInput();
-    });
-  }
-
-  function toggleChecklistItem(li) {
-    const checked = li.getAttribute('data-checked') === 'true';
-    const nowChecked = !checked;
-    li.setAttribute('data-checked', String(nowChecked));
-    const box = li.querySelector('.pages-chk-box-span');
-    if (box) box.textContent = nowChecked ? '✓' : ' ';
-    setTimeout(() => onBodyInput(), 0);
+    const ul = document.createElement('ul');
+    ul.className = 'pages-checklist';
+    const li = makeChkLi();
+    ul.appendChild(li);
+    // Use a marker span to inject at cursor position
+    const markerId = 'chk_m_' + Date.now();
+    document.execCommand('insertHTML', false, '<span id="' + markerId + '"></span>');
+    const markerEl = bodyRef.current?.querySelector('#' + markerId);
+    if (markerEl) {
+      markerEl.parentNode.insertBefore(ul, markerEl);
+      markerEl.remove();
+    } else {
+      bodyRef.current?.appendChild(ul);
+    }
+    // Cursor goes to the text node after the checkbox
+    const textNode = li.lastChild;
+    const r = document.createRange();
+    r.setStart(textNode, 0);
+    r.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(r);
+    onBodyInput();
   }
 
   function handleEnterInChecklist(li, sel) {
-    // Check if item is empty (only has <br> or whitespace)
-    const text = (li.innerText || li.textContent || '').replace(/​/g, '').trim();
-    if (text === '') {
-      // Empty item — exit the list
+    const textContent = Array.from(li.childNodes)
+      .filter(n => n.nodeType === 3).map(n => n.textContent)
+      .join('').replace(/ /g, '').trim();
+    if (textContent === '') {
+      // Empty — exit the list
       const ul = li.closest('ul.pages-checklist');
       if (ul) {
         const p = document.createElement('p');
-        p.innerHTML = '<br>';
+        p.appendChild(document.createTextNode(' '));
         ul.parentNode.insertBefore(p, ul.nextSibling);
         li.remove();
         if (ul.children.length === 0) ul.remove();
         const r = document.createRange();
-        r.setStart(p, 0);
+        r.setStart(p.firstChild, 0);
         r.collapse(true);
         sel.removeAllRanges();
         sel.addRange(r);
       }
     } else {
-      // Add new empty checklist item after this one
-      const newLi = document.createElement('li');
-      newLi.className = 'pages-chk-li';
-      newLi.setAttribute('data-checked', 'false');
-      newLi.innerHTML = '<span class="pages-chk-box-span" contenteditable="false"> </span><span class="pages-chk-text-span"></span>';
+      const newLi = makeChkLi();
       li.parentNode.insertBefore(newLi, li.nextSibling);
-      placeCursorInLi(newLi, sel);
+      const textNode = newLi.lastChild;
+      const r = document.createRange();
+      r.setStart(textNode, 0);
+      r.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(r);
     }
     setTimeout(() => onBodyInput(), 0);
   }
@@ -3801,9 +3793,7 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
   function handleBodyKeyDown(e) {
     const sel = window.getSelection();
     const li = getChkLi(sel);
-
-    if (!li) return; // Not in a checklist — browser handles normally
-
+    if (!li) return;
     if (e.key === 'Enter') {
       e.preventDefault();
       handleEnterInChecklist(li, sel);
@@ -3814,20 +3804,12 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
       } else {
         document.execCommand('indent');
       }
-      // Re-apply class to indented li (browser may create a new ul without our class)
-      requestAnimationFrame(() => {
-        const s = window.getSelection();
-        const newLi = getChkLi(s);
-        if (newLi && !newLi.classList.contains('pages-chk-li')) {
-          newLi.classList.add('pages-chk-li');
-          newLi.setAttribute('data-checked', 'false');
-        }
-        if (newLi) placeCursorInLi(newLi, s);
-        onBodyInput();
-      });
+      setTimeout(() => onBodyInput(), 0);
     } else if (e.key === 'Backspace') {
-      const text = (li.innerText || li.textContent || '').replace(/​/g, '').trim();
-      if (text === '') {
+      const textContent = Array.from(li.childNodes)
+        .filter(n => n.nodeType === 3).map(n => n.textContent)
+        .join('').replace(/ /g, '').trim();
+      if (textContent === '') {
         e.preventDefault();
         const ul = li.closest('ul.pages-checklist');
         const prev = li.previousElementSibling || (ul ? ul.previousSibling : null);
@@ -4264,11 +4246,9 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
                 onInput={e=>{onBodyInput();setWordCount(countWords(bodyRef.current?.innerText||''));}}
                 onKeyDown={e=>handleBodyKeyDown(e)}
                 onClick={e=>{
-                  // Toggle if clicking the checkbox span directly
-                  if(e.target.classList.contains('pages-chk-box-span')){
-                    e.preventDefault();
-                    const li = e.target.closest('li.pages-chk-li');
-                    if(li) toggleChecklistItem(li);
+                  // Checkbox inputs handle their own change event; just stop propagation
+                  if(e.target.classList.contains('pages-chk-input')){
+                    e.stopPropagation();
                   }
                 }}
                 data-placeholder="Start writing…"
