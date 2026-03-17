@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v1.7.0 -->
+<!-- LP Planner v1.7.1 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -381,6 +381,51 @@
   }
   .task-color-swatch:hover { transform: scale(1.25); }
   .task-color-swatch.active { border-color: var(--ink); transform: scale(1.15); }
+
+  /* REPEAT CONTROLS */
+  .task-repeat-toggle {
+    background: none; border: none; cursor: pointer; font-size: 11px;
+    color: var(--ink-light); padding: 2px 6px; border-radius: 4px;
+    display: flex; align-items: center; gap: 4px; transition: background 0.15s;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .task-repeat-toggle:hover { background: rgba(0,0,0,0.07); color: var(--ink); }
+  .task-repeat-toggle.active { color: var(--accent); font-weight: 600; }
+  .task-repeat-days {
+    display: flex; gap: 4px; flex-wrap: wrap; padding-top: 6px;
+  }
+  .task-repeat-day-btn {
+    width: 24px; height: 24px; border-radius: 50%; border: 1.5px solid var(--border);
+    background: none; cursor: pointer; font-size: 10px; font-weight: 600;
+    font-family: 'DM Mono', monospace; color: var(--ink-light);
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.12s;
+  }
+  .task-repeat-day-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .task-repeat-day-btn.active { background: var(--accent); border-color: var(--accent); color: white; }
+  .task-repeat-end {
+    display: flex; align-items: center; gap: 6px; padding-top: 6px;
+  }
+  .task-repeat-end-label {
+    font-size: 10px; color: var(--ink-faint); font-family: 'DM Mono', monospace; flex-shrink: 0;
+  }
+  .task-repeat-end-input {
+    font-family: 'DM Mono', monospace; font-size: 11px; color: var(--ink-light);
+    border: 1px solid var(--border); border-radius: 4px; padding: 2px 6px;
+    background: white; cursor: pointer;
+  }
+  .task-repeat-end-input:focus { outline: none; border-color: var(--accent); }
+  .task-repeat-apply-btn {
+    font-family: 'DM Sans', sans-serif; font-size: 11px; font-weight: 600;
+    color: white; background: var(--accent); border: none; border-radius: 4px;
+    padding: 3px 10px; cursor: pointer; transition: opacity 0.15s;
+  }
+  .task-repeat-apply-btn:hover { opacity: 0.85; }
+  .task-repeat-badge {
+    font-family: 'DM Mono', monospace; font-size: 9px; color: var(--accent);
+    background: var(--accent-light); padding: 1px 5px; border-radius: 8px;
+    display: inline-flex; align-items: center; margin-top: 2px;
+  }
 
   /* CONTEXT MENU */
   .task-ctx-menu {
@@ -1796,6 +1841,55 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
     });
   }
 
+  // Propagate a repeat task across future days up to endDate
+  function propagateRepeat(sourceTask, sourceDayKey, repeatDays, endDate) {
+    if (!repeatDays || repeatDays.length === 0 || !endDate) return;
+    const end = new Date(endDate + 'T00:00:00');
+    const start = new Date(sourceDayKey + 'T00:00:00');
+    start.setDate(start.getDate() + 1); // start day after source
+    const repeatId = sourceTask.repeatId || sourceTask.id;
+    // First stamp the source task with repeatId if not set
+    if (!sourceTask.repeatId) {
+      setTasks(sourceDayKey, ts => ts.map(t => t.id === sourceTask.id ? {...t, repeatId} : t));
+    }
+    // Build all target dates
+    const cursor = new Date(start);
+    const targets = [];
+    while (cursor <= end) {
+      if (repeatDays.includes(cursor.getDay())) {
+        targets.push(fmt(new Date(cursor)));
+      }
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    if (targets.length === 0) return;
+    // Write copies into weekData
+    setWeekData(wd => {
+      let next = {...wd};
+      targets.forEach(dk => {
+        const dateObj = new Date(dk + 'T00:00:00');
+        const wk = fmt(getWeekStart(dateObj));
+        const week = next[wk] || { proverb:'', toCreate:[], people:[], beWord:'', proud:'', story:'', tasks:{} };
+        const dayTasks = (week.tasks || {})[dk] || [];
+        // Skip if a repeat copy already exists for this repeatId on this day
+        if (dayTasks.some(t => t.repeatId === repeatId)) return;
+        const copy = {
+          ...sourceTask,
+          id: `${repeatId}_${dk}`,
+          repeatId,
+          repeat: { days: repeatDays, endDate },
+          done: false,
+          expanded: false,
+          gcalId: null,
+        };
+        next = {
+          ...next,
+          [wk]: { ...week, tasks: { ...(week.tasks || {}), [dk]: [...dayTasks, copy] } }
+        };
+      });
+      return next;
+    });
+  }
+
   function addTask(dayKey, afterId) {
     const id = Date.now().toString();
     pendingTaskFocus.current = {id, dayKey};
@@ -2083,6 +2177,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
                           });
                         }}
                         onShowCtxMenu={(x,y,cp,pp,hp)=>setCtxMenu({x,y,onCopy:cp,onPaste:pp,hasCopied:hp})}
+                        onApplyRepeat={(days,endDate)=>propagateRepeat(task,dk,days,endDate)}
                         isDragOver={dragOver?.dayKey===dk && dragOver?.id===task.id}
                         onDragStart={()=>setDragging({dayKey:dk, id:task.id})}
                         onDragOver={()=>setDragOver({dayKey:dk, id:task.id})}
@@ -2150,6 +2245,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
               onEnterKey={()=>addTask(mobileDayKey,task.id)}
               titleRef={el=>taskTitleRefsMobile.current[task.id]=el}
               deleteIfEmpty={()=>{if(!task.title.trim())deleteTask(mobileDayKey,task.id);}}
+              onApplyRepeat={(days,endDate)=>propagateRepeat(task,mobileDayKey,days,endDate)}
               isDragOver={false} onDragStart={()=>{}} onDragOver={()=>{}} onDrop={()=>{}} />
           ))}
           <button className="mobile-add-btn" onClick={()=>addTask(mobileDayKey)}>+ Add task</button>
@@ -2282,7 +2378,7 @@ const EVENT_COLORS = [
   '#ffe4e6', // blush
   '#ecfdf5', // aqua mist
 ];
-function TaskCard({ task, onUpdate, onBlurSync, onDelete, onEnterKey, titleRef, deleteIfEmpty, onCopy, hasCopied, onPasteBelow, onShowCtxMenu, onDragStart, onDragOver, onDrop, isDragOver }) {
+function TaskCard({ task, onUpdate, onBlurSync, onDelete, onEnterKey, titleRef, deleteIfEmpty, onCopy, hasCopied, onPasteBelow, onShowCtxMenu, onDragStart, onDragOver, onDrop, isDragOver, onApplyRepeat }) {
   const textareaRef = useRef();
   const [confirming, setConfirming] = useState(false);
   const [showColors, setShowColors] = useState(false);
@@ -2430,6 +2526,63 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onEnterKey, titleRef, 
                   onClick={e=>e.stopPropagation()}
                 />
               </div>
+            </div>
+          )}
+          {/* ── Repeat ── */}
+          {!task.isProjectTask && (
+            <div style={{paddingTop:6,borderTop:'1px solid rgba(0,0,0,0.07)',marginTop:6}} onClick={e=>e.stopPropagation()}>
+              <div style={{display:'flex',alignItems:'center',gap:6}}>
+                <button
+                  className={`task-repeat-toggle ${task.repeat?.days?.length ? 'active' : ''}`}
+                  onClick={e=>{
+                    e.stopPropagation();
+                    if(task.repeat?.days?.length){
+                      onUpdate({repeat:null});
+                    } else {
+                      onUpdate({repeat:{days:[], endDate:''}});
+                    }
+                  }}>
+                  🔁 Repeat {task.repeat?.days?.length ? '▲' : '▼'}
+                </button>
+                {task.repeat?.days?.length > 0 && (
+                  <span className="task-repeat-badge">
+                    {['S','M','T','W','T','F','S'].filter((_,i)=>task.repeat.days.includes(i)).join('')}
+                    {task.repeat.endDate ? ` until ${task.repeat.endDate}` : ''}
+                  </span>
+                )}
+              </div>
+              {task.repeat !== null && task.repeat !== undefined && (
+                <div>
+                  <div className="task-repeat-days">
+                    {['S','M','T','W','T','F','S'].map((d,i)=>(
+                      <button key={i}
+                        className={`task-repeat-day-btn ${(task.repeat?.days||[]).includes(i)?'active':''}`}
+                        onClick={e=>{
+                          e.stopPropagation();
+                          const cur = task.repeat?.days||[];
+                          const next = cur.includes(i) ? cur.filter(x=>x!==i) : [...cur,i].sort((a,b)=>a-b);
+                          onUpdate({repeat:{...(task.repeat||{}),days:next}});
+                        }}>
+                        {d}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="task-repeat-end">
+                    <span className="task-repeat-end-label">Until:</span>
+                    <input type="date" className="task-repeat-end-input"
+                      value={task.repeat?.endDate||''}
+                      onChange={e=>{ e.stopPropagation(); onUpdate({repeat:{...(task.repeat||{}),endDate:e.target.value}}); }}
+                      onClick={e=>e.stopPropagation()}
+                    />
+                    {(task.repeat?.days||[]).length > 0 && task.repeat?.endDate && (
+                      <button className="task-repeat-apply-btn"
+                        onClick={e=>{ e.stopPropagation(); onApplyRepeat && onApplyRepeat(task.repeat.days, task.repeat.endDate); }}>
+                        Apply
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -3567,7 +3720,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.7.0</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.7.1</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
