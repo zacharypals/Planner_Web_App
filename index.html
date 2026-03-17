@@ -2102,7 +2102,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
       <div className="sidebar-section">
         <div className="sidebar-section-title">Be-Word of the Week</div>
         <textarea className="sidebar-textarea" placeholder="Your be-word and how to apply it…"
-          value={wd.beWord||''} onChange={e=>setWD(w=>({...w,beWord:e.target.value}))} rows={3} />
+          value={wd.beWord||''} onChange={e=>setWD(w=>({...w,beWord:e.target.value}))} rows={10} />
       </div>
     </>
   );
