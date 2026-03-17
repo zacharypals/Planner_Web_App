@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v1.7.2 -->
+<!-- LP Planner v1.7.3 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -2572,7 +2572,7 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onEnterKey, titleRef, 
                   </div>
                   <div className="task-repeat-end">
                     <span className="task-repeat-end-label" style={{color: !task.repeat?.endDate && (task.repeat?.days||[]).length > 0 ? '#ef4444' : undefined}}>
-                      Until: {!task.repeat?.endDate && (task.repeat?.days||[]).length > 0 ? '(required)' : ''}
+                      Until{!task.repeat?.endDate && (task.repeat?.days||[]).length > 0 ? '*' : ''}:
                     </span>
                     <input type="date" className="task-repeat-end-input"
                       value={task.repeat?.endDate||''}
@@ -3728,7 +3728,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.7.2</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.7.3</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
