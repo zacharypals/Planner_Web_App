@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v1.7.3 -->
+<!-- LP Planner v1.7.4 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -313,10 +313,10 @@
   }
   .task-expand-btn:hover { opacity: 1; }
   .task-delete-btn {
-    position: absolute; bottom: 6px; right: 6px;
+    position: absolute; bottom: 6px; right: 2px;
     background: #e74c3c; border: none; cursor: pointer;
     color: white; border-radius: 4px;
-    width: 22px; height: 22px; font-size: 14px; font-weight: 700; line-height: 1;
+    width: 20px; height: 20px; font-size: 12px; font-weight: 700; line-height: 1;
     display: flex; align-items: center; justify-content: center;
     z-index: 10;
     opacity: 0;
@@ -326,7 +326,7 @@
   .task-card:hover .task-delete-btn {
     opacity: 1;
     visibility: visible;
-    transition: opacity 0.2s 1s, visibility 0s 1s;
+    transition: opacity 0.2s 1.15s, visibility 0s 1.15s;
   }
   .task-delete-btn:hover { background: #c0392b; }
   .task-delete-btn.confirming {
@@ -3728,7 +3728,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.7.3</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.7.4</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
