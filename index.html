@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v1.7.1 -->
+<!-- LP Planner v1.7.2 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -1846,9 +1846,9 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
     if (!repeatDays || repeatDays.length === 0 || !endDate) return;
     const end = new Date(endDate + 'T00:00:00');
     const start = new Date(sourceDayKey + 'T00:00:00');
-    start.setDate(start.getDate() + 1); // start day after source
+    start.setDate(start.getDate() + 1); // start from day after source
     const repeatId = sourceTask.repeatId || sourceTask.id;
-    // First stamp the source task with repeatId if not set
+    // Stamp the source task with repeatId if not already set
     if (!sourceTask.repeatId) {
       setTasks(sourceDayKey, ts => ts.map(t => t.id === sourceTask.id ? {...t, repeatId} : t));
     }
@@ -1862,17 +1862,19 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
       cursor.setDate(cursor.getDate() + 1);
     }
     if (targets.length === 0) return;
-    // Write copies into weekData
+    // Write copies into weekData — accumulate into a single draft object
+    // so targets that share a week don't clobber each other
     setWeekData(wd => {
-      let next = {...wd};
+      const draft = JSON.parse(JSON.stringify(wd)); // deep clone
       targets.forEach(dk => {
         const dateObj = new Date(dk + 'T00:00:00');
         const wk = fmt(getWeekStart(dateObj));
-        const week = next[wk] || { proverb:'', toCreate:[], people:[], beWord:'', proud:'', story:'', tasks:{} };
-        const dayTasks = (week.tasks || {})[dk] || [];
+        if (!draft[wk]) draft[wk] = { proverb:'', toCreate:[], people:[], beWord:'', proud:'', story:'', tasks:{} };
+        if (!draft[wk].tasks) draft[wk].tasks = {};
+        const dayTasks = draft[wk].tasks[dk] || [];
         // Skip if a repeat copy already exists for this repeatId on this day
         if (dayTasks.some(t => t.repeatId === repeatId)) return;
-        const copy = {
+        draft[wk].tasks[dk] = [...dayTasks, {
           ...sourceTask,
           id: `${repeatId}_${dk}`,
           repeatId,
@@ -1880,13 +1882,9 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
           done: false,
           expanded: false,
           gcalId: null,
-        };
-        next = {
-          ...next,
-          [wk]: { ...week, tasks: { ...(week.tasks || {}), [dk]: [...dayTasks, copy] } }
-        };
+        }];
       });
-      return next;
+      return draft;
     });
   }
 
@@ -2561,25 +2559,35 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onEnterKey, titleRef, 
                           e.stopPropagation();
                           const cur = task.repeat?.days||[];
                           const next = cur.includes(i) ? cur.filter(x=>x!==i) : [...cur,i].sort((a,b)=>a-b);
-                          onUpdate({repeat:{...(task.repeat||{}),days:next}});
+                          const updated = {...(task.repeat||{}), days:next};
+                          onUpdate({repeat:updated});
+                          // Auto-apply if end date already set
+                          if (updated.endDate && next.length > 0 && onApplyRepeat) {
+                            onApplyRepeat(next, updated.endDate);
+                          }
                         }}>
                         {d}
                       </button>
                     ))}
                   </div>
                   <div className="task-repeat-end">
-                    <span className="task-repeat-end-label">Until:</span>
+                    <span className="task-repeat-end-label" style={{color: !task.repeat?.endDate && (task.repeat?.days||[]).length > 0 ? '#ef4444' : undefined}}>
+                      Until: {!task.repeat?.endDate && (task.repeat?.days||[]).length > 0 ? '(required)' : ''}
+                    </span>
                     <input type="date" className="task-repeat-end-input"
                       value={task.repeat?.endDate||''}
-                      onChange={e=>{ e.stopPropagation(); onUpdate({repeat:{...(task.repeat||{}),endDate:e.target.value}}); }}
+                      style={{borderColor: !task.repeat?.endDate && (task.repeat?.days||[]).length > 0 ? '#ef4444' : undefined}}
+                      onChange={e=>{
+                        e.stopPropagation();
+                        const updated = {...(task.repeat||{}), endDate:e.target.value};
+                        onUpdate({repeat:updated});
+                        // Auto-apply when end date is set and days are already selected
+                        if (e.target.value && (updated.days||[]).length > 0 && onApplyRepeat) {
+                          onApplyRepeat(updated.days, e.target.value);
+                        }
+                      }}
                       onClick={e=>e.stopPropagation()}
                     />
-                    {(task.repeat?.days||[]).length > 0 && task.repeat?.endDate && (
-                      <button className="task-repeat-apply-btn"
-                        onClick={e=>{ e.stopPropagation(); onApplyRepeat && onApplyRepeat(task.repeat.days, task.repeat.endDate); }}>
-                        Apply
-                      </button>
-                    )}
                   </div>
                 </div>
               )}
@@ -3720,7 +3728,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.7.1</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.7.2</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
