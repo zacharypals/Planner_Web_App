@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v1.8.4 -->
+<!-- LP Planner v1.8.5 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -2905,6 +2905,7 @@ function HabitTracker({ onGoToPlanner, goals, setGoals, completions, setCompleti
 
         {view==='monthly' && <>
           <MonthlyView date={selectedDate} selected={selectedDate} goals={displayGoals} completions={completions}
+            qty={qty} notes={notes}
             onDayClick={setSelectedDate} today={today} />
           <HabitChecklist date={selectedDate} goals={goals} completions={completions}
             onToggle={toggleCompletion} onAdd={addGoal} onDelete={deleteGoal} onRename={updateGoal}
@@ -2915,7 +2916,7 @@ function HabitTracker({ onGoToPlanner, goals, setGoals, completions, setCompleti
             countInView={countInView} calcStreak={calcStreak} />
         </>}
         {view==='weekly' && <>
-          <WeeklyHabitView date={selectedDate} selected={selectedDate} goals={displayGoals} completions={completions} today={today} onDayClick={setSelectedDate} />
+          <WeeklyHabitView date={selectedDate} selected={selectedDate} goals={displayGoals} completions={completions} today={today} qty={qty} notes={notes} onDayClick={setSelectedDate} />
           <HabitChecklist date={selectedDate} goals={goals} completions={completions}
             onToggle={toggleCompletion} onAdd={addGoal} onDelete={deleteGoal} onRename={updateGoal}
             onReorder={reorderGoals}
@@ -3208,7 +3209,7 @@ function HabitDotsForDay({dayKey, goals, completions}) {
   );
 }
 
-function MonthlyView({date, selected, goals, completions, onDayClick, today}) {
+function MonthlyView({date, selected, goals, completions, onDayClick, today, qty, notes}) {
   const year=date.getFullYear(), month=date.getMonth();
   const firstDay=new Date(year,month,1);
   const startPad=firstDay.getDay();
@@ -3233,6 +3234,22 @@ function MonthlyView({date, selected, goals, completions, onDayClick, today}) {
               onClick={()=>onDayClick(new Date(c.date))} style={{cursor:'pointer'}}>
               <div className="month-day-num">{isToday?c.date.getDate():c.date.getDate()}</div>
               <HabitDotsForDay dayKey={dk} goals={goals} completions={completions} />
+              {goals.length === 1 && (() => {
+                const g = goals[0];
+                const done = (completions[dk]||[]).includes(g.id);
+                const qtyVal = qty ? (qty[dk]||{})[g.id] || '' : '';
+                const notesVal = notes ? (notes[dk]||{})[g.id] || '' : '';
+                const noteLines = notesVal.split('\n').slice(0,4).filter(l=>l.trim());
+                if (!done && !qtyVal && !noteLines.length) return null;
+                return (
+                  <div style={{marginTop:2,padding:'1px 3px'}}>
+                    {qtyVal && <div style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:g.color,fontWeight:700,lineHeight:1.3}}>{qtyVal}</div>}
+                    {noteLines.map((l,i)=>(
+                      <div key={i} style={{fontSize:8,fontFamily:"'DM Sans',sans-serif",color:'var(--ink-light)',lineHeight:1.3,overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis'}}>{l}</div>
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
           );
         })}
@@ -3241,7 +3258,7 @@ function MonthlyView({date, selected, goals, completions, onDayClick, today}) {
   );
 }
 
-function WeeklyHabitView({date, selected, goals, completions, today, onDayClick}) {
+function WeeklyHabitView({date, selected, goals, completions, today, onDayClick, qty, notes}) {
   const ws=getWeekStart(date);
   const days=Array.from({length:7},(_,i)=>addDays(ws,i));
   const maxCount=Math.max(1,...days.map(d=>((completions[fmt(d)]||[]).length)));
@@ -3263,8 +3280,30 @@ function WeeklyHabitView({date, selected, goals, completions, today, onDayClick}
               <div style={{flex:1,width:'100%',display:'flex',flexDirection:'column',gap:2,background:'var(--cream)',borderRadius:8,padding:4,border:isToday?'2px solid var(--gold)':isSelected?'2px solid var(--accent)':'1px solid var(--border)'}}>
                 {goals.map(g=>{
                   const done=(completions[dk]||[]).includes(g.id);
+                  const isSingle = goals.length === 1;
+                  const qtyVal = (isSingle && qty) ? (qty[dk]||{})[g.id] || '' : '';
+                  const notesVal = (isSingle && notes) ? (notes[dk]||{})[g.id] || '' : '';
+                  const noteLines = notesVal.split('\n').slice(0,4).filter(l=>l.trim());
                   return (
-                    <div key={g.id} style={{height:24,borderRadius:4,background:done?g.color:'transparent',border:done?'none':'1px solid var(--border)',opacity:done?0.85:0.4,minHeight:14,flexShrink:0}} />
+                    <div key={g.id} style={{
+                      borderRadius:4,
+                      background:done?g.color:'transparent',
+                      border:done?'none':'1px solid var(--border)',
+                      opacity:done?0.9:0.4,
+                      minHeight: isSingle ? 40 : 14,
+                      flexShrink:0,
+                      padding: isSingle ? '4px 6px' : 0,
+                      display: isSingle ? 'flex' : 'block',
+                      flexDirection:'column', justifyContent:'flex-start', gap:1,
+                      overflow:'hidden',
+                    }}>
+                      {isSingle && qtyVal && (
+                        <div style={{fontSize:10,fontFamily:"'DM Mono',monospace",fontWeight:700,color:done?'white':g.color,lineHeight:1.3}}>{qtyVal}</div>
+                      )}
+                      {isSingle && noteLines.map((l,li)=>(
+                        <div key={li} style={{fontSize:9,fontFamily:"'DM Sans',sans-serif",color:done?'rgba(255,255,255,0.85)':'var(--ink-light)',lineHeight:1.3,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{l}</div>
+                      ))}
+                    </div>
                   );
                 })}
               </div>
@@ -3996,7 +4035,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.8.4</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.8.5</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
