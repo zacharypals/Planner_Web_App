@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v1.8.1 -->
+<!-- LP Planner v1.8.2 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -1832,9 +1832,6 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
     }
   });
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [expandedGoals, setExpandedGoals] = useState({}); // {goalId: bool}
-  const [dragGoalId, setDragGoalId] = useState(null);
-  const [dragOverGoalId, setDragOverGoalId] = useState(null);
   const [mobileDayIndex, setMobileDayIndex] = useState(today.getDay()); // 0=Sun
   const [sheetOpen, setSheetOpen] = useState(false);
   const pendingTaskFocus = useRef(null); // {id, dayKey} — task to focus after render
@@ -2639,6 +2636,9 @@ function HabitTracker({ onGoToPlanner, goals, setGoals, completions, setCompleti
   const [view, setView] = useState('monthly'); // daily, weekly, monthly, yearly
   const [filterGoal, setFilterGoal] = useState(null); // null = all
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [expandedGoals, setExpandedGoals] = useState({}); // {goalId: bool} for sidebar
+  const [dragGoalId, setDragGoalId] = useState(null);
+  const [dragOverGoalId, setDragOverGoalId] = useState(null);
 
   function isCompleted(goalId, dateKey) {
     return (completions[dateKey]||[]).includes(goalId);
@@ -3962,7 +3962,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.8.1</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.8.2</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
