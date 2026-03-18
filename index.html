@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v1.8.2 -->
+<!-- LP Planner v1.8.3 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -2908,6 +2908,7 @@ function HabitTracker({ onGoToPlanner, goals, setGoals, completions, setCompleti
             onDayClick={setSelectedDate} today={today} />
           <HabitChecklist date={selectedDate} goals={goals} completions={completions}
             onToggle={toggleCompletion} onAdd={addGoal} onDelete={deleteGoal} onRename={updateGoal}
+            onReorder={reorderGoals}
             getMetric={getMetric} setMetric={setMetric}
             getQty={getQty} setGoalQty={setGoalQty}
             getNote={getNote} setGoalNote={setGoalNote}
@@ -2917,6 +2918,7 @@ function HabitTracker({ onGoToPlanner, goals, setGoals, completions, setCompleti
           <WeeklyHabitView date={selectedDate} selected={selectedDate} goals={displayGoals} completions={completions} today={today} onDayClick={setSelectedDate} />
           <HabitChecklist date={selectedDate} goals={goals} completions={completions}
             onToggle={toggleCompletion} onAdd={addGoal} onDelete={deleteGoal} onRename={updateGoal}
+            onReorder={reorderGoals}
             getMetric={getMetric} setMetric={setMetric}
             getQty={getQty} setGoalQty={setGoalQty}
             getNote={getNote} setGoalNote={setGoalNote}
@@ -2926,6 +2928,7 @@ function HabitTracker({ onGoToPlanner, goals, setGoals, completions, setCompleti
           <YearlyView date={selectedDate} selected={selectedDate} goals={displayGoals} completions={completions} today={today} onDayClick={setSelectedDate} />
           <HabitChecklist date={selectedDate} goals={goals} completions={completions}
             onToggle={toggleCompletion} onAdd={addGoal} onDelete={deleteGoal} onRename={updateGoal}
+            onReorder={reorderGoals}
             getMetric={getMetric} setMetric={setMetric}
             getQty={getQty} setGoalQty={setGoalQty}
             getNote={getNote} setGoalNote={setGoalNote}
@@ -2939,7 +2942,7 @@ function HabitTracker({ onGoToPlanner, goals, setGoals, completions, setCompleti
   );
 }
 
-function HabitChecklist({ date, goals, completions, onToggle, onAdd, onDelete, onRename, getMetric, setMetric, getQty, setGoalQty, getNote, setGoalNote, countInView, calcStreak }) {
+function HabitChecklist({ date, goals, completions, onToggle, onAdd, onDelete, onRename, onReorder, getMetric, setMetric, getQty, setGoalQty, getNote, setGoalNote, countInView, calcStreak }) {
   const dk = fmt(date);
   const [confirmId, setConfirmId] = useState(null);
   const [editingId, setEditingId] = useState(null);
@@ -2969,13 +2972,32 @@ function HabitChecklist({ date, goals, completions, onToggle, onAdd, onDelete, o
     else setConfirmId(id);
   }
 
-  // Long press to trigger edit
-  const pressTimer = useRef(null);
-  function onPressStart(e, id) {
-    pressTimer.current = setTimeout(() => { setEditingId(id); }, 500);
+  // Touch drag for reordering
+  const touchDragId = useRef(null);
+  const touchDragEl = useRef(null);
+
+  function onHandleTouchStart(e, id) {
+    touchDragId.current = id;
+    touchDragEl.current = e.currentTarget.closest('[data-goal-id]');
+    if (touchDragEl.current) touchDragEl.current.style.opacity = '0.5';
+    e.stopPropagation();
   }
-  function onPressEnd() {
-    if (pressTimer.current) clearTimeout(pressTimer.current);
+  function onHandleTouchMove(e) {
+    e.preventDefault(); // prevent scroll while dragging
+  }
+  function onHandleTouchEnd(e) {
+    if (!touchDragId.current) return;
+    const touch = e.changedTouches[0];
+    const el = document.elementFromPoint(touch.clientX, touch.clientY);
+    const targetRow = el?.closest('[data-goal-id]');
+    const targetId = targetRow?.getAttribute('data-goal-id');
+    if (targetId && targetId !== touchDragId.current && onReorder) {
+      onReorder(touchDragId.current, targetId);
+    }
+    if (touchDragEl.current) touchDragEl.current.style.opacity = '';
+    touchDragId.current = null;
+    touchDragEl.current = null;
+    e.stopPropagation();
   }
 
   return (
@@ -3022,11 +3044,21 @@ function HabitChecklist({ date, goals, completions, onToggle, onAdd, onDelete, o
           const isExpanded = !!expandedGoals[g.id];
           return (
             <div key={g.id}
+              data-goal-id={g.id}
               className={`monthly-habit-check-row ${done?'done':''}`}
               style={{borderLeft:`3px solid ${g.color}`, flexDirection:'column', alignItems:'stretch', padding:0}}
               onMouseLeave={()=>setConfirmId(null)}>
               {/* Main row */}
               <div style={{display:'flex',alignItems:'center',padding:'8px 12px',gap:8}}>
+                {/* Touch drag handle */}
+                {onReorder && (
+                  <span
+                    style={{fontSize:13,color:'var(--border)',cursor:'grab',flexShrink:0,touchAction:'none',userSelect:'none'}}
+                    onTouchStart={e=>onHandleTouchStart(e,g.id)}
+                    onTouchMove={onHandleTouchMove}
+                    onTouchEnd={onHandleTouchEnd}
+                    title="Hold and drag to reorder">⣿</span>
+                )}
                 <div className="mhc-check"
                   style={{background: done ? g.color : 'transparent', borderColor: g.color}}
                   onClick={()=>{if(!editing){setConfirmId(null);onToggle(g.id,dk);}}}>
@@ -3049,14 +3081,16 @@ function HabitChecklist({ date, goals, completions, onToggle, onAdd, onDelete, o
                   />
                 ) : (
                   <span className="mhc-name"
-                    style={{color: done ? g.color : 'var(--ink)', flex:1}}
-                    onMouseDown={e=>onPressStart(e,g.id)}
-                    onMouseUp={onPressEnd}
-                    onTouchStart={e=>onPressStart(e,g.id)}
-                    onTouchEnd={onPressEnd}
-                    title="Hold to edit name">
+                    style={{color: done ? g.color : 'var(--ink)', flex:1}}>
                     {g.name}
                   </span>
+                )}
+                {/* Edit button — always visible, no long-press needed */}
+                {!editing && (
+                  <button
+                    style={{background:'none',border:'none',cursor:'pointer',fontSize:13,color:'var(--ink-faint)',padding:'0 3px',flexShrink:0}}
+                    onClick={e=>{e.stopPropagation();setEditingId(g.id);}}
+                    title="Edit name">✏️</button>
                 )}
                 {/* Count + streak */}
                 {countInView && calcStreak && (
@@ -3962,7 +3996,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.8.2</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.8.3</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
