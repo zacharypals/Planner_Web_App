@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v1.8.3 -->
+<!-- LP Planner v1.8.4 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -502,7 +502,7 @@
     min-width: 0;
   }
   .goal-count {
-    font-family: 'DM Mono', monospace; font-size: 11px; color: var(--ink-faint);
+    font-family: 'DM Mono', monospace; font-size: 11px; color: var(--ink-light);
     background: var(--cream); padding: 2px 6px; border-radius: 10px; flex-shrink: 0;
   }
 
@@ -2807,7 +2807,7 @@ function HabitTracker({ onGoToPlanner, goals, setGoals, completions, setCompleti
                 onClick={e=>e.stopPropagation()} />
               <span className="goal-count" style={{flexShrink:0}}>
                 {countInView(goal.id)}
-                <span style={{margin:'0 3px',opacity:0.4}}>·</span>
+                <span style={{margin:'0 3px',opacity:0.6}}>·</span>
                 <span title="Current streak" style={{color:'var(--gold)'}}>🔥{calcStreak(goal.id)}</span>
               </span>
               <button
@@ -3094,9 +3094,9 @@ function HabitChecklist({ date, goals, completions, onToggle, onAdd, onDelete, o
                 )}
                 {/* Count + streak */}
                 {countInView && calcStreak && (
-                  <span style={{fontSize:10,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace",flexShrink:0,whiteSpace:'nowrap'}}>
+                  <span style={{fontSize:10,color:'var(--ink-light)',fontFamily:"'DM Mono',monospace",flexShrink:0,whiteSpace:'nowrap'}}>
                     {countInView(g.id)}
-                    <span style={{margin:'0 2px',opacity:0.4}}>·</span>
+                    <span style={{margin:'0 2px',opacity:0.6}}>·</span>
                     <span style={{color:'var(--gold)'}}>🔥{calcStreak(g.id)}</span>
                   </span>
                 )}
@@ -3996,7 +3996,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.8.3</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.8.4</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
