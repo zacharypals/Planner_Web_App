@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v1.7.4 -->
+<!-- LP Planner v1.8.0 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -467,6 +467,14 @@
 
   /* ===================== HABIT TRACKER ===================== */
   .habit-sidebar {}
+  .habit-qty-input {
+    width: 36px; border: 1px solid var(--border); border-radius: 4px;
+    padding: 2px 4px; font-size: 11px; font-family: 'DM Mono', monospace;
+    color: var(--ink); background: white; text-align: center;
+    flex-shrink: 0;
+  }
+  .habit-qty-input:focus { outline: none; border-color: var(--accent); }
+  .habit-qty-input::placeholder { color: var(--border); font-size: 10px; }
   .date-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
   .date-nav-label { font-family: 'Playfair Display', serif; font-size: 15px; font-weight: 600; }
 
@@ -2602,11 +2610,12 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onEnterKey, titleRef, 
 // ─────────────────────────────────────────────
 // HABIT TRACKER
 // ─────────────────────────────────────────────
-function HabitTracker({ onGoToPlanner, goals, setGoals, completions, setCompletions }) {
+function HabitTracker({ onGoToPlanner, goals, setGoals, completions, setCompletions, metrics, setMetrics, qty, setQty }) {
   const today = new Date(); today.setHours(0,0,0,0);
   const [selectedDate, setSelectedDate] = useState(today);
   const [view, setView] = useState('monthly'); // daily, weekly, monthly, yearly
   const [filterGoal, setFilterGoal] = useState(null); // null = all
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   function isCompleted(goalId, dateKey) {
     return (completions[dateKey]||[]).includes(goalId);
@@ -2617,6 +2626,18 @@ function HabitTracker({ onGoToPlanner, goals, setGoals, completions, setCompleti
       const has = arr.includes(goalId);
       return { ...c, [dateKey]: has ? arr.filter(x=>x!==goalId) : [...arr, goalId] };
     });
+  }
+
+  // Metrics helpers (weight/cals per day)
+  function getMetric(field) { return (metrics[selectedDayKey] || {})[field] || ''; }
+  function setMetric(field, val) {
+    setMetrics(m => ({...m, [selectedDayKey]: {...(m[selectedDayKey]||{}), [field]: val}}));
+  }
+
+  // Qty helpers (amount per goal per day)
+  function getQty(goalId) { return (qty[selectedDayKey] || {})[goalId] || ''; }
+  function setGoalQty(goalId, val) {
+    setQty(q => ({...q, [selectedDayKey]: {...(q[selectedDayKey]||{}), [goalId]: val}}));
   }
 
   function addGoal() {
@@ -2667,11 +2688,13 @@ function HabitTracker({ onGoToPlanner, goals, setGoals, completions, setCompleti
   }
 
   const selectedDayKey = fmt(selectedDate);
+
   const displayGoals = filterGoal ? goals.filter(g=>g.id===filterGoal) : goals;
 
   return (
     <div className="main-content">
-      {/* SIDEBAR */}
+      {/* SIDEBAR — collapsible */}
+      <div className={`sidebar-wrap ${sidebarCollapsed ? 'collapsed' : ''}`}>
       <div className="sidebar habit-sidebar">
         <div className="date-nav">
           <button className="nav-arrow" onClick={()=>setSelectedDate(d=>addDays(d,-1))}>‹</button>
@@ -2679,6 +2702,32 @@ function HabitTracker({ onGoToPlanner, goals, setGoals, completions, setCompleti
             {MONTHS[selectedDate.getMonth()].slice(0,3)} {selectedDate.getDate()}, {selectedDate.getFullYear()}
           </span>
           <button className="nav-arrow" onClick={()=>setSelectedDate(d=>addDays(d,1))}>›</button>
+        </div>
+
+        {/* Weight + Cal/Pts fields */}
+        <div style={{display:'flex',gap:8,marginBottom:12,padding:'8px 0',borderBottom:'1px solid var(--border)'}}>
+          <div style={{flex:1,display:'flex',flexDirection:'column',gap:3}}>
+            <label style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)',textTransform:'uppercase',letterSpacing:'0.06em'}}>Weight</label>
+            <input type="number" step="0.1"
+              className="goal-name-input"
+              style={{width:'100%',textAlign:'center',fontFamily:"'DM Mono',monospace",fontSize:13,fontWeight:600}}
+              placeholder="—"
+              value={getMetric('weight')}
+              onChange={e=>setMetric('weight', e.target.value)}
+              onClick={e=>e.stopPropagation()}
+            />
+          </div>
+          <div style={{flex:1,display:'flex',flexDirection:'column',gap:3}}>
+            <label style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)',textTransform:'uppercase',letterSpacing:'0.06em'}}>Cal/Pts</label>
+            <input type="number" step="1"
+              className="goal-name-input"
+              style={{width:'100%',textAlign:'center',fontFamily:"'DM Mono',monospace",fontSize:13,fontWeight:600}}
+              placeholder="—"
+              value={getMetric('cals')}
+              onChange={e=>setMetric('cals', e.target.value)}
+              onClick={e=>e.stopPropagation()}
+            />
+          </div>
         </div>
 
         <div className="checklist-header" style={{marginBottom:8}}>
@@ -2701,6 +2750,14 @@ function HabitTracker({ onGoToPlanner, goals, setGoals, completions, setCompleti
             <input className="goal-name-input" value={goal.name}
               onChange={e=>updateGoal(goal.id,{name:e.target.value})}
               onClick={e=>e.stopPropagation()} />
+            <input type="number" min="0" step="1"
+              className="habit-qty-input"
+              placeholder="qty"
+              value={getQty(goal.id)}
+              onChange={e=>{ e.stopPropagation(); setGoalQty(goal.id, e.target.value); }}
+              onClick={e=>e.stopPropagation()}
+              title="Quantity for today"
+            />
             <span className="goal-count">
               {countInView(goal.id)}
               <span style={{margin:'0 3px',opacity:0.4}}>·</span>
@@ -2715,7 +2772,13 @@ function HabitTracker({ onGoToPlanner, goals, setGoals, completions, setCompleti
         <div className="sidebar-links">
           <button className="sidebar-link planner" onClick={onGoToPlanner}>📅 Weekly Planner</button>
         </div>
+      </div>{/* end habit-sidebar */}
+      <div className="sidebar-toggle-strip" onClick={()=>setSidebarCollapsed(c=>!c)}
+        title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
+        <div className="sidebar-toggle-btn">{sidebarCollapsed ? '›' : '‹'}</div>
+        <span className="sidebar-collapsed-label">Habits</span>
       </div>
+      </div>{/* end sidebar-wrap */}
 
       {/* MAIN */}
       {(() => {
@@ -3518,7 +3581,7 @@ function ColorPickerPopover({ color, onChange }) {
 // ─────────────────────────────────────────────
 // APP ROOT
 // ─────────────────────────────────────────────
-const ALL_STORAGE_KEYS = ['weekData','habitGoals','habitCompletions','monthlyGoals','navColor','calHeaderColor','pagesData','foldersData'];
+const ALL_STORAGE_KEYS = ['weekData','habitGoals','habitCompletions','habitMetrics','habitQty','monthlyGoals','navColor','calHeaderColor','pagesData','foldersData'];
 
 function App() {
   const [page, setPage] = useState('planner');
@@ -3534,6 +3597,8 @@ function App() {
     {id:'g3', name:'Vocal Exercises', color:'#e0a800'},
   ]);
   const [habitCompletions, setHabitCompletions] = useStorage('habitCompletions', {});
+  const [habitMetrics, setHabitMetrics] = useStorage('habitMetrics', {}); // {[dateKey]: {weight:'', cals:''}}
+  const [habitQty, setHabitQty] = useStorage('habitQty', {}); // {[dateKey]: {[goalId]: qty}}
   const [monthlyGoals, setMonthlyGoals] = useStorage('monthlyGoals', {});
 
   // Auth state
@@ -3560,6 +3625,8 @@ function App() {
       if (data.calHeaderColor) setCalHeaderColor(data.calHeaderColor);
       if (data.habitGoals) setHabitGoals(data.habitGoals);
       if (data.habitCompletions) setHabitCompletions(data.habitCompletions);
+      if (data.habitMetrics) setHabitMetrics(data.habitMetrics);
+      if (data.habitQty) setHabitQty(data.habitQty);
       if (data.monthlyGoals) setMonthlyGoals(data.monthlyGoals);
       if (data.pagesData) setPagesData(data.pagesData);
       if (data.foldersData) setFoldersData(data.foldersData);
@@ -3728,7 +3795,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.7.4</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.8.0</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -3789,6 +3856,8 @@ function App() {
       {page==='habit' && <HabitTracker
         goals={habitGoals} setGoals={setHabitGoals}
         completions={habitCompletions} setCompletions={setHabitCompletions}
+        metrics={habitMetrics} setMetrics={setHabitMetrics}
+        qty={habitQty} setQty={setHabitQty}
         onGoToPlanner={()=>setPage('planner')} />}
       {page==='pages' && <PagesView pagesData={pagesData} setPagesData={setPagesData} foldersData={foldersData} setFoldersData={setFoldersData} weekData={weekData} setWeekData={setWeekData} selectedId={selectedPagesId} setSelectedId={setSelectedPagesId} />}
 
