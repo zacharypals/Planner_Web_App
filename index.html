@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v2.0.3 -->
+<!-- LP Planner v2.0.4 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -4529,7 +4529,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v2.0.3</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v2.0.4</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -5522,7 +5522,7 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
                       const inLi = el?.closest('li');
                       if (inLi) {
                         e.preventDefault();
-                        document.execCommand(dx < 0 ? 'indent' : 'outdent');
+                        document.execCommand(dx > 0 ? 'indent' : 'outdent');
                         // Re-apply checklist class if needed
                         requestAnimationFrame(() => {
                           const s2 = window.getSelection();
