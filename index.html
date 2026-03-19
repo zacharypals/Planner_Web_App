@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v2.0.6 -->
+<!-- LP Planner v2.0.7 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -2347,7 +2347,16 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
                     titleRef={el=>taskTitleRefsMobile.current[task.id]=el}
                     deleteIfEmpty={()=>{if(!task.title.trim())deleteTask(mobileDayKey,task.id);}}
                     onApplyRepeat={(days,endDate)=>propagateRepeat(task,mobileDayKey,days,endDate)}
-                    onReschedule={(toDayKey)=>{ moveTaskBetweenDays(mobileDayKey,toDayKey,task.id,null); if(task.expanded) updateTask(toDayKey,task.id,{expanded:false}); }}
+                    onReschedule={(toDayKey)=>{
+                moveTaskBetweenDays(mobileDayKey,toDayKey,task.id,null);
+                if(task.expanded) updateTask(toDayKey,task.id,{expanded:false});
+                // If it's a project task, also update scheduledDate in pagesData
+                if(task.isProjectTask && task.projectDocId && setPagesData) {
+                  setPagesData(p => p.map(doc => doc.id !== task.projectDocId ? doc : {
+                    ...doc, tasks: (doc.tasks||[]).map(t => t.id===task.id ? {...t, scheduledDate:toDayKey} : t)
+                  }));
+                }
+              }}
                     weekDays={weekDays}
                     currentDayKey={mobileDayKey}
                     isDragOver={false} onDragStart={()=>{}} onDragOver={()=>{}} onDrop={()=>{}} />
@@ -2667,7 +2676,7 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onEnterKey, titleRef, 
             </div>
           )}
           {/* ── Reschedule (mobile only) ── */}
-          {onReschedule && weekDays && !task.isProjectTask && (
+          {onReschedule && weekDays && (
             <div style={{paddingTop:6,borderTop:'1px solid rgba(0,0,0,0.07)',marginTop:6}} onClick={e=>e.stopPropagation()}>
               <div style={{fontSize:10,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace",marginBottom:5}}>📅 Reschedule:</div>
               <div style={{display:'flex',gap:4}}>
@@ -4529,7 +4538,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v2.0.6</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v2.0.7</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -5465,6 +5474,8 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
               </button>
             </div>
 
+            {/* Scrollable area: body + tasks */}
+            <div className="pages-scroll-area">
             {/* Sticky title header — does not scroll */}
             <div className="pages-doc-header">
               <div style={{display:'flex',alignItems:'flex-start',gap:8,marginBottom:4}}>
@@ -5522,9 +5533,6 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
                 </div>
               </div>
             </div>
-
-            {/* Scrollable area: body + tasks */}
-            <div className="pages-scroll-area">
             <div className="pages-editor">
 
 
