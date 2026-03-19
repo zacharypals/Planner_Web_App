@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v1.8.6 -->
+<!-- LP Planner v1.8.7 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -4031,6 +4031,24 @@ function App() {
     if (!authUser || !driveFileId || pullRefreshing) return;
     setPullRefreshing(true);
     try {
+      // Check if a newer version of the app is deployed
+      const CURRENT_VERSION = '1.8.7';
+      try {
+        const res = await fetch(window.location.href + '?cachebust=' + Date.now(), {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache' },
+        });
+        const html = await res.text();
+        const match = html.match(/LP Planner v([\d.]+)/);
+        if (match && match[1] !== CURRENT_VERSION) {
+          // New version available — reload after Drive sync
+          await loadAllFromDrive();
+          window.location.reload(true);
+          return;
+        }
+      } catch (e) {
+        // Network issue checking version — continue with Drive sync only
+      }
       await loadAllFromDrive();
     } finally {
       setPullRefreshing(false);
@@ -4049,7 +4067,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.8.6</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.8.7</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
