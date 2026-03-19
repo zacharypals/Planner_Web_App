@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v1.8.8 -->
+<!-- LP Planner v1.8.9 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -2086,6 +2086,51 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
   const mobileDayTasks = getTasks(mobileDayKey);
   const mobileDayDate = weekDays[mobileDayIndex];
 
+  // Mobile touch drag for task reordering
+  const mobileTouchDragId = useRef(null);
+  const mobileTouchDragEl = useRef(null);
+  const mobileTasksContainerRef = useRef(null);
+  const [mobileDragOverId, setMobileDragOverId] = useState(null);
+
+  useEffect(() => {
+    const el = mobileTasksContainerRef.current;
+    if (!el) return;
+    function handleTouchMove(e) {
+      if (mobileTouchDragId.current) e.preventDefault();
+    }
+    el.addEventListener('touchmove', handleTouchMove, {passive: false});
+    return () => el.removeEventListener('touchmove', handleTouchMove);
+  }, []);
+
+  function onMobileTaskTouchStart(e, taskId) {
+    mobileTouchDragId.current = taskId;
+    mobileTouchDragEl.current = e.currentTarget.closest('[data-task-id]');
+    if (mobileTouchDragEl.current) mobileTouchDragEl.current.style.opacity = '0.45';
+    e.stopPropagation();
+  }
+  function onMobileTaskTouchEnd(e) {
+    if (!mobileTouchDragId.current) return;
+    const touch = e.changedTouches[0];
+    const el = document.elementFromPoint(touch.clientX, touch.clientY);
+    const targetRow = el?.closest('[data-task-id]');
+    const targetId = targetRow?.getAttribute('data-task-id');
+    if (targetId && targetId !== mobileTouchDragId.current) {
+      reorderTasks(mobileDayKey, mobileTouchDragId.current, targetId);
+    }
+    if (mobileTouchDragEl.current) mobileTouchDragEl.current.style.opacity = '';
+    setMobileDragOverId(null);
+    mobileTouchDragId.current = null;
+    mobileTouchDragEl.current = null;
+    e.stopPropagation();
+  }
+  function onMobileTaskTouchMove(e) {
+    if (!mobileTouchDragId.current) return;
+    const touch = e.touches[0];
+    const el = document.elementFromPoint(touch.clientX, touch.clientY);
+    const targetRow = el?.closest('[data-task-id]');
+    setMobileDragOverId(targetRow?.getAttribute('data-task-id') || null);
+  }
+
   const sidebarContent = (
     <>
       <div className="week-nav">
@@ -2263,20 +2308,36 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
             return i+1;
           })}>›</button>
         </div>
-        <div className="mobile-day-tasks">
+        <div className="mobile-day-tasks" ref={mobileTasksContainerRef}>
           {mobileDayTasks.map(task=>(
-            <TaskCard key={task.id} task={task}
-              onUpdate={p=>updateTask(mobileDayKey,task.id,p)}
-              onBlurSync={()=>syncTaskToCalendar(mobileDayKey,task.id)}
-              onDelete={()=>deleteTask(mobileDayKey,task.id)}
-              onEnterKey={()=>addTask(mobileDayKey,task.id)}
-              titleRef={el=>taskTitleRefsMobile.current[task.id]=el}
-              deleteIfEmpty={()=>{if(!task.title.trim())deleteTask(mobileDayKey,task.id);}}
-              onApplyRepeat={(days,endDate)=>propagateRepeat(task,mobileDayKey,days,endDate)}
-              onReschedule={(toDayKey)=>{ moveTaskBetweenDays(mobileDayKey,toDayKey,task.id,null); onUpdate({expanded:false}); }}
-              weekDays={weekDays}
-              currentDayKey={mobileDayKey}
-              isDragOver={false} onDragStart={()=>{}} onDragOver={()=>{}} onDrop={()=>{}} />
+            <div key={task.id} data-task-id={task.id}
+              style={{opacity: mobileTouchDragId.current===task.id ? 0.45 : 1,
+                      outline: mobileDragOverId===task.id ? '2px dashed var(--accent)' : 'none',
+                      borderRadius:8, transition:'outline 0.1s'}}>
+              <div style={{display:'flex',alignItems:'flex-start',gap:0}}>
+                <span
+                  style={{fontSize:16,color:'var(--border)',cursor:'grab',padding:'10px 6px 10px 2px',
+                          flexShrink:0,touchAction:'none',userSelect:'none',alignSelf:'flex-start',marginTop:2}}
+                  onTouchStart={e=>onMobileTaskTouchStart(e,task.id)}
+                  onTouchMove={onMobileTaskTouchMove}
+                  onTouchEnd={onMobileTaskTouchEnd}
+                  title="Drag to reorder">⣿</span>
+                <div style={{flex:1,minWidth:0}}>
+                  <TaskCard task={task}
+                    onUpdate={p=>updateTask(mobileDayKey,task.id,p)}
+                    onBlurSync={()=>syncTaskToCalendar(mobileDayKey,task.id)}
+                    onDelete={()=>deleteTask(mobileDayKey,task.id)}
+                    onEnterKey={()=>addTask(mobileDayKey,task.id)}
+                    titleRef={el=>taskTitleRefsMobile.current[task.id]=el}
+                    deleteIfEmpty={()=>{if(!task.title.trim())deleteTask(mobileDayKey,task.id);}}
+                    onApplyRepeat={(days,endDate)=>propagateRepeat(task,mobileDayKey,days,endDate)}
+                    onReschedule={(toDayKey)=>{ moveTaskBetweenDays(mobileDayKey,toDayKey,task.id,null); task.expanded && updateTask(mobileDayKey,task.id,{expanded:false}); }}
+                    weekDays={weekDays}
+                    currentDayKey={mobileDayKey}
+                    isDragOver={false} onDragStart={()=>{}} onDragOver={()=>{}} onDrop={()=>{}} />
+                </div>
+              </div>
+            </div>
           ))}
           <button className="mobile-add-btn" onClick={()=>addTask(mobileDayKey)}>+ Add task</button>
         </div>
@@ -3006,18 +3067,26 @@ function HabitChecklist({ date, goals, completions, onToggle, onAdd, onDelete, o
     else setConfirmId(id);
   }
 
-  // Touch drag for reordering
+  // Touch drag for reordering — uses native non-passive listener so preventDefault works
   const touchDragId = useRef(null);
   const touchDragEl = useRef(null);
+  const itemsContainerRef = useRef(null);
+
+  useEffect(() => {
+    const el = itemsContainerRef.current;
+    if (!el) return;
+    function handleTouchMove(e) {
+      if (touchDragId.current) e.preventDefault();
+    }
+    el.addEventListener('touchmove', handleTouchMove, {passive: false});
+    return () => el.removeEventListener('touchmove', handleTouchMove);
+  }, []);
 
   function onHandleTouchStart(e, id) {
     touchDragId.current = id;
     touchDragEl.current = e.currentTarget.closest('[data-goal-id]');
     if (touchDragEl.current) touchDragEl.current.style.opacity = '0.5';
     e.stopPropagation();
-  }
-  function onHandleTouchMove(e) {
-    e.preventDefault(); // prevent scroll while dragging
   }
   function onHandleTouchEnd(e) {
     if (!touchDragId.current) return;
@@ -3065,7 +3134,7 @@ function HabitChecklist({ date, goals, completions, onToggle, onAdd, onDelete, o
         </div>
       )}
 
-      <div className="monthly-habit-checklist-items">
+      <div className="monthly-habit-checklist-items" ref={itemsContainerRef}>
         {goals.length === 0 && (
           <div style={{fontSize:12,color:'var(--ink-faint)',fontFamily:"'DM Sans',sans-serif",padding:'4px 0'}}>
             No habits yet — tap + to add one
@@ -3089,9 +3158,8 @@ function HabitChecklist({ date, goals, completions, onToggle, onAdd, onDelete, o
                   <span
                     style={{fontSize:13,color:'var(--border)',cursor:'grab',flexShrink:0,touchAction:'none',userSelect:'none'}}
                     onTouchStart={e=>onHandleTouchStart(e,g.id)}
-                    onTouchMove={onHandleTouchMove}
                     onTouchEnd={onHandleTouchEnd}
-                    title="Hold and drag to reorder">⣿</span>
+                    title="Drag to reorder">⣿</span>
                 )}
                 <div className="mhc-check"
                   style={{background: done ? g.color : 'transparent', borderColor: g.color}}
@@ -4099,7 +4167,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.8.8</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.8.9</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
