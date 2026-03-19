@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v1.9.1 -->
+<!-- LP Planner v1.9.2 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -3194,18 +3194,16 @@ function HabitChecklist({ date, goals, completions, onToggle, onAdd, onDelete, o
             <div key={g.id}
               data-goal-id={g.id}
               className={`monthly-habit-check-row ${done?'done':''}`}
-              style={{borderLeft:`3px solid ${g.color}`, flexDirection:'column', alignItems:'stretch', padding:0,
-                      outline: touchDragOverId===g.id && touchDragOverId!==touchDragId.current
-                               ? '2px dashed var(--accent)' : 'none',
-                      userSelect:'none', WebkitUserSelect:'none'}}
+              style={{borderLeft:`3px solid ${g.color}`, flexDirection:'column', alignItems:'stretch', padding:0}}
               onMouseLeave={()=>setConfirmId(null)}>
               {/* Main row */}
               <div style={{display:'flex',alignItems:'center',padding:'8px 12px',gap:8}}>
                 {/* Touch drag handle */}
                 {onReorder && (
-                  <span className="mobile-drag-handle"
-                    style={{fontSize:13,color:'var(--border)',cursor:'grab',flexShrink:0,
-                            touchAction:'none',userSelect:'none',WebkitUserSelect:'none'}}
+                  <span
+                    style={{fontSize:13,color:'var(--border)',cursor:'grab',flexShrink:0,userSelect:'none'}}
+                    onTouchStart={e=>onHandleTouchStart(e,g.id)}
+                    onTouchEnd={onHandleTouchEnd}
                     title="Drag to reorder">⣿</span>
                 )}
                 <div className="mhc-check"
@@ -4215,7 +4213,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.9.1</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.9.2</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
