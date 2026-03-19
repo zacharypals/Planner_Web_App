@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v1.9.0 -->
+<!-- LP Planner v1.9.1 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -336,6 +336,13 @@
     visibility: visible; opacity: 1; transition: none;
   }
   .task-delete-btn.confirming:hover { background: #96281b; }
+  @media (hover: none) { .task-delete-btn { display: none !important; } }
+  .task-mobile-delete-btn {
+    background: #e74c3c; border: none; border-radius: 4px; cursor: pointer;
+    color: white; font-size: 11px; font-weight: 700; padding: 2px 8px;
+    flex-shrink: 0; white-space: nowrap; font-family: 'DM Sans', sans-serif;
+  }
+  .task-mobile-delete-btn:active { background: #c0392b; }
   .task-details {
     padding: 0 8px 8px 28px; border-top: 1px solid rgba(0,0,0,0.08);
   }
@@ -2092,44 +2099,51 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
   const mobileTasksContainerRef = useRef(null);
   const [mobileDragOverId, setMobileDragOverId] = useState(null);
 
+  // Native touch drag: all 3 events passive:false so both scroll-block AND
+  // text-selection-block work. Only activates when touch starts on .mobile-drag-handle.
   useEffect(() => {
     const el = mobileTasksContainerRef.current;
     if (!el) return;
-    function handleTouchMove(e) {
-      if (mobileTouchDragId.current) e.preventDefault();
+    function onTStart(e) {
+      if (!e.target.closest('.mobile-drag-handle')) return;
+      e.preventDefault(); // prevents text selection from the very first touch
+      const row = e.target.closest('[data-task-id]');
+      if (!row) return;
+      mobileTouchDragId.current = row.getAttribute('data-task-id');
+      mobileTouchDragEl.current = row;
+      row.style.opacity = '0.45';
     }
-    el.addEventListener('touchmove', handleTouchMove, {passive: false});
-    return () => el.removeEventListener('touchmove', handleTouchMove);
-  }, []);
-
-  function onMobileTaskTouchStart(e, taskId) {
-    mobileTouchDragId.current = taskId;
-    mobileTouchDragEl.current = e.currentTarget.closest('[data-task-id]');
-    if (mobileTouchDragEl.current) mobileTouchDragEl.current.style.opacity = '0.45';
-    e.stopPropagation();
-  }
-  function onMobileTaskTouchEnd(e) {
-    if (!mobileTouchDragId.current) return;
-    const touch = e.changedTouches[0];
-    const el = document.elementFromPoint(touch.clientX, touch.clientY);
-    const targetRow = el?.closest('[data-task-id]');
-    const targetId = targetRow?.getAttribute('data-task-id');
-    if (targetId && targetId !== mobileTouchDragId.current) {
-      reorderTasks(mobileDayKey, mobileTouchDragId.current, targetId);
+    function onTMove(e) {
+      if (!mobileTouchDragId.current) return;
+      e.preventDefault(); // prevents scroll while dragging
+      const t = e.touches[0];
+      const over = document.elementFromPoint(t.clientX, t.clientY);
+      const row = over?.closest('[data-task-id]');
+      setMobileDragOverId(row ? row.getAttribute('data-task-id') : null);
     }
-    if (mobileTouchDragEl.current) mobileTouchDragEl.current.style.opacity = '';
-    setMobileDragOverId(null);
-    mobileTouchDragId.current = null;
-    mobileTouchDragEl.current = null;
-    e.stopPropagation();
-  }
-  function onMobileTaskTouchMove(e) {
-    if (!mobileTouchDragId.current) return;
-    const touch = e.touches[0];
-    const el = document.elementFromPoint(touch.clientX, touch.clientY);
-    const targetRow = el?.closest('[data-task-id]');
-    setMobileDragOverId(targetRow?.getAttribute('data-task-id') || null);
-  }
+    function onTEnd(e) {
+      if (!mobileTouchDragId.current) return;
+      const t = e.changedTouches[0];
+      const over = document.elementFromPoint(t.clientX, t.clientY);
+      const targetRow = over?.closest('[data-task-id]');
+      const targetId = targetRow ? targetRow.getAttribute('data-task-id') : null;
+      if (targetId && targetId !== mobileTouchDragId.current) {
+        reorderTasks(mobileDayKey, mobileTouchDragId.current, targetId);
+      }
+      if (mobileTouchDragEl.current) mobileTouchDragEl.current.style.opacity = '';
+      setMobileDragOverId(null);
+      mobileTouchDragId.current = null;
+      mobileTouchDragEl.current = null;
+    }
+    el.addEventListener('touchstart', onTStart, {passive: false});
+    el.addEventListener('touchmove',  onTMove,  {passive: false});
+    el.addEventListener('touchend',   onTEnd,   {passive: false});
+    return () => {
+      el.removeEventListener('touchstart', onTStart);
+      el.removeEventListener('touchmove',  onTMove);
+      el.removeEventListener('touchend',   onTEnd);
+    };
+  }, [mobileDayKey]);
 
   const sidebarContent = (
     <>
@@ -2311,16 +2325,17 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
         <div className="mobile-day-tasks" ref={mobileTasksContainerRef}>
           {mobileDayTasks.map(task=>(
             <div key={task.id} data-task-id={task.id}
-              style={{opacity: mobileTouchDragId.current===task.id ? 0.45 : 1,
-                      outline: mobileDragOverId===task.id ? '2px dashed var(--accent)' : 'none',
-                      borderRadius:8, transition:'outline 0.1s'}}>
+              style={{
+                outline: mobileDragOverId===task.id && mobileDragOverId!==mobileTouchDragId.current
+                         ? '2px dashed var(--accent)' : 'none',
+                borderRadius:8, transition:'outline 0.1s',
+                userSelect:'none', WebkitUserSelect:'none',
+              }}>
               <div style={{display:'flex',alignItems:'flex-start',gap:0}}>
-                <span
+                <span className="mobile-drag-handle"
                   style={{fontSize:16,color:'var(--border)',cursor:'grab',padding:'10px 6px 10px 2px',
-                          flexShrink:0,touchAction:'none',userSelect:'none',alignSelf:'flex-start',marginTop:2}}
-                  onTouchStart={e=>onMobileTaskTouchStart(e,task.id)}
-                  onTouchMove={onMobileTaskTouchMove}
-                  onTouchEnd={onMobileTaskTouchEnd}
+                          flexShrink:0,touchAction:'none',userSelect:'none',WebkitUserSelect:'none',
+                          alignSelf:'flex-start',marginTop:2}}
                   title="Drag to reorder">⣿</span>
                 <div style={{flex:1,minWidth:0}}>
                   <TaskCard task={task}
@@ -2472,7 +2487,9 @@ const EVENT_COLORS = [
 function TaskCard({ task, onUpdate, onBlurSync, onDelete, onEnterKey, titleRef, deleteIfEmpty, onCopy, hasCopied, onPasteBelow, onShowCtxMenu, onDragStart, onDragOver, onDrop, isDragOver, onApplyRepeat, onReschedule, weekDays, currentDayKey }) {
   const textareaRef = useRef();
   const [confirming, setConfirming] = useState(false);
+  const [mobileConfirming, setMobileConfirming] = useState(false);
   const [showColors, setShowColors] = useState(false);
+  const longPressTimer = useRef(null);
 
   // Auto-grow textarea
   useEffect(() => {
@@ -2494,6 +2511,18 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onEnterKey, titleRef, 
     }
   }
 
+  // Mobile long-press delete — only when onReschedule prop present (mobile context)
+  function handleCardTouchStart(e) {
+    if (['INPUT','TEXTAREA','BUTTON','SELECT'].includes(e.target.tagName)) return;
+    longPressTimer.current = setTimeout(() => { setMobileConfirming(true); }, 600);
+  }
+  function handleCardTouchEnd() {
+    if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null; }
+  }
+  function handleCardTouchMove() {
+    if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null; }
+  }
+
   return (
     <div className={`task-card ${task.done?'done':''} ${isDragOver?'drag-over':''} ${task.isEvent?'is-event':''}`}
       style={{
@@ -2513,7 +2542,10 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onEnterKey, titleRef, 
       onDragStart={onDragStart}
       onDragOver={e=>{e.preventDefault();onDragOver();}}
       onDrop={e=>{e.preventDefault();onDrop();}}
-      onMouseLeave={handleMouseLeave}>
+      onMouseLeave={handleMouseLeave}
+      onTouchStart={onReschedule ? handleCardTouchStart : undefined}
+      onTouchEnd={onReschedule ? handleCardTouchEnd : undefined}
+      onTouchMove={onReschedule ? handleCardTouchMove : undefined}>
       <button
         className={`task-delete-btn ${confirming?'confirming':''}`}
         title={confirming ? 'Click again to confirm delete' : 'Delete task'}
@@ -2574,9 +2606,22 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onEnterKey, titleRef, 
             {task.priority ? '★' : '☆'}
           </button>
         )}
-        <button className="task-expand-btn" onClick={()=>onUpdate({expanded:!task.expanded})}>
-          {task.expanded ? '▲' : '▼'}
-        </button>
+        {mobileConfirming && onReschedule ? (
+          <>
+            <button className="task-mobile-delete-btn"
+              onClick={e=>{e.stopPropagation();onDelete();}}>
+              Delete?
+            </button>
+            <button onClick={e=>{e.stopPropagation();setMobileConfirming(false);}}
+              style={{background:'none',border:'none',cursor:'pointer',fontSize:13,
+                      color:'var(--ink-faint)',padding:'0 4px',flexShrink:0}}>✕</button>
+          </>
+        ) : (
+          <button className="task-expand-btn"
+            onClick={()=>{setMobileConfirming(false);onUpdate({expanded:!task.expanded});}}>
+            {task.expanded ? '▲' : '▼'}
+          </button>
+        )}
       </div>
       {task.expanded && (
         <div className="task-details">
@@ -3149,16 +3194,18 @@ function HabitChecklist({ date, goals, completions, onToggle, onAdd, onDelete, o
             <div key={g.id}
               data-goal-id={g.id}
               className={`monthly-habit-check-row ${done?'done':''}`}
-              style={{borderLeft:`3px solid ${g.color}`, flexDirection:'column', alignItems:'stretch', padding:0}}
+              style={{borderLeft:`3px solid ${g.color}`, flexDirection:'column', alignItems:'stretch', padding:0,
+                      outline: touchDragOverId===g.id && touchDragOverId!==touchDragId.current
+                               ? '2px dashed var(--accent)' : 'none',
+                      userSelect:'none', WebkitUserSelect:'none'}}
               onMouseLeave={()=>setConfirmId(null)}>
               {/* Main row */}
               <div style={{display:'flex',alignItems:'center',padding:'8px 12px',gap:8}}>
                 {/* Touch drag handle */}
                 {onReorder && (
-                  <span
-                    style={{fontSize:13,color:'var(--border)',cursor:'grab',flexShrink:0,touchAction:'none',userSelect:'none'}}
-                    onTouchStart={e=>onHandleTouchStart(e,g.id)}
-                    onTouchEnd={onHandleTouchEnd}
+                  <span className="mobile-drag-handle"
+                    style={{fontSize:13,color:'var(--border)',cursor:'grab',flexShrink:0,
+                            touchAction:'none',userSelect:'none',WebkitUserSelect:'none'}}
                     title="Drag to reorder">⣿</span>
                 )}
                 <div className="mhc-check"
@@ -4168,7 +4215,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.9.0</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.9.1</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
