@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v2.0.4 -->
+<!-- LP Planner v2.0.5 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -1081,7 +1081,7 @@
 
   /* Sticky title header */
   .pages-doc-header {
-    flex-shrink: 0; padding: 24px 36px 0; background: #ffffff;
+    flex-shrink: 0; padding: 24px 36px 8px; background: #ffffff;
     border-bottom: 1px solid #e2e8f0;
     box-shadow: 0 1px 4px rgba(0,0,0,0.04);
   }
@@ -1112,9 +1112,9 @@
   /* ── Toolbar — floating rounded card ── */
   .pages-toolbar {
     display: flex; gap: 1px; flex-wrap: wrap;
-    padding: 5px 6px; background: #ffffff;
-    border: 1px solid #e2e8f0; border-radius: 10px;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.06); margin-bottom: 0;
+    padding: 4px 0; background: transparent;
+    border: none; border-top: 1px solid #e2e8f0;
+    margin-top: 6px;
   }
   .pages-toolbar-btn {
     padding: 5px 9px; border-radius: 6px; border: none; background: none;
@@ -1129,8 +1129,8 @@
   /* ── Rich text body ── */
   .pages-body {
     min-height: 240px; padding: 16px 18px;
-    border: 1px solid #e2e8f0; border-top: none;
-    border-radius: 0 0 10px 10px;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
     background: #ffffff; outline: none;
     font-family: 'DM Sans', sans-serif;
     font-size: 14px; line-height: 1.75; color: #1e293b;
@@ -1259,7 +1259,7 @@
     .pages-toggle-strip { display: none !important; }
     .pages-editor { padding: 14px 16px 0; }
     .pages-tasks-section { padding: 0 16px 80px; }
-    .pages-doc-header { padding: 14px 16px 0; box-shadow: none; }
+    .pages-doc-header { padding: 10px 16px 6px; box-shadow: none; }
     .pages-mobile-back { display: block; }
     .pages-mobile-list { display: flex; flex-direction: column; flex: 1; overflow-y: auto; }
   }
@@ -4529,7 +4529,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v2.0.4</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v2.0.5</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -4981,6 +4981,27 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
   }
 
   function onBodyInput() {
+    // Markdown shortcut: "- " at start of a block → bullet list
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0 && bodyRef.current) {
+      const range = sel.getRangeAt(0);
+      const node = range.startContainer;
+      const block = node.nodeType === 3 ? node.parentElement : node;
+      const blockEl = block?.closest('p,div,li') || block;
+      // Only apply in plain paragraphs/divs, not already inside a list
+      if (blockEl && !blockEl.closest('ul,ol')) {
+        const text = blockEl.textContent || '';
+        if (text === '- ' || text === ' - ' || text.match(/^- $/)) {
+          // Clear the block content first
+          blockEl.textContent = '';
+          bodyRef.current.focus();
+          document.execCommand('insertUnorderedList');
+          // Don't let the debounce save stale HTML
+          setTimeout(() => { if (bodyRef.current && selectedId) updateDoc(selectedId, { body: bodyRef.current.innerHTML }); }, 0);
+          return;
+        }
+      }
+    }
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       if (bodyRef.current && selectedId) {
@@ -5450,38 +5471,41 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
                   return path.length > 0 ? <span style={{marginLeft:8,opacity:0.6}}>· 📁 {path.join(' › ')}</span> : null;
                 })()}
               </div>
+              {/* Toolbar — sticky in header so it's always visible */}
+              <div style={{padding:'8px 0 0'}}>
+                <div className="pages-toolbar">
+                  <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();exec('bold');}} title="Bold"><b>B</b></button>
+                  <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();exec('italic');}} title="Italic"><i>I</i></button>
+                  <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();exec('underline');}} title="Underline"><u>U</u></button>
+                  <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();exec('strikeThrough');}} title="Strikethrough"><s>S</s></button>
+                  <div className="pages-toolbar-sep"/>
+                  <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();exec('formatBlock','h1');}} title="Heading 1">H1</button>
+                  <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();exec('formatBlock','h2');}} title="Heading 2">H2</button>
+                  <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();exec('formatBlock','h3');}} title="Heading 3">H3</button>
+                  <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();exec('formatBlock','p');}} title="Normal text">¶</button>
+                  <div className="pages-toolbar-sep"/>
+                  <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();exec('insertUnorderedList');}} title="Bullet list">• —</button>
+                  <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();exec('insertOrderedList');}} title="Numbered list">1.</button>
+                  <button className="pages-toolbar-btn" onMouseDown={e=>{
+                    e.preventDefault();
+                    insertChecklistItem();
+                  }} title="Checklist">☑</button>
+                  <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();exec('formatBlock','blockquote');}} title="Quote">"</button>
+                  <div className="pages-toolbar-sep"/>
+                  <button className="pages-toolbar-btn" onMouseDown={e=>{
+                    e.preventDefault();
+                    const url = prompt('Enter URL:');
+                    if (url) exec('createLink', url);
+                  }} title="Link">🔗</button>
+                  <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();exec('removeFormat');}} title="Clear formatting">✕</button>
+                </div>
+              </div>
             </div>
 
-            {/* Scrollable area: toolbar + body + tasks */}
+            {/* Scrollable area: body + tasks */}
             <div className="pages-scroll-area">
             <div className="pages-editor">
 
-              <div className="pages-toolbar">
-                <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();exec('bold');}} title="Bold"><b>B</b></button>
-                <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();exec('italic');}} title="Italic"><i>I</i></button>
-                <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();exec('underline');}} title="Underline"><u>U</u></button>
-                <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();exec('strikeThrough');}} title="Strikethrough"><s>S</s></button>
-                <div className="pages-toolbar-sep"/>
-                <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();exec('formatBlock','h1');}} title="Heading 1">H1</button>
-                <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();exec('formatBlock','h2');}} title="Heading 2">H2</button>
-                <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();exec('formatBlock','h3');}} title="Heading 3">H3</button>
-                <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();exec('formatBlock','p');}} title="Normal text">¶</button>
-                <div className="pages-toolbar-sep"/>
-                <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();exec('insertUnorderedList');}} title="Bullet list">• —</button>
-                <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();exec('insertOrderedList');}} title="Numbered list">1.</button>
-                <button className="pages-toolbar-btn" onMouseDown={e=>{
-                  e.preventDefault();
-                  insertChecklistItem();
-                }} title="Checklist">☑</button>
-                <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();exec('formatBlock','blockquote');}} title="Quote">"</button>
-                <div className="pages-toolbar-sep"/>
-                <button className="pages-toolbar-btn" onMouseDown={e=>{
-                  e.preventDefault();
-                  const url = prompt('Enter URL:');
-                  if (url) exec('createLink', url);
-                }} title="Link">🔗</button>
-                <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();exec('removeFormat');}} title="Clear formatting">✕</button>
-              </div>
 
               <div ref={bodyRef} className="pages-body" contentEditable suppressContentEditableWarning
                 onInput={e=>{onBodyInput();setWordCount(countWords(bodyRef.current?.innerText||''));}}
