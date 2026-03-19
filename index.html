@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v1.8.5 -->
+<!-- LP Planner v1.8.6 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -40,6 +40,7 @@
     --pink: #c0392b;
   }
   html, body { height: 100%; font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--ink); overflow-x: hidden; }
+  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
   #root { height: 100%; }
 
   /* LAYOUT */
@@ -3846,6 +3847,9 @@ function App() {
   const [saveStatus, setSaveStatus] = useState(''); // '', 'saving', 'saved', 'error'
   const [authError, setAuthError] = useState(false); // true when session expired and silent refresh failed
   const [syncing, setSyncing] = useState(false);
+  const [pullRefreshing, setPullRefreshing] = useState(false);
+  const pullStartY = useRef(0);
+  const pullDeltaY = useRef(0);
   const saveTimerRef = useRef(null);
 
   // Load all data from Drive after sign-in
@@ -4023,6 +4027,16 @@ function App() {
     setSyncing(false);
   }
 
+  async function handlePullRefresh() {
+    if (!authUser || !driveFileId || pullRefreshing) return;
+    setPullRefreshing(true);
+    try {
+      await loadAllFromDrive();
+    } finally {
+      setPullRefreshing(false);
+    }
+  }
+
   const isErr = saveStatus.startsWith('ERR:');
   const errDetail = isErr ? saveStatus.slice(4) : '';
   const saveLabel = saveStatus === 'saving' ? '↑ Saving…'
@@ -4035,7 +4049,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.8.5</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.8.6</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -4091,6 +4105,34 @@ function App() {
           )}
         </div>
       </div>
+      {/* Pull-to-refresh indicator — mobile only */}
+      {pullRefreshing && (
+        <div style={{
+          position:'fixed', top:48, left:0, right:0, zIndex:300,
+          display:'flex', alignItems:'center', justifyContent:'center',
+          padding:'8px', background:'var(--accent)', color:'white',
+          fontFamily:"'DM Sans',sans-serif", fontSize:12, gap:6,
+        }}>
+          <span style={{display:'inline-block',animation:'spin 0.8s linear infinite'}}>↻</span>
+          Refreshing…
+        </div>
+      )}
+
+      <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden',position:'relative'}}
+        onTouchStart={e=>{
+          pullStartY.current = e.touches[0].clientY;
+          pullDeltaY.current = 0;
+        }}
+        onTouchMove={e=>{
+          pullDeltaY.current = e.touches[0].clientY - pullStartY.current;
+        }}
+        onTouchEnd={()=>{
+          // Only trigger if pulled down >80px and page is near the top
+          if (pullDeltaY.current > 80 && authUser && driveFileId && !pullRefreshing) {
+            handlePullRefresh();
+          }
+          pullDeltaY.current = 0;
+        }}>
       {page==='planner' && <WeeklyPlanner weekData={weekData} setWeekData={setWeekData} pagesData={pagesData} setPagesData={setPagesData} onGoToHabit={()=>setPage('habit')} calHeaderColor={calHeaderColor} setCalHeaderColor={setCalHeaderColor} />}
       {page==='monthly' && <MonthlyCalendar weekData={weekData} setWeekData={setWeekData} monthlyGoals={monthlyGoals} setMonthlyGoals={setMonthlyGoals} />}
       {page==='habit' && <HabitTracker
@@ -4101,6 +4143,7 @@ function App() {
         notes={habitNotes} setNotes={setHabitNotes}
         onGoToPlanner={()=>setPage('planner')} />}
       {page==='pages' && <PagesView pagesData={pagesData} setPagesData={setPagesData} foldersData={foldersData} setFoldersData={setFoldersData} weekData={weekData} setWeekData={setWeekData} selectedId={selectedPagesId} setSelectedId={setSelectedPagesId} />}
+      </div>
 
       {/* Mobile bottom nav — only visible on phones via CSS */}
       <div className="mobile-bottom-nav">
