@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v1.8.9 -->
+<!-- LP Planner v1.9.0 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -4131,17 +4131,18 @@ function App() {
     if (!authUser || !driveFileId || pullRefreshing) return;
     setPullRefreshing(true);
     try {
-      // Check if a newer version of the app is deployed
-      const CURRENT_VERSION = '1.8.7';
+      // Read the running version dynamically from the document comment
+      const runningMatch = document.documentElement.outerHTML.match(/LP Planner v([\d.]+)/);
+      const RUNNING_VERSION = runningMatch ? runningMatch[1] : '0.0.0';
       try {
-        const res = await fetch(window.location.href + '?cachebust=' + Date.now(), {
+        const res = await fetch(window.location.pathname + '?v=' + Date.now(), {
           cache: 'no-store',
-          headers: { 'Cache-Control': 'no-cache' },
+          headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' },
         });
         const html = await res.text();
-        const match = html.match(/LP Planner v([\d.]+)/);
-        if (match && match[1] !== CURRENT_VERSION) {
-          // New version available — reload after Drive sync
+        const deployedMatch = html.match(/LP Planner v([\d.]+)/);
+        if (deployedMatch && deployedMatch[1] !== RUNNING_VERSION) {
+          // New version detected — sync data then hard-reload
           await loadAllFromDrive();
           window.location.reload(true);
           return;
@@ -4167,7 +4168,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.8.9</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.9.0</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
