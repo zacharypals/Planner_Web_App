@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v2.0.0 -->
+<!-- LP Planner v2.0.1 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -2347,7 +2347,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
                     titleRef={el=>taskTitleRefsMobile.current[task.id]=el}
                     deleteIfEmpty={()=>{if(!task.title.trim())deleteTask(mobileDayKey,task.id);}}
                     onApplyRepeat={(days,endDate)=>propagateRepeat(task,mobileDayKey,days,endDate)}
-                    onReschedule={(toDayKey)=>{ moveTaskBetweenDays(mobileDayKey,toDayKey,task.id,null); task.expanded && updateTask(mobileDayKey,task.id,{expanded:false}); }}
+                    onReschedule={(toDayKey)=>{ moveTaskBetweenDays(mobileDayKey,toDayKey,task.id,null); if(task.expanded) updateTask(toDayKey,task.id,{expanded:false}); }}
                     weekDays={weekDays}
                     currentDayKey={mobileDayKey}
                     isDragOver={false} onDragStart={()=>{}} onDragOver={()=>{}} onDrop={()=>{}} />
@@ -2490,6 +2490,7 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onEnterKey, titleRef, 
   const [confirming, setConfirming] = useState(false);
   const [mobileConfirming, setMobileConfirming] = useState(false);
   const [showColors, setShowColors] = useState(false);
+  const [repeatOpen, setRepeatOpen] = useState(false);
   const longPressTimer = useRef(null);
 
   // Auto-grow textarea
@@ -2702,13 +2703,16 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onEnterKey, titleRef, 
                   className={`task-repeat-toggle ${task.repeat?.days?.length ? 'active' : ''}`}
                   onClick={e=>{
                     e.stopPropagation();
-                    if(task.repeat?.days?.length){
-                      onUpdate({repeat:null});
-                    } else {
+                    if (task.repeat === null || task.repeat === undefined) {
+                      // Turn on repeat + open panel
                       onUpdate({repeat:{days:[], endDate:''}});
+                      setRepeatOpen(true);
+                    } else {
+                      // Toggle panel open/closed (repeat stays saved)
+                      setRepeatOpen(o => !o);
                     }
                   }}>
-                  🔁 Repeat {task.repeat?.days?.length ? '▲' : '▼'}
+                  🔁 Repeat {(task.repeat !== null && task.repeat !== undefined) ? (repeatOpen ? '▲' : '▼') : '▼'}
                 </button>
                 {task.repeat?.days?.length > 0 && (
                   <span className="task-repeat-badge">
@@ -2716,8 +2720,15 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onEnterKey, titleRef, 
                     {task.repeat.endDate ? ` until ${task.repeat.endDate}` : ''}
                   </span>
                 )}
+                {/* Clear repeat entirely */}
+                {task.repeat !== null && task.repeat !== undefined && (
+                  <button onClick={e=>{e.stopPropagation();onUpdate({repeat:null});setRepeatOpen(false);}}
+                    style={{background:'none',border:'none',cursor:'pointer',fontSize:11,color:'var(--ink-faint)',padding:'0 2px',marginLeft:'auto'}}>
+                    ✕ clear
+                  </button>
+                )}
               </div>
-              {task.repeat !== null && task.repeat !== undefined && (
+              {(task.repeat !== null && task.repeat !== undefined) && repeatOpen && (
                 <div>
                   <div className="task-repeat-days">
                     {['S','M','T','W','T','F','S'].map((d,i)=>(
@@ -2729,7 +2740,6 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onEnterKey, titleRef, 
                           const next = cur.includes(i) ? cur.filter(x=>x!==i) : [...cur,i].sort((a,b)=>a-b);
                           const updated = {...(task.repeat||{}), days:next};
                           onUpdate({repeat:updated});
-                          // Auto-apply if end date already set
                           if (updated.endDate && next.length > 0 && onApplyRepeat) {
                             onApplyRepeat(next, updated.endDate);
                           }
@@ -2749,7 +2759,6 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onEnterKey, titleRef, 
                         e.stopPropagation();
                         const updated = {...(task.repeat||{}), endDate:e.target.value};
                         onUpdate({repeat:updated});
-                        // Auto-apply when end date is set and days are already selected
                         if (e.target.value && (updated.days||[]).length > 0 && onApplyRepeat) {
                           onApplyRepeat(updated.days, e.target.value);
                         }
@@ -2758,6 +2767,28 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onEnterKey, titleRef, 
                     />
                   </div>
                 </div>
+              )}
+            </div>
+          )}
+          {/* Mobile delete — only in expanded section, only in mobile context */}
+          {onReschedule && (
+            <div style={{paddingTop:8,marginTop:6,borderTop:'1px solid rgba(0,0,0,0.07)',display:'flex',justifyContent:'flex-end'}}
+              onClick={e=>e.stopPropagation()}>
+              {mobileConfirming ? (
+                <div style={{display:'flex',gap:6,alignItems:'center'}}>
+                  <button className="task-mobile-delete-btn"
+                    onClick={e=>{e.stopPropagation();onDelete();}}>
+                    Delete?
+                  </button>
+                  <button onClick={e=>{e.stopPropagation();setMobileConfirming(false);}}
+                    style={{background:'none',border:'none',cursor:'pointer',fontSize:13,color:'var(--ink-faint)',padding:'0 4px'}}>✕</button>
+                </div>
+              ) : (
+                <button onClick={e=>{e.stopPropagation();setMobileConfirming(true);}}
+                  style={{background:'none',border:'1px solid #fca5a5',borderRadius:4,cursor:'pointer',
+                          fontSize:11,color:'#ef4444',padding:'3px 10px',fontFamily:"'DM Sans',sans-serif",fontWeight:600}}>
+                  Delete
+                </button>
               )}
             </div>
           )}
@@ -4498,7 +4529,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v2.0.0</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v2.0.1</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
