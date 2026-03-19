@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v1.9.4 -->
+<!-- LP Planner v2.0.0 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -17,6 +17,7 @@
 <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -2769,7 +2770,7 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onEnterKey, titleRef, 
 // ─────────────────────────────────────────────
 // HABIT TRACKER
 // ─────────────────────────────────────────────
-function HabitTracker({ onGoToPlanner, goals, setGoals, completions, setCompletions, metrics, setMetrics, qty, setQty, notes, setNotes }) {
+function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completions, setCompletions, metrics, setMetrics, qty, setQty, notes, setNotes }) {
   const today = new Date(); today.setHours(0,0,0,0);
   const [selectedDate, setSelectedDate] = useState(today);
   const [view, setView] = useState('monthly'); // daily, weekly, monthly, yearly
@@ -2882,8 +2883,7 @@ function HabitTracker({ onGoToPlanner, goals, setGoals, completions, setCompleti
         </div>
 
         {/* Weight + Cal/Pts fields */}
-        <div style={{display:'flex',gap:8,marginBottom:12,padding:'8px 0',borderBottom:'1px solid var(--border)'}}>
-          <div style={{flex:1,display:'flex',flexDirection:'column',gap:3}}>
+        <div style={{display:'flex',gap:8,marginBottom:12,padding:'8px 0',borderBottom:'1px solid var(--border)',alignItems:'flex-end'}}>          <div style={{flex:1,display:'flex',flexDirection:'column',gap:3}}>
             <label style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)',textTransform:'uppercase',letterSpacing:'0.06em'}}>Weight</label>
             <input type="number" step="0.1"
               className="goal-name-input"
@@ -2905,6 +2905,13 @@ function HabitTracker({ onGoToPlanner, goals, setGoals, completions, setCompleti
               onClick={e=>e.stopPropagation()}
             />
           </div>
+          <button
+            onClick={onGoToMetrics}
+            title="View Metrics Charts"
+            style={{background:'none',border:'1px solid var(--border)',borderRadius:6,cursor:'pointer',
+                    padding:'4px 7px',fontSize:15,color:'var(--accent)',flexShrink:0,marginBottom:1}}>
+            📈
+          </button>
         </div>
 
         <div className="checklist-header" style={{marginBottom:8}}>
@@ -3049,6 +3056,7 @@ function HabitTracker({ onGoToPlanner, goals, setGoals, completions, setCompleti
           <HabitChecklist date={selectedDate} goals={goals} completions={completions}
             onToggle={toggleCompletion} onAdd={addGoal} onDelete={deleteGoal} onRename={updateGoal}
             onReorder={reorderGoals}
+            onGoToMetrics={onGoToMetrics}
             getMetric={getMetric} setMetric={setMetric}
             getQty={getQty} setGoalQty={setGoalQty}
             getNote={getNote} setGoalNote={setGoalNote}
@@ -3059,6 +3067,7 @@ function HabitTracker({ onGoToPlanner, goals, setGoals, completions, setCompleti
           <HabitChecklist date={selectedDate} goals={goals} completions={completions}
             onToggle={toggleCompletion} onAdd={addGoal} onDelete={deleteGoal} onRename={updateGoal}
             onReorder={reorderGoals}
+            onGoToMetrics={onGoToMetrics}
             getMetric={getMetric} setMetric={setMetric}
             getQty={getQty} setGoalQty={setGoalQty}
             getNote={getNote} setGoalNote={setGoalNote}
@@ -3069,6 +3078,7 @@ function HabitTracker({ onGoToPlanner, goals, setGoals, completions, setCompleti
           <HabitChecklist date={selectedDate} goals={goals} completions={completions}
             onToggle={toggleCompletion} onAdd={addGoal} onDelete={deleteGoal} onRename={updateGoal}
             onReorder={reorderGoals}
+            onGoToMetrics={onGoToMetrics}
             getMetric={getMetric} setMetric={setMetric}
             getQty={getQty} setGoalQty={setGoalQty}
             getNote={getNote} setGoalNote={setGoalNote}
@@ -3082,7 +3092,7 @@ function HabitTracker({ onGoToPlanner, goals, setGoals, completions, setCompleti
   );
 }
 
-function HabitChecklist({ date, goals, completions, onToggle, onAdd, onDelete, onRename, onReorder, getMetric, setMetric, getQty, setGoalQty, getNote, setGoalNote, countInView, calcStreak }) {
+function HabitChecklist({ date, goals, completions, onToggle, onAdd, onDelete, onRename, onReorder, onGoToMetrics, getMetric, setMetric, getQty, setGoalQty, getNote, setGoalNote, countInView, calcStreak }) {
   const dk = fmt(date);
   const [confirmId, setConfirmId] = useState(null);
   const [editingId, setEditingId] = useState(null);
@@ -3159,7 +3169,7 @@ function HabitChecklist({ date, goals, completions, onToggle, onAdd, onDelete, o
 
       {/* Weight + Cal/Pts — shown in mobile only (desktop sidebar already has these) */}
       {setMetric && (
-        <div className="mhc-metrics-row">
+        <div className="mhc-metrics-row" style={{alignItems:'flex-end'}}>
           <div className="mhc-metric-field">
             <label className="mhc-metric-label">Weight</label>
             <input type="number" step="0.1" inputMode="decimal"
@@ -3176,6 +3186,13 @@ function HabitChecklist({ date, goals, completions, onToggle, onAdd, onDelete, o
               onChange={e=>setMetric('cals', e.target.value)}
             />
           </div>
+          {onGoToMetrics && (
+            <button onClick={onGoToMetrics} title="View Metrics Charts"
+              style={{background:'none',border:'1px solid var(--border)',borderRadius:6,cursor:'pointer',
+                      padding:'5px 8px',fontSize:16,color:'var(--accent)',flexShrink:0,marginBottom:1}}>
+              📈
+            </button>
+          )}
         </div>
       )}
 
@@ -3962,10 +3979,274 @@ function ColorPickerPopover({ color, onChange }) {
   );
 }
 
+
+// ─────────────────────────────────────────────
+// METRICS VIEW
+// ─────────────────────────────────────────────
+function MetricsView({ metrics, weightTarget, setWeightTarget, calsTarget, setCalsTarget, onBack }) {
+
+  function dflt30() {
+    const end = new Date(); end.setHours(0,0,0,0);
+    const start = new Date(end); start.setDate(start.getDate() - 29);
+    return { start: fmt(start), end: fmt(end) };
+  }
+  const [dateRange, setDateRange] = useState(dflt30);
+  const weightChartRef = useRef(null);
+  const calsChartRef   = useRef(null);
+  const weightChartInst = useRef(null);
+  const calsChartInst   = useRef(null);
+
+  // Build an array of dateKeys in range
+  function getDatesInRange(startStr, endStr) {
+    const dates = [];
+    const cursor = new Date(startStr + 'T00:00:00');
+    const end    = new Date(endStr   + 'T00:00:00');
+    while (cursor <= end) { dates.push(fmt(new Date(cursor))); cursor.setDate(cursor.getDate()+1); }
+    return dates;
+  }
+
+  // Outlier filter: remove points > 3 IQR from median
+  function filterOutliers(vals) {
+    const nums = vals.filter(v => v !== null);
+    if (nums.length < 4) return vals;
+    const sorted = [...nums].sort((a,b)=>a-b);
+    const q1 = sorted[Math.floor(sorted.length*0.25)];
+    const q3 = sorted[Math.floor(sorted.length*0.75)];
+    const iqr = q3 - q1;
+    const lo = q1 - 3*iqr, hi = q3 + 3*iqr;
+    return vals.map(v => (v !== null && v >= lo && v <= hi) ? v : null);
+  }
+
+  // 3-day simple moving average
+  function sma3(vals) {
+    return vals.map((_, i) => {
+      const window = vals.slice(Math.max(0, i-2), i+1).filter(v => v !== null);
+      return window.length > 0 ? Math.round((window.reduce((a,b)=>a+b,0)/window.length)*10)/10 : null;
+    });
+  }
+
+  // Compute smart Y-axis bounds: pad 10% around actual data range, floor at 0 for cals
+  function yBounds(vals, floorZero) {
+    const nums = vals.filter(v => v !== null);
+    if (nums.length === 0) return floorZero ? {min:0, max:100} : {min:0, max:100};
+    const lo = Math.min(...nums), hi = Math.max(...nums);
+    const pad = Math.max((hi - lo) * 0.5, floorZero ? hi*0.15 : Math.abs(hi)*0.1, 5);
+    return {
+      min: floorZero ? Math.max(0, Math.floor(lo - pad)) : Math.floor(lo - pad),
+      max: Math.ceil(hi + pad)
+    };
+  }
+
+  function buildCharts() {
+    const dates = getDatesInRange(dateRange.start, dateRange.end);
+    const labels = dates.map(dk => {
+      const d = new Date(dk+'T00:00:00');
+      return `${MONTHS[d.getMonth()].slice(0,3)} ${d.getDate()}`;
+    });
+
+    const rawWeight = dates.map(dk => {
+      const v = parseFloat((metrics[dk]||{}).weight);
+      return isNaN(v) ? null : v;
+    });
+    const rawCals = dates.map(dk => {
+      const v = parseFloat((metrics[dk]||{}).cals);
+      return isNaN(v) ? null : v;
+    });
+    const weightVals = filterOutliers(rawWeight);
+    const calsVals   = filterOutliers(rawCals);
+    const smaVals    = sma3(weightVals);
+    const wTarget    = parseFloat(weightTarget);
+    const cTarget    = parseFloat(calsTarget);
+
+    const wBounds = yBounds(weightVals, false);
+    const cBounds = yBounds(calsVals, true);
+
+    const commonOpts = {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 300 },
+      plugins: {
+        legend: { position: 'bottom', labels: { font: { family: 'DM Sans', size: 11 }, boxWidth: 14 } },
+        tooltip: {
+          callbacks: {
+            label: ctx => ctx.dataset.label + ': ' + (ctx.parsed.y !== null ? ctx.parsed.y : '—')
+          }
+        }
+      },
+      elements: { point: { radius: 3, hoverRadius: 5 }, line: { tension: 0.35 } },
+      scales: {
+        x: {
+          ticks: { font: { family: 'DM Mono', size: 10 }, maxRotation: 45, autoSkip: true, maxTicksLimit: 14 },
+          grid: { color: 'rgba(0,0,0,0.06)' }
+        },
+        y: { ticks: { font: { family: 'DM Mono', size: 10 } }, grid: { color: 'rgba(0,0,0,0.06)' } }
+      }
+    };
+
+    // Weight chart
+    if (weightChartInst.current) weightChartInst.current.destroy();
+    const wCtx = weightChartRef.current?.getContext('2d');
+    if (wCtx) {
+      const wDatasets = [
+        {
+          label: 'Weight',
+          data: weightVals,
+          borderColor: '#2d5a3d',
+          backgroundColor: 'rgba(45,90,61,0.10)',
+          fill: true,
+          spanGaps: true,
+          borderWidth: 2,
+        },
+        {
+          label: '3-day avg',
+          data: smaVals,
+          borderColor: '#e0a800',
+          backgroundColor: 'transparent',
+          borderWidth: 2,
+          borderDash: [5,3],
+          pointRadius: 0,
+          spanGaps: true,
+        },
+      ];
+      if (!isNaN(wTarget)) {
+        wDatasets.push({
+          label: `Target (${wTarget})`,
+          data: dates.map(()=>wTarget),
+          borderColor: '#c0392b',
+          backgroundColor: 'transparent',
+          borderWidth: 1.5,
+          borderDash: [8,4],
+          pointRadius: 0,
+        });
+      }
+      weightChartInst.current = new Chart(wCtx, {
+        type: 'line',
+        data: { labels, datasets: wDatasets },
+        options: { ...commonOpts,
+          scales: { ...commonOpts.scales,
+            y: { ...commonOpts.scales.y, min: wBounds.min, max: wBounds.max }
+          }
+        }
+      });
+    }
+
+    // Cals chart
+    if (calsChartInst.current) calsChartInst.current.destroy();
+    const cCtx = calsChartRef.current?.getContext('2d');
+    if (cCtx) {
+      const cDatasets = [
+        {
+          label: 'Cal/Pts',
+          data: calsVals,
+          borderColor: '#2471a3',
+          backgroundColor: 'rgba(36,113,163,0.10)',
+          fill: true,
+          spanGaps: true,
+          borderWidth: 2,
+        },
+      ];
+      if (!isNaN(cTarget)) {
+        cDatasets.push({
+          label: `Target (${cTarget})`,
+          data: dates.map(()=>cTarget),
+          borderColor: '#7d3c98',
+          backgroundColor: 'transparent',
+          borderWidth: 1.5,
+          borderDash: [8,4],
+          pointRadius: 0,
+        });
+      }
+      calsChartInst.current = new Chart(cCtx, {
+        type: 'line',
+        data: { labels, datasets: cDatasets },
+        options: { ...commonOpts,
+          scales: { ...commonOpts.scales,
+            y: { ...commonOpts.scales.y, min: cBounds.min, max: cBounds.max }
+          }
+        }
+      });
+    }
+  }
+
+  useEffect(() => {
+    // Wait a tick for canvases to be in DOM
+    const t = setTimeout(buildCharts, 50);
+    return () => { clearTimeout(t); if(weightChartInst.current) weightChartInst.current.destroy(); if(calsChartInst.current) calsChartInst.current.destroy(); };
+  }, [metrics, dateRange, weightTarget, calsTarget]);
+
+  return (
+    <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden',background:'var(--cream)'}}>
+      {/* Header */}
+      <div style={{display:'flex',alignItems:'center',gap:10,padding:'12px 20px',background:'var(--paper)',borderBottom:'1px solid var(--border)',flexShrink:0}}>
+        <button onClick={onBack}
+          style={{background:'none',border:'none',color:'var(--accent)',cursor:'pointer',fontSize:13,fontFamily:"'DM Sans',sans-serif",padding:'0 4px',display:'flex',alignItems:'center',gap:4}}>
+          ‹ Habits
+        </button>
+        <span style={{fontFamily:"'DM Sans',sans-serif",fontSize:15,fontWeight:700,color:'var(--ink)',flex:1}}>Metrics</span>
+        {/* Date range */}
+        <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap',justifyContent:'flex-end'}}>
+          <input type="date" value={dateRange.start}
+            onChange={e=>setDateRange(r=>({...r,start:e.target.value}))}
+            style={{fontFamily:"'DM Mono',monospace",fontSize:11,border:'1px solid var(--border)',borderRadius:4,padding:'3px 6px',background:'white',color:'var(--ink)'}} />
+          <span style={{fontSize:11,color:'var(--ink-faint)'}}>–</span>
+          <input type="date" value={dateRange.end}
+            onChange={e=>setDateRange(r=>({...r,end:e.target.value}))}
+            style={{fontFamily:"'DM Mono',monospace",fontSize:11,border:'1px solid var(--border)',borderRadius:4,padding:'3px 6px',background:'white',color:'var(--ink)'}} />
+        </div>
+      </div>
+
+      {/* Charts scroll area */}
+      <div style={{flex:1,overflowY:'auto',padding:'16px 16px 32px',display:'flex',flexDirection:'column',gap:24}}>
+
+        {/* Weight Chart */}
+        <div style={{background:'var(--paper)',borderRadius:10,padding:'16px',border:'1px solid var(--border)',boxShadow:'0 1px 4px rgba(0,0,0,0.05)'}}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12,flexWrap:'wrap',gap:8}}>
+            <span style={{fontFamily:"'DM Sans',sans-serif",fontSize:13,fontWeight:700,color:'var(--ink)'}}>Weight</span>
+            <div style={{display:'flex',alignItems:'center',gap:6}}>
+              <span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:'var(--ink-faint)'}}>Target:</span>
+              <input type="number" step="0.1"
+                value={weightTarget}
+                onChange={e=>setWeightTarget(e.target.value)}
+                placeholder="—"
+                style={{width:64,fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:600,
+                        border:'1px solid var(--border)',borderRadius:5,padding:'3px 6px',
+                        background:'white',color:'#c0392b',textAlign:'center'}} />
+            </div>
+          </div>
+          <div style={{height:220,position:'relative'}}>
+            <canvas ref={weightChartRef} />
+          </div>
+        </div>
+
+        {/* Cal/Pts Chart */}
+        <div style={{background:'var(--paper)',borderRadius:10,padding:'16px',border:'1px solid var(--border)',boxShadow:'0 1px 4px rgba(0,0,0,0.05)'}}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12,flexWrap:'wrap',gap:8}}>
+            <span style={{fontFamily:"'DM Sans',sans-serif",fontSize:13,fontWeight:700,color:'var(--ink)'}}>Cal / Pts</span>
+            <div style={{display:'flex',alignItems:'center',gap:6}}>
+              <span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:'var(--ink-faint)'}}>Target:</span>
+              <input type="number" step="1"
+                value={calsTarget}
+                onChange={e=>setCalsTarget(e.target.value)}
+                placeholder="—"
+                style={{width:72,fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:600,
+                        border:'1px solid var(--border)',borderRadius:5,padding:'3px 6px',
+                        background:'white',color:'#7d3c98',textAlign:'center'}} />
+            </div>
+          </div>
+          <div style={{height:220,position:'relative'}}>
+            <canvas ref={calsChartRef} />
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
 // ─────────────────────────────────────────────
 // APP ROOT
 // ─────────────────────────────────────────────
-const ALL_STORAGE_KEYS = ['weekData','habitGoals','habitCompletions','habitMetrics','habitQty','habitNotes','monthlyGoals','navColor','calHeaderColor','pagesData','foldersData'];
+const ALL_STORAGE_KEYS = ['weekData','habitGoals','habitCompletions','habitMetrics','habitQty','habitNotes','monthlyGoals','navColor','calHeaderColor','pagesData','foldersData','weightTarget','calsTarget'];
 
 function App() {
   const [page, setPage] = useState('planner');
@@ -3984,6 +4265,8 @@ function App() {
   const [habitMetrics, setHabitMetrics] = useStorage('habitMetrics', {}); // {[dateKey]: {weight:'', cals:''}}
   const [habitQty, setHabitQty] = useStorage('habitQty', {}); // {[dateKey]: {[goalId]: qty}}
   const [habitNotes, setHabitNotes] = useStorage('habitNotes', {}); // {[dateKey]: {[goalId]: notes}}
+  const [weightTarget, setWeightTarget] = useStorage('weightTarget', '');
+  const [calsTarget, setCalsTarget] = useStorage('calsTarget', '');
   const [monthlyGoals, setMonthlyGoals] = useStorage('monthlyGoals', {});
 
   // Auth state
@@ -4016,6 +4299,8 @@ function App() {
       if (data.habitMetrics) setHabitMetrics(data.habitMetrics);
       if (data.habitQty) setHabitQty(data.habitQty);
       if (data.habitNotes) setHabitNotes(data.habitNotes);
+      if (data.weightTarget !== undefined) setWeightTarget(data.weightTarget);
+      if (data.calsTarget !== undefined) setCalsTarget(data.calsTarget);
       if (data.monthlyGoals) setMonthlyGoals(data.monthlyGoals);
       if (data.pagesData) setPagesData(data.pagesData);
       if (data.foldersData) setFoldersData(data.foldersData);
@@ -4213,7 +4498,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v1.9.4</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v2.0.0</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -4305,7 +4590,13 @@ function App() {
         metrics={habitMetrics} setMetrics={setHabitMetrics}
         qty={habitQty} setQty={setHabitQty}
         notes={habitNotes} setNotes={setHabitNotes}
-        onGoToPlanner={()=>setPage('planner')} />}
+        onGoToPlanner={()=>setPage('planner')}
+        onGoToMetrics={()=>setPage('metrics')} />}
+      {page==='metrics' && <MetricsView
+        metrics={habitMetrics}
+        weightTarget={weightTarget} setWeightTarget={setWeightTarget}
+        calsTarget={calsTarget} setCalsTarget={setCalsTarget}
+        onBack={()=>setPage('habit')} />}
       {page==='pages' && <PagesView pagesData={pagesData} setPagesData={setPagesData} foldersData={foldersData} setFoldersData={setFoldersData} weekData={weekData} setWeekData={setWeekData} selectedId={selectedPagesId} setSelectedId={setSelectedPagesId} />}
       </div>
 
