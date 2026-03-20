@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v2.1.8 -->
+<!-- LP Planner v2.1.9 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -1821,7 +1821,15 @@ function SortableChecklist({ items, onUpdate, onAdd, onDelete, onReorder, placeh
 
 function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToHabit, calHeaderColor, setCalHeaderColor }) {
   const today = new Date(); today.setHours(0,0,0,0);
-  const [weekStart, setWeekStart] = useState(getWeekStart(today));
+  const [weekStart, setWeekStartRaw] = useState(() => {
+    const saved = sessionStorage.getItem('lp_weekStart');
+    return saved ? new Date(saved) : getWeekStart(today);
+  });
+  const setWeekStart = (v) => setWeekStartRaw(prev => {
+    const next = typeof v === 'function' ? v(prev) : v;
+    sessionStorage.setItem('lp_weekStart', fmt(next));
+    return next;
+  });
   const weekKey = fmt(weekStart);
   const weekDataRef = useRef(weekData);
   useEffect(() => { weekDataRef.current = weekData; }, [weekData]);
@@ -1851,7 +1859,15 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
     }
   });
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [mobileDayIndex, setMobileDayIndex] = useState(today.getDay()); // 0=Sun
+  const [mobileDayIndex, setMobileDayIndexRaw] = useState(() => {
+    const saved = sessionStorage.getItem('lp_mobileDayIndex');
+    return saved !== null ? parseInt(saved, 10) : today.getDay();
+  }); // 0=Sun
+  const setMobileDayIndex = (v) => setMobileDayIndexRaw(prev => {
+    const next = typeof v === 'function' ? v(prev) : v;
+    sessionStorage.setItem('lp_mobileDayIndex', String(next));
+    return next;
+  });
   const [sheetOpen, setSheetOpen] = useState(false);
   const pendingTaskFocus = useRef(null); // {id, dayKey} — task to focus after render
   const taskTitleRefs = useRef({}); // id -> input ref (desktop)
@@ -2823,7 +2839,8 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onEnterKey, titleRef, 
 function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completions, setCompletions, metrics, setMetrics, qty, setQty, notes, setNotes }) {
   const today = new Date(); today.setHours(0,0,0,0);
   const [selectedDate, setSelectedDate] = useState(today);
-  const [view, setView] = useState('monthly'); // daily, weekly, monthly, yearly
+  const [view, setViewRaw] = useState(() => sessionStorage.getItem('lp_habitView') || 'monthly'); // daily, weekly, monthly, yearly
+  const setView = (v) => { sessionStorage.setItem('lp_habitView', v); setViewRaw(v); };
   const [filterGoal, setFilterGoal] = useState(null); // null = all
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [expandedGoals, setExpandedGoals] = useState({}); // {goalId: bool} for sidebar
@@ -4550,7 +4567,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v2.1.8</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v2.1.9</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -4698,7 +4715,7 @@ function App() {
 // ─────────────────────────────────────────────
 function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekData, setWeekData, selectedId, setSelectedId }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [mobileView, setMobileView] = useState('list');
+  const [mobileView, setMobileView] = useState(() => selectedId ? 'editor' : 'list');
   const bodyRef = useRef(null);
   const titleRef = useRef(null);
   const debounceRef = useRef(null);
