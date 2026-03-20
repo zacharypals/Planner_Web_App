@@ -4609,15 +4609,15 @@ function App() {
       {/* Pull-to-refresh indicator — Chrome-style circle */}
       {(pullDisplayY > 0 || pullRefreshing) && (
         <div className="pull-indicator" style={{
-          opacity: pullRefreshing ? 1 : Math.min(pullDisplayY / 120, 1),
+          opacity: pullRefreshing ? 1 : Math.min(pullDisplayY / 325, 1),
           top: pullRefreshing ? 56 : Math.min(48 + pullDisplayY * 0.4, 80),
         }}>
           <span style={{
             display:'inline-block',
-            transform: pullRefreshing ? undefined : `rotate(${Math.min(pullDisplayY / 120, 1) * 360}deg)`,
+            transform: pullRefreshing ? undefined : `rotate(${Math.min(pullDisplayY / 325, 1) * 360}deg)`,
             animation: pullRefreshing ? 'spin 0.8s linear infinite' : 'none',
             transition: pullRefreshing ? 'none' : 'transform 0.05s',
-            color: pullDisplayY >= 120 && !pullRefreshing ? 'var(--accent)' : 'var(--ink)',
+            color: pullDisplayY >= 325 && !pullRefreshing ? 'var(--accent)' : 'var(--ink)',
           }}>↻</span>
         </div>
       )}
