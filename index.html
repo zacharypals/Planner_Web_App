@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v2.1.9 -->
+<!-- LP Planner v2.2.0 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -1321,6 +1321,8 @@ function addDays(date, n) {
   return d;
 }
 function fmt(date) { return date.toISOString().slice(0,10); }
+function fmtLocal(d) { return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function parseLocal(s) { const [y,m,d]=(s||'').split('-').map(Number); return (y&&m&&d)?new Date(y,m-1,d):null; }
 function fmtDisplay(d) {
   return `${MONTHS[d.getMonth()].slice(0,3)} ${d.getDate()}`;
 }
@@ -1822,12 +1824,12 @@ function SortableChecklist({ items, onUpdate, onAdd, onDelete, onReorder, placeh
 function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToHabit, calHeaderColor, setCalHeaderColor }) {
   const today = new Date(); today.setHours(0,0,0,0);
   const [weekStart, setWeekStartRaw] = useState(() => {
-    const saved = sessionStorage.getItem('lp_weekStart');
-    return saved ? new Date(saved) : getWeekStart(today);
+    const saved = parseLocal(sessionStorage.getItem('lp_weekStart'));
+    return saved ? getWeekStart(saved) : getWeekStart(today);
   });
   const setWeekStart = (v) => setWeekStartRaw(prev => {
     const next = typeof v === 'function' ? v(prev) : v;
-    sessionStorage.setItem('lp_weekStart', fmt(next));
+    sessionStorage.setItem('lp_weekStart', fmtLocal(next));
     return next;
   });
   const weekKey = fmt(weekStart);
@@ -2838,7 +2840,15 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onEnterKey, titleRef, 
 // ─────────────────────────────────────────────
 function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completions, setCompletions, metrics, setMetrics, qty, setQty, notes, setNotes }) {
   const today = new Date(); today.setHours(0,0,0,0);
-  const [selectedDate, setSelectedDate] = useState(today);
+  const [selectedDate, setSelectedDateRaw] = useState(() => {
+    const saved = parseLocal(sessionStorage.getItem('lp_habitDate'));
+    return saved || today;
+  });
+  const setSelectedDate = (v) => setSelectedDateRaw(prev => {
+    const next = typeof v === 'function' ? v(prev) : v;
+    sessionStorage.setItem('lp_habitDate', fmtLocal(next));
+    return next;
+  });
   const [view, setViewRaw] = useState(() => sessionStorage.getItem('lp_habitView') || 'monthly'); // daily, weekly, monthly, yearly
   const setView = (v) => { sessionStorage.setItem('lp_habitView', v); setViewRaw(v); };
   const [filterGoal, setFilterGoal] = useState(null); // null = all
@@ -4527,7 +4537,7 @@ function App() {
   }
 
   async function handlePullRefresh() {
-    if (!authUser || !driveFileId || pullRefreshing) return;
+    if (pullRefreshing) return;
     setPullRefreshing(true);
     try {
       // Read the running version dynamically from the document comment
@@ -4542,14 +4552,16 @@ function App() {
         const deployedMatch = html.match(/LP Planner v([\d.]+)/);
         if (deployedMatch && deployedMatch[1] !== RUNNING_VERSION) {
           // New version detected — sync data then hard-reload
-          await loadAllFromDrive();
+          if (authUser && driveFileId) await loadAllFromDrive();
           window.location.reload(true);
           return;
         }
       } catch (e) {
         // Network issue checking version — continue with Drive sync only
       }
-      await loadAllFromDrive();
+      if (authUser && driveFileId) {
+        await loadAllFromDrive();
+      }
     } finally {
       setPullRefreshing(false);
     }
@@ -4567,7 +4579,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v2.1.9</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v2.2.0</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -4659,7 +4671,7 @@ function App() {
         }}
         onTouchEnd={()=>{
           if (!pullActive.current) { setPullDisplayY(0); return; }
-          if (pullDeltaY.current >= 325 && authUser && driveFileId && !pullRefreshing) {
+          if (pullDeltaY.current >= 325 && !pullRefreshing) {
             handlePullRefresh().finally(() => setPullDisplayY(0));
           } else {
             setPullDisplayY(0);
