@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v2.1.6 -->
+<!-- LP Planner v2.1.7 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -40,8 +40,16 @@
     --teal: #148f77; --teal-light: #e8f8f5;
     --pink: #c0392b;
   }
-  html, body { height: 100%; font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--ink); overflow-x: hidden; }
+  html, body { height: 100%; font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--ink); overflow-x: hidden; overscroll-behavior-y: contain; }
   @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  .pull-indicator {
+    position: fixed; top: 48px; left: 50%; transform: translateX(-50%);
+    z-index: 350; width: 36px; height: 36px; border-radius: 50%;
+    background: var(--paper); box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; transition: opacity 0.15s;
+    pointer-events: none;
+  }
   #root { height: 100%; }
 
   /* LAYOUT */
@@ -4291,13 +4299,15 @@ function MetricsView({ metrics, weightTarget, setWeightTarget, calsTarget, setCa
 const ALL_STORAGE_KEYS = ['weekData','habitGoals','habitCompletions','habitMetrics','habitQty','habitNotes','monthlyGoals','navColor','calHeaderColor','pagesData','foldersData','weightTarget','calsTarget'];
 
 function App() {
-  const [page, setPage] = useState('planner');
+  const [page, setPageRaw] = useState(() => sessionStorage.getItem('lp_page') || 'planner');
+  const setPage = (p) => { sessionStorage.setItem('lp_page', p); setPageRaw(p); };
   const [navColor, setNavColor] = useStorage('navColor', '#1e3d29');
   const [calHeaderColor, setCalHeaderColor] = useStorage('calHeaderColor', '#2d5a3d');
   const [weekData, setWeekData] = useStorage('weekData', {});
   const [pagesData, setPagesData] = useStorage('pagesData', []); // [{id,title,body,createdAt,lastModified,folderId,order,tasks:[]}]
   const [foldersData, setFoldersData] = useStorage('foldersData', []); // [{id,name,expanded,order}]
-  const [selectedPagesId, setSelectedPagesId] = useState(null);
+  const [selectedPagesId, setSelectedPagesIdRaw] = useState(() => sessionStorage.getItem('lp_selectedPagesId') || null);
+  const setSelectedPagesId = (id) => { if(id) sessionStorage.setItem('lp_selectedPagesId', id); else sessionStorage.removeItem('lp_selectedPagesId'); setSelectedPagesIdRaw(id); };
   const [habitGoals, setHabitGoals] = useStorage('habitGoals', [
     {id:'g1', name:'Daily Pages', color:'#2d5a3d'},
   ]);
@@ -4316,8 +4326,10 @@ function App() {
   const [authError, setAuthError] = useState(false); // true when session expired and silent refresh failed
   const [syncing, setSyncing] = useState(false);
   const [pullRefreshing, setPullRefreshing] = useState(false);
+  const [pullDisplayY, setPullDisplayY] = useState(0);
   const pullStartY = useRef(0);
   const pullDeltaY = useRef(0);
+  const pullActive = useRef(false);
   const saveTimerRef = useRef(null);
 
   // Load all data from Drive after sign-in
@@ -4538,7 +4550,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v2.1.6</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v2.1.7</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -4594,33 +4606,49 @@ function App() {
           )}
         </div>
       </div>
-      {/* Pull-to-refresh indicator — mobile only */}
-      {pullRefreshing && (
-        <div style={{
-          position:'fixed', top:48, left:0, right:0, zIndex:300,
-          display:'flex', alignItems:'center', justifyContent:'center',
-          padding:'8px', background:'var(--accent)', color:'white',
-          fontFamily:"'DM Sans',sans-serif", fontSize:12, gap:6,
+      {/* Pull-to-refresh indicator — Chrome-style circle */}
+      {(pullDisplayY > 0 || pullRefreshing) && (
+        <div className="pull-indicator" style={{
+          opacity: pullRefreshing ? 1 : Math.min(pullDisplayY / 120, 1),
+          top: pullRefreshing ? 56 : Math.min(48 + pullDisplayY * 0.4, 80),
         }}>
-          <span style={{display:'inline-block',animation:'spin 0.8s linear infinite'}}>↻</span>
-          Refreshing…
+          <span style={{
+            display:'inline-block',
+            transform: pullRefreshing ? undefined : `rotate(${Math.min(pullDisplayY / 120, 1) * 360}deg)`,
+            animation: pullRefreshing ? 'spin 0.8s linear infinite' : 'none',
+            transition: pullRefreshing ? 'none' : 'transform 0.05s',
+            color: pullDisplayY >= 120 && !pullRefreshing ? 'var(--accent)' : 'var(--ink)',
+          }}>↻</span>
         </div>
       )}
 
       <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden',position:'relative'}}
         onTouchStart={e=>{
-          pullStartY.current = e.touches[0].clientY;
-          pullDeltaY.current = 0;
+          // Only start tracking if near top of page
+          const scrollTop = document.scrollingElement?.scrollTop || document.documentElement.scrollTop || 0;
+          if (scrollTop <= 5 && !pullRefreshing) {
+            pullStartY.current = e.touches[0].clientY;
+            pullDeltaY.current = 0;
+            pullActive.current = true;
+          } else {
+            pullActive.current = false;
+          }
         }}
         onTouchMove={e=>{
-          pullDeltaY.current = e.touches[0].clientY - pullStartY.current;
+          if (!pullActive.current) return;
+          const delta = e.touches[0].clientY - pullStartY.current;
+          pullDeltaY.current = delta;
+          if (delta > 10) setPullDisplayY(delta);
         }}
         onTouchEnd={()=>{
-          // Only trigger if pulled down >80px and page is near the top
-          if (pullDeltaY.current > 80 && authUser && driveFileId && !pullRefreshing) {
-            handlePullRefresh();
+          if (!pullActive.current) { setPullDisplayY(0); return; }
+          if (pullDeltaY.current >= 120 && authUser && driveFileId && !pullRefreshing) {
+            handlePullRefresh().finally(() => setPullDisplayY(0));
+          } else {
+            setPullDisplayY(0);
           }
           pullDeltaY.current = 0;
+          pullActive.current = false;
         }}>
       {page==='planner' && <WeeklyPlanner weekData={weekData} setWeekData={setWeekData} pagesData={pagesData} setPagesData={setPagesData} onGoToHabit={()=>setPage('habit')} calHeaderColor={calHeaderColor} setCalHeaderColor={setCalHeaderColor} />}
       {page==='monthly' && <MonthlyCalendar weekData={weekData} setWeekData={setWeekData} monthlyGoals={monthlyGoals} setMonthlyGoals={setMonthlyGoals} />}
