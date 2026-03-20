@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v2.2.3 -->
+<!-- LP Planner v2.2.4 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -832,7 +832,7 @@
     .weekly-main-panel { display: none !important; }
     /* Bigger tap targets for task radio and accordion caret on mobile */
     .task-check { width: 16px; height: 16px; padding: 4px; box-sizing: content-box; margin: -4px; margin-right: 0; }
-    .task-check.done::after { font-size: 10px; }
+    .task-check.done::after { font-size: 12px; }
     .task-expand-btn { font-size: 14px; padding: 8px 10px; margin: -8px -10px -8px 0; }
 
     /* ── Mobile day view ── */
@@ -4583,7 +4583,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v2.2.3</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v2.2.4</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
