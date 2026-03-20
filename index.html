@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v2.2.0 -->
+<!-- LP Planner v2.2.1 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -4579,7 +4579,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v2.2.0</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v2.2.1</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -5531,7 +5531,7 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
         {selectedDoc && (
           <div style={{flex:1,display:'flex',flexDirection:'column',minHeight:0}}>
             <div className="pages-mobile-back">
-              <button onClick={()=>setMobileView('list')} style={{background:'none',border:'none',color:'var(--accent)',cursor:'pointer',padding:'10px 16px 0',fontFamily:"'DM Sans',sans-serif",fontSize:13,display:'flex',alignItems:'center',gap:4}}>
+              <button onClick={()=>{setSelectedId(null);setMobileView('list');}} style={{background:'none',border:'none',color:'var(--accent)',cursor:'pointer',padding:'10px 16px 0',fontFamily:"'DM Sans',sans-serif",fontSize:13,display:'flex',alignItems:'center',gap:4}}>
                 ‹ All Pages
               </button>
             </div>
