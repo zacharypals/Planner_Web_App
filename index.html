@@ -4300,8 +4300,6 @@ function App() {
   const [selectedPagesId, setSelectedPagesId] = useState(null);
   const [habitGoals, setHabitGoals] = useStorage('habitGoals', [
     {id:'g1', name:'Daily Pages', color:'#2d5a3d'},
-    {id:'g2', name:'Run', color:'#c0392b'},
-    {id:'g3', name:'Vocal Exercises', color:'#e0a800'},
   ]);
   const [habitCompletions, setHabitCompletions] = useStorage('habitCompletions', {});
   const [habitMetrics, setHabitMetrics] = useStorage('habitMetrics', {}); // {[dateKey]: {weight:'', cals:''}}
