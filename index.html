@@ -4642,7 +4642,7 @@ function App() {
         }}
         onTouchEnd={()=>{
           if (!pullActive.current) { setPullDisplayY(0); return; }
-          if (pullDeltaY.current >= 120 && authUser && driveFileId && !pullRefreshing) {
+          if (pullDeltaY.current >= 325 && authUser && driveFileId && !pullRefreshing) {
             handlePullRefresh().finally(() => setPullDisplayY(0));
           } else {
             setPullDisplayY(0);
