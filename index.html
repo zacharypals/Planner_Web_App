@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v2.7.0 -->
+<!-- LP Planner v2.7.1 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -2572,7 +2572,7 @@ function DayNote({ dayKey, note, onChange }) {
 // ─────────────────────────────────────────────
 function DailyHabitsSection({ dayKey, habitGoals, habitCompletions, setHabitCompletions, habitQty, setHabitQty, habitNotes, setHabitNotes }) {
   const dailyHabits = (habitGoals || []).filter(g => g.schedule === 'daily');
-  const [collapsed, setCollapsed] = React.useState(false);
+  const [collapsed, setCollapsed] = React.useState(true);
   const [expandedIds, setExpandedIds] = React.useState({});
 
   if (dailyHabits.length === 0) return null;
@@ -4803,7 +4803,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v2.7.0</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v2.7.1</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
