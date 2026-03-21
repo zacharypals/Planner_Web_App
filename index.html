@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v2.6.0 -->
+<!-- LP Planner v2.7.0 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -301,6 +301,47 @@
   }
   .day-note-textarea:focus { background: rgba(0,0,0,0.06); }
   .day-note-textarea::placeholder { color: var(--ink-faint); font-style: italic; }
+
+  /* ── DAILY HABITS IN PLANNER ── */
+  .habit-task-section {
+    border-bottom: 1px solid rgba(0,0,0,0.07);
+    margin-bottom: 5px;
+  }
+  .habit-task-label {
+    display: flex; align-items: center; gap: 4px;
+    font-size: 9px; font-family: 'DM Mono', monospace; letter-spacing: 0.06em;
+    text-transform: uppercase; color: var(--accent);
+    padding: 4px 6px; cursor: pointer; user-select: none;
+    background: var(--accent-light); border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+    font-weight: 600; transition: background 0.1s;
+  }
+  .habit-task-label:hover { background: #d0edda; }
+  .habit-task-row {
+    background: white;
+    border-bottom: 1px solid rgba(0,0,0,0.04);
+    transition: background 0.1s;
+  }
+  .habit-task-row:last-child { border-bottom: none; border-radius: 0 0 var(--radius-sm) var(--radius-sm); }
+  .habit-task-check {
+    width: 13px; height: 13px; border-radius: 50%; border: 1.5px solid;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; flex-shrink: 0; transition: all 0.12s;
+  }
+  .habit-task-check:active { transform: scale(0.9); }
+  /* ── SCHEDULE SELECTOR (habit checklist) ── */
+  .habit-schedule-selector {
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  .habit-schedule-btn {
+    font-size: 10px; font-family: 'DM Sans', sans-serif; font-weight: 500;
+    border: 1px solid var(--border); border-radius: 20px;
+    padding: 2px 8px; cursor: pointer; background: white; color: var(--ink-light);
+    transition: all 0.12s; white-space: nowrap;
+  }
+  .habit-schedule-btn.active {
+    background: var(--accent); border-color: var(--accent); color: white; font-weight: 600;
+  }
+  .habit-schedule-btn:hover:not(.active) { border-color: var(--accent); color: var(--accent); }
 
   /* TASK CARDS */
   .task-card {
@@ -1847,7 +1888,7 @@ function SortableChecklist({ items, onUpdate, onAdd, onDelete, onReorder, placeh
   );
 }
 
-function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToHabit, calHeaderColor, setCalHeaderColor }) {
+function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToHabit, calHeaderColor, setCalHeaderColor, habitGoals, habitCompletions, setHabitCompletions, habitQty, setHabitQty, habitNotes, setHabitNotes }) {
   const today = new Date(); today.setHours(0,0,0,0);
   const [weekStart, setWeekStartRaw] = useState(() => {
     const saved = parseLocal(sessionStorage.getItem('lp_weekStart'));
@@ -2296,6 +2337,9 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
                       }
                       setDragging(null); setDragOver(null);
                     }}>
+                    <DailyHabitsSection dayKey={dk}
+                      habitGoals={habitGoals} habitCompletions={habitCompletions} setHabitCompletions={setHabitCompletions}
+                      habitQty={habitQty} setHabitQty={setHabitQty} habitNotes={habitNotes} setHabitNotes={setHabitNotes} />
                     {tasks.map(task=>(
                       <TaskCard key={task.id} task={task}
                         onUpdate={p=>updateTask(dk,task.id,p)}
@@ -2378,6 +2422,9 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
           })}>›</button>
         </div>
         <div className="mobile-day-tasks" ref={mobileTasksContainerRef}>
+          <DailyHabitsSection dayKey={mobileDayKey}
+            habitGoals={habitGoals} habitCompletions={habitCompletions} setHabitCompletions={setHabitCompletions}
+            habitQty={habitQty} setHabitQty={setHabitQty} habitNotes={habitNotes} setHabitNotes={setHabitNotes} />
           {mobileDayTasks.map(task=>(
             <div key={task.id} data-task-id={task.id}
               style={{
@@ -2516,6 +2563,100 @@ function DayNote({ dayKey, note, onChange }) {
           onClick={e => e.stopPropagation()}
         />
       )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// DAILY HABITS SECTION (shown in WeeklyPlanner day columns)
+// ─────────────────────────────────────────────
+function DailyHabitsSection({ dayKey, habitGoals, habitCompletions, setHabitCompletions, habitQty, setHabitQty, habitNotes, setHabitNotes }) {
+  const dailyHabits = (habitGoals || []).filter(g => g.schedule === 'daily');
+  const [collapsed, setCollapsed] = React.useState(false);
+  const [expandedIds, setExpandedIds] = React.useState({});
+
+  if (dailyHabits.length === 0) return null;
+
+  function toggleHabit(goalId) {
+    setHabitCompletions(c => {
+      const arr = c[dayKey] || [];
+      const has = arr.includes(goalId);
+      return { ...c, [dayKey]: has ? arr.filter(x => x !== goalId) : [...arr, goalId] };
+    });
+  }
+  function getQty(goalId) { return (habitQty[dayKey] || {})[goalId] || ''; }
+  function setQtyVal(goalId, val) {
+    setHabitQty(q => ({ ...q, [dayKey]: { ...(q[dayKey] || {}), [goalId]: val } }));
+  }
+  function getNoteVal(goalId) { return (habitNotes[dayKey] || {})[goalId] || ''; }
+  function setNoteVal(goalId, val) {
+    setHabitNotes(n => ({ ...n, [dayKey]: { ...(n[dayKey] || {}), [goalId]: val } }));
+  }
+
+  const completedCount = dailyHabits.filter(g => (habitCompletions[dayKey] || []).includes(g.id)).length;
+
+  return (
+    <div className="habit-task-section">
+      <div className="habit-task-label" onClick={() => setCollapsed(c => !c)}>
+        <span style={{fontSize:8}}>{collapsed ? '▸' : '▾'}</span>
+        <span>Habits</span>
+        <span style={{marginLeft:'auto', fontSize:9, fontWeight:700, opacity:0.8}}>
+          {completedCount}/{dailyHabits.length}
+        </span>
+      </div>
+      {!collapsed && dailyHabits.map(g => {
+        const done = (habitCompletions[dayKey] || []).includes(g.id);
+        const isExpanded = !!expandedIds[g.id];
+        return (
+          <div key={g.id} className="habit-task-row" style={{borderLeft:`3px solid ${g.color}`}}>
+            <div style={{display:'flex', alignItems:'center', gap:5, padding:'4px 6px'}}>
+              <div className="habit-task-check"
+                style={{background: done ? g.color : 'transparent', borderColor: g.color}}
+                onClick={e => { e.stopPropagation(); toggleHabit(g.id); }}>
+                {done && <span style={{color:'white', fontSize:9, lineHeight:1}}>✓</span>}
+              </div>
+              <span style={{flex:1, fontSize:11.5, fontFamily:"'DM Sans',sans-serif", fontWeight:500,
+                color: done ? g.color : 'var(--ink)', textDecoration: done ? 'line-through' : 'none',
+                opacity: done ? 0.7 : 1}}>
+                {g.name}
+              </span>
+              <button
+                style={{background:'none',border:'none',cursor:'pointer',fontSize:9,color:'var(--ink-faint)',padding:'0 2px',flexShrink:0,lineHeight:1}}
+                onClick={e => { e.stopPropagation(); setExpandedIds(ex => ({...ex, [g.id]: !ex[g.id]})); }}>
+                {isExpanded ? '▲' : '▼'}
+              </button>
+            </div>
+            {isExpanded && (
+              <div style={{padding:'3px 10px 7px', display:'flex', flexDirection:'column', gap:5, borderTop:'1px solid var(--border)'}}
+                onClick={e => e.stopPropagation()}>
+                <div style={{display:'flex', alignItems:'center', gap:6}}>
+                  <span style={{fontSize:9, color:'var(--ink-faint)', fontFamily:"'DM Mono',monospace", flexShrink:0}}>Qty:</span>
+                  <input type="number" min="0" step="1" inputMode="numeric"
+                    value={getQty(g.id)}
+                    onChange={e => setQtyVal(g.id, e.target.value)}
+                    placeholder="—"
+                    style={{width:60, fontSize:11, fontFamily:"'DM Mono',monospace",
+                      border:'1px solid var(--border)', borderRadius:3, padding:'2px 4px',
+                      background:'white', color:'var(--ink)', outline:'none'}}
+                  />
+                </div>
+                <div style={{display:'flex', flexDirection:'column', gap:2}}>
+                  <span style={{fontSize:9, color:'var(--ink-faint)', fontFamily:"'DM Mono',monospace"}}>Notes:</span>
+                  <textarea rows={2}
+                    style={{width:'100%', fontSize:11, fontFamily:"'DM Sans',sans-serif",
+                      border:'1px solid var(--border)', borderRadius:3, padding:'3px 5px',
+                      resize:'vertical', outline:'none', background:'white', color:'var(--ink)',
+                      boxSizing:'border-box'}}
+                    placeholder="Notes for today…"
+                    value={getNoteVal(g.id)}
+                    onChange={e => setNoteVal(g.id, e.target.value)}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -3072,6 +3213,18 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
             {isExpanded && (
               <div style={{padding:'4px 8px 8px 8px',display:'flex',flexDirection:'column',gap:6,borderTop:'1px solid var(--border)'}}
                 onClick={e=>e.stopPropagation()}>
+                {/* Schedule */}
+                <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                  <span style={{fontSize:10,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace",flexShrink:0}}>Schedule:</span>
+                  <div className="habit-schedule-selector">
+                    {[['none','—'],['daily','Daily'],['xweek','x/Week'],['quota','Quota']].map(([val,label])=>(
+                      <button key={val} className={`habit-schedule-btn ${(goal.schedule||'none')===val?'active':''}`}
+                        onClick={e=>{e.stopPropagation();updateGoal(goal.id,{schedule:val==='none'?undefined:val});}}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 <div style={{display:'flex',alignItems:'center',gap:6}}>
                   <span style={{fontSize:10,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace",flexShrink:0}}>Qty:</span>
                   <input type="number" min="0" step="1"
@@ -3390,6 +3543,20 @@ function HabitChecklist({ date, goals, completions, onToggle, onAdd, onDelete, o
               {isExpanded && (
                 <div style={{padding:'4px 12px 10px',display:'flex',flexDirection:'column',gap:6,borderTop:'1px solid var(--border)'}}
                   onClick={e=>e.stopPropagation()}>
+                  {/* Schedule */}
+                  {onRename && (
+                    <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                      <span style={{fontSize:10,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace",flexShrink:0}}>Schedule:</span>
+                      <div className="habit-schedule-selector">
+                        {[['none','—'],['daily','Daily'],['xweek','x/Week'],['quota','Quota']].map(([val,label])=>(
+                          <button key={val} className={`habit-schedule-btn ${(g.schedule||'none')===val?'active':''}`}
+                            onClick={e=>{e.stopPropagation();onRename(g.id,{schedule:val==='none'?undefined:val});}}>
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   {getQty && (
                     <div style={{display:'flex',alignItems:'center',gap:8}}>
                       <span style={{fontSize:10,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace",flexShrink:0}}>Qty:</span>
@@ -4636,7 +4803,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v2.6.0</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v2.7.0</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -4736,7 +4903,7 @@ function App() {
           pullDeltaY.current = 0;
           pullActive.current = false;
         }}>
-      {page==='planner' && <WeeklyPlanner weekData={weekData} setWeekData={setWeekData} pagesData={pagesData} setPagesData={setPagesData} onGoToHabit={()=>setPage('habit')} calHeaderColor={calHeaderColor} setCalHeaderColor={setCalHeaderColor} />}
+      {page==='planner' && <WeeklyPlanner weekData={weekData} setWeekData={setWeekData} pagesData={pagesData} setPagesData={setPagesData} onGoToHabit={()=>setPage('habit')} calHeaderColor={calHeaderColor} setCalHeaderColor={setCalHeaderColor} habitGoals={habitGoals} habitCompletions={habitCompletions} setHabitCompletions={setHabitCompletions} habitQty={habitQty} setHabitQty={setHabitQty} habitNotes={habitNotes} setHabitNotes={setHabitNotes} />}
       {page==='monthly' && <MonthlyCalendar weekData={weekData} setWeekData={setWeekData} monthlyGoals={monthlyGoals} setMonthlyGoals={setMonthlyGoals} />}
       {page==='habit' && <HabitTracker
         goals={habitGoals} setGoals={setHabitGoals}
