@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v2.5.0 -->
+<!-- LP Planner v2.6.0 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -3700,6 +3700,8 @@ function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals 
   const [eventForm, setEventForm] = useState({title:'', time:'', date:'', details:''});
   const [dragInfo, setDragInfo] = useState(null); // {eventId, fromDayKey}
   const [dragOverDay, setDragOverDay] = useState(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   function handleDragStart(ev, eventId, fromDayKey) {
     setDragInfo({eventId, fromDayKey});
@@ -3903,56 +3905,69 @@ function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals 
 
   const monthEvents = getAllMonthEvents();
 
+  const sidebarContent = (
+    <>
+      {/* Month Nav */}
+      <div className="week-nav">
+        <button className="nav-arrow" onClick={()=>setViewDate(d=>new Date(d.getFullYear(), d.getMonth()-1, 1))}>‹</button>
+        <span className="week-nav-label">{MONTHS[month]} {year}</span>
+        <button className="nav-arrow" onClick={()=>setViewDate(d=>new Date(d.getFullYear(), d.getMonth()+1, 1))}>›</button>
+      </div>
+
+      <a className="sidebar-link daily" href="https://penzu.com">✍️ Daily Pages</a>
+
+      {/* Monthly Goals */}
+      <div className="sidebar-section">
+        <div className="checklist-header">
+          <div className="sidebar-section-title">Monthly Goals:</div>
+          <button className="add-btn" onClick={addMonthGoal}>+</button>
+        </div>
+        {getMonthGoals().map(g=>(
+          <div key={g.id} className={`checklist-item ${g.done?'checked':''}`}>
+            <div className={`check-box ${g.done?'checked':''}`} onClick={()=>updateMonthGoal(g.id,{done:!g.done})} />
+            <input className="checklist-input" placeholder="Goal…" value={g.name}
+              onChange={e=>updateMonthGoal(g.id,{name:e.target.value})} />
+            <button className="delete-item-btn" onClick={()=>deleteMonthGoal(g.id)}>✕</button>
+          </div>
+        ))}
+      </div>
+
+      {/* Events this month */}
+      <div className="sidebar-section" style={{flex:1}}>
+        <div className="sidebar-section-title">Events This Month</div>
+        {monthEvents.length === 0 && (
+          <div style={{fontSize:11,color:'var(--ink-faint)',fontStyle:'italic',marginTop:4}}>No events yet</div>
+        )}
+        {monthEvents.map(ev=>(
+          <div key={ev.id} className="month-event-item" onClick={()=>openEditEvent(ev)}>
+            <div className="month-event-date">
+              {MONTHS[ev.date.getMonth()].slice(0,3)} {ev.date.getDate()}
+              {ev.eventTime && <span className="month-event-time"> {ev.eventTime}</span>}
+            </div>
+            <div className="month-event-title">{ev.title||<em style={{opacity:0.5}}>Untitled</em>}</div>
+            <button className="delete-item-btn" style={{marginLeft:'auto',flexShrink:0,opacity:0.4,fontSize:13,color:'var(--red)'}}
+              onMouseEnter={e=>e.currentTarget.style.opacity=1} onMouseLeave={e=>e.currentTarget.style.opacity=0.4}
+              onClick={e=>{
+                e.stopPropagation();
+                if(window.confirm(`Delete "${ev.title||'Untitled'}"?`)) deleteEvent(ev);
+              }}>✕</button>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+
   return (
     <div className="main-content">
-      {/* SIDEBAR */}
-      <div className="sidebar" style={{overflowY:'auto'}}>
-        {/* Month Nav */}
-        <div className="week-nav">
-          <button className="nav-arrow" onClick={()=>setViewDate(d=>new Date(d.getFullYear(), d.getMonth()-1, 1))}>‹</button>
-          <span className="week-nav-label">{MONTHS[month]} {year}</span>
-          <button className="nav-arrow" onClick={()=>setViewDate(d=>new Date(d.getFullYear(), d.getMonth()+1, 1))}>›</button>
+      {/* DESKTOP SIDEBAR (collapsible) */}
+      <div className={`sidebar-wrap ${sidebarCollapsed ? 'collapsed' : ''}`}>
+        <div className="sidebar" style={{overflowY:'auto'}}>
+          {sidebarContent}
         </div>
-
-        <a className="sidebar-link daily" href="https://penzu.com">✍️ Daily Pages</a>
-
-        {/* Monthly Goals */}
-        <div className="sidebar-section">
-          <div className="checklist-header">
-            <div className="sidebar-section-title">Monthly Goals:</div>
-            <button className="add-btn" onClick={addMonthGoal}>+</button>
-          </div>
-          {getMonthGoals().map(g=>(
-            <div key={g.id} className={`checklist-item ${g.done?'checked':''}`}>
-              <div className={`check-box ${g.done?'checked':''}`} onClick={()=>updateMonthGoal(g.id,{done:!g.done})} />
-              <input className="checklist-input" placeholder="Goal…" value={g.name}
-                onChange={e=>updateMonthGoal(g.id,{name:e.target.value})} />
-              <button className="delete-item-btn" onClick={()=>deleteMonthGoal(g.id)}>✕</button>
-            </div>
-          ))}
-        </div>
-
-        {/* Events this month */}
-        <div className="sidebar-section" style={{flex:1}}>
-          <div className="sidebar-section-title">Events This Month</div>
-          {monthEvents.length === 0 && (
-            <div style={{fontSize:11,color:'var(--ink-faint)',fontStyle:'italic',marginTop:4}}>No events yet</div>
-          )}
-          {monthEvents.map(ev=>(
-            <div key={ev.id} className="month-event-item" onClick={()=>openEditEvent(ev)}>
-              <div className="month-event-date">
-                {MONTHS[ev.date.getMonth()].slice(0,3)} {ev.date.getDate()}
-                {ev.eventTime && <span className="month-event-time"> {ev.eventTime}</span>}
-              </div>
-              <div className="month-event-title">{ev.title||<em style={{opacity:0.5}}>Untitled</em>}</div>
-              <button className="delete-item-btn" style={{marginLeft:'auto',flexShrink:0,opacity:0.4,fontSize:13,color:'var(--red)'}}
-                onMouseEnter={e=>e.currentTarget.style.opacity=1} onMouseLeave={e=>e.currentTarget.style.opacity=0.4}
-                onClick={e=>{
-                  e.stopPropagation();
-                  if(window.confirm(`Delete "${ev.title||'Untitled'}"?`)) deleteEvent(ev);
-                }}>✕</button>
-            </div>
-          ))}
+        <div className="sidebar-toggle-strip" onClick={()=>setSidebarCollapsed(c=>!c)}
+          title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
+          <div className="sidebar-toggle-btn">{sidebarCollapsed ? '›' : '‹'}</div>
+          <span className="sidebar-collapsed-label">Monthly</span>
         </div>
       </div>
 
@@ -4003,6 +4018,22 @@ function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals 
           </div>
         </div>
       </div>
+
+      {/* MOBILE: Bottom sheet overlay */}
+      <div className={`mobile-sheet-overlay ${sheetOpen?'open':''}`} onClick={()=>setSheetOpen(false)} />
+      <div className={`mobile-sheet ${sheetOpen?'open':''}`}>
+        <div className="mobile-sheet-handle" />
+        <div className="mobile-sheet-header">
+          <span className="mobile-sheet-title">{MONTHS[month]} {year}</span>
+          <button className="mobile-sheet-close" onClick={()=>setSheetOpen(false)}>✕</button>
+        </div>
+        <div className="mobile-sheet-body">
+          {sidebarContent}
+        </div>
+      </div>
+
+      {/* MOBILE: FAB to open sheet */}
+      <button className="mobile-fab" onClick={()=>setSheetOpen(o=>!o)} title="Monthly goals & events">☰</button>
 
       {/* EVENT MODAL */}
       {showEventModal && (
@@ -4605,7 +4636,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v2.5.0</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v2.6.0</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
