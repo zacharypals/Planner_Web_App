@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v2.2.6 -->
+<!-- LP Planner v2.3.0 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -22,8 +22,8 @@
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
-    --cream: #f5f0e8;
-    --paper: #faf7f2;
+    --cream: #f7f4ef;
+    --paper: #fbf9f6;
     --ink: #1a1510;
     --ink-light: #6b6055;
     --ink-faint: #c8bfb0;
@@ -31,8 +31,13 @@
     --accent-light: #e8f0eb;
     --gold: #b8860b;
     --gold-light: #fdf6e3;
-    --border: #ddd5c8;
-    --shadow: rgba(26,21,16,0.08);
+    --border: #e5dfd6;
+    --shadow: rgba(26,21,16,0.05);
+    --shadow-md: rgba(26,21,16,0.10);
+    --shadow-lg: rgba(26,21,16,0.15);
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
     --red: #c0392b; --red-light: #fdecea;
     --blue: #2471a3; --blue-light: #eaf4fb;
     --purple: #7d3c98; --purple-light: #f5eef8;
@@ -55,16 +60,18 @@
   /* LAYOUT */
   .app { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
   .nav-bar {
-    background: #1e3d29; color: var(--paper);
+    background: linear-gradient(135deg, #1e3d29 0%, #264d35 100%);
+    color: var(--paper);
     display: flex; align-items: center; justify-content: space-between;
     padding: 0 24px; height: 48px; flex-shrink: 0;
-    border-bottom: 2px solid var(--gold);
+    border-bottom: none;
+    box-shadow: 0 1px 8px rgba(26,21,16,0.18), 0 0 0 1px rgba(184,134,11,0.15);
   }
   .nav-brand { font-family: 'Playfair Display', serif; font-size: 18px; letter-spacing: 0.03em; color: var(--cream); }
   /* AUTH BAR */
   .auth-area { display: flex; align-items: center; gap: 8px; min-width: 200px; justify-content: flex-end; }
   .auth-btn {
-    padding: 5px 12px; border-radius: 5px; border: 1.5px solid rgba(255,255,255,0.3);
+    padding: 5px 12px; border-radius: var(--radius-sm); border: 1.5px solid rgba(255,255,255,0.3);
     background: rgba(255,255,255,0.1); color: var(--cream); cursor: pointer;
     font-size: 12px; font-family: 'DM Sans', sans-serif; font-weight: 500;
     transition: all 0.15s; white-space: nowrap;
@@ -101,8 +108,8 @@
   .cal-header-cell:last-child { position: relative; }
   .hdr-color-popover {
     position: absolute; top: calc(100% + 6px); right: 0; left: auto; z-index: 100;
-    background: white; border-radius: 8px; padding: 10px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.18);
+    background: white; border-radius: var(--radius-md); padding: 12px;
+    box-shadow: 0 8px 28px var(--shadow-lg);
     min-width: 170px;
   }
   .hdr-color-presets {
@@ -126,13 +133,13 @@
   }
   .nav-tabs { display: flex; gap: 4px; }
   .nav-tab {
-    padding: 6px 18px; border-radius: 4px; border: none; cursor: pointer;
+    padding: 6px 18px; border-radius: var(--radius-sm); border: none; cursor: pointer;
     font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500;
     background: transparent; color: var(--ink-faint); letter-spacing: 0.05em; text-transform: uppercase;
     transition: all 0.15s;
   }
   .nav-tab:hover { color: var(--cream); }
-  .nav-tab.active { background: var(--gold); color: var(--ink); }
+  .nav-tab.active { background: rgba(184,134,11,0.2); color: var(--gold); }
   .main-content { flex: 1; display: flex; overflow: hidden; }
 
   /* SIDEBAR */
@@ -140,7 +147,7 @@
     width: 280px; flex-shrink: 0; background: var(--paper);
     border-right: 1px solid var(--border);
     display: flex; flex-direction: column; overflow-y: auto;
-    padding: 16px;
+    padding: 20px;
   }
   .sidebar::-webkit-scrollbar { width: 4px; }
   .sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
@@ -153,8 +160,8 @@
   }
   .week-nav-label { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--ink-light); font-weight: 500; }
   .nav-arrow {
-    background: none; border: 1px solid var(--border); border-radius: 4px;
-    width: 26px; height: 26px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    background: none; border: 1px solid var(--border); border-radius: var(--radius-sm);
+    width: 28px; height: 28px; cursor: pointer; display: flex; align-items: center; justify-content: center;
     color: var(--ink-light); transition: all 0.15s; font-size: 12px;
   }
   .nav-arrow:hover { background: var(--accent); color: white; border-color: var(--accent); }
@@ -166,8 +173,8 @@
     color: var(--ink); margin-bottom: 6px; letter-spacing: 0.02em;
   }
   .sidebar-textarea {
-    width: 100%; border: 1px solid var(--border); border-radius: 6px;
-    background: var(--cream); padding: 8px 10px; font-size: 12px;
+    width: 100%; border: 1px solid var(--border); border-radius: var(--radius-sm);
+    background: var(--cream); padding: 10px 12px; font-size: 12px;
     font-family: 'DM Sans', sans-serif; color: var(--ink); resize: vertical;
     min-height: 64px; line-height: 1.5; transition: border 0.15s;
   }
@@ -222,7 +229,7 @@
   .sidebar-links { margin-top: auto; padding-top: 12px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 6px; }
   .sidebar-link.daily { display: block; margin: 8px 12px 16px; }
   .sidebar-link {
-    display: block; padding: 8px 12px; border-radius: 6px; text-decoration: none;
+    display: block; padding: 8px 12px; border-radius: var(--radius-sm); text-decoration: none;
     font-size: 12.5px; font-weight: 600; font-family: 'Playfair Display', serif;
     letter-spacing: 0.03em; transition: all 0.15s; cursor: pointer; border: none;
     text-align: left;
@@ -263,14 +270,14 @@
   .cal-header-cell.today .day-date { color: var(--gold); }
   .cal-day {
     border-right: 1px solid var(--border);
-    border-top: 2px solid var(--border);
-    padding: 8px; position: relative; background: var(--paper);
+    border-top: 1px solid var(--border);
+    padding: 10px; position: relative; background: var(--paper);
     transition: background 0.1s; min-height: 200px;
   }
   .cal-day:hover { background: #f8f4ee; }
   .cal-day.today { background: var(--gold-light); }
   .add-task-btn {
-    width: 100%; border: 1.5px dashed var(--border); border-radius: 6px;
+    width: 100%; border: 1.5px dashed var(--border); border-radius: var(--radius-sm);
     background: transparent; color: var(--ink-faint); padding: 6px;
     cursor: pointer; font-size: 18px; transition: all 0.15s; display: block;
     margin-top: 6px;
@@ -286,7 +293,7 @@
   }
   .day-note-label:hover { color: var(--ink-light); }
   .day-note-textarea {
-    width: 100%; border: none; border-radius: 4px; background: rgba(0,0,0,0.03);
+    width: 100%; border: none; border-radius: 6px; background: rgba(0,0,0,0.03);
     padding: 5px 7px; font-size: 11.5px; font-family: 'DM Sans', sans-serif;
     color: var(--ink); resize: none; outline: none; line-height: 1.5;
     transition: background 0.15s; min-height: 48px;
@@ -296,11 +303,12 @@
 
   /* TASK CARDS */
   .task-card {
-    border-radius: 6px; margin-bottom: 6px;
-    box-shadow: 0 1px 3px var(--shadow); position: relative;
-    cursor: pointer; transition: box-shadow 0.15s;
+    border-radius: var(--radius-md); margin-bottom: 8px;
+    box-shadow: 0 1px 4px var(--shadow), 0 0 0 1px rgba(0,0,0,0.03);
+    position: relative;
+    cursor: pointer; transition: box-shadow 0.2s;
   }
-  .task-card:hover { box-shadow: 0 2px 8px var(--shadow); }
+  .task-card:hover { box-shadow: 0 4px 12px var(--shadow-md), 0 0 0 1px rgba(0,0,0,0.03); }
   .task-card-header {
     display: flex; align-items: center; gap: 6px; padding: 7px 8px;
     font-size: 12px; font-weight: 500;
@@ -325,7 +333,7 @@
   .task-delete-btn {
     position: absolute; bottom: 6px; right: 2px;
     background: #e74c3c; border: none; cursor: pointer;
-    color: white; border-radius: 4px;
+    color: white; border-radius: 6px;
     width: 20px; height: 20px; font-size: 12px; font-weight: 700; line-height: 1;
     display: flex; align-items: center; justify-content: center;
     z-index: 10;
@@ -341,13 +349,13 @@
   .task-delete-btn:hover { background: #c0392b; }
   .task-delete-btn.confirming {
     width: auto; padding: 0 8px; font-size: 11px; font-weight: 700;
-    background: #c0392b; white-space: nowrap; border-radius: 4px;
+    background: #c0392b; white-space: nowrap; border-radius: 6px;
     visibility: visible; opacity: 1; transition: none;
   }
   .task-delete-btn.confirming:hover { background: #96281b; }
   @media (hover: none) { .task-delete-btn { display: none !important; } }
   .task-mobile-delete-btn {
-    background: #e74c3c; border: none; border-radius: 4px; cursor: pointer;
+    background: #e74c3c; border: none; border-radius: 6px; cursor: pointer;
     color: white; font-size: 11px; font-weight: 700; padding: 2px 8px;
     flex-shrink: 0; white-space: nowrap; font-family: 'DM Sans', sans-serif;
   }
@@ -373,7 +381,7 @@
   .task-type-btn:hover { opacity: 1; transform: scale(1.15); }
   .task-type-btn.event { opacity: 1; }
   .task-time-input {
-    border: 1px solid var(--border); border-radius: 4px; font-size: 11px;
+    border: 1px solid var(--border); border-radius: 6px; font-size: 11px;
     font-family: 'DM Mono', monospace; color: var(--ink); padding: 2px 6px;
     background: var(--paper); cursor: pointer;
   }
@@ -428,13 +436,13 @@
   }
   .task-repeat-end-input {
     font-family: 'DM Mono', monospace; font-size: 11px; color: var(--ink-light);
-    border: 1px solid var(--border); border-radius: 4px; padding: 2px 6px;
+    border: 1px solid var(--border); border-radius: 6px; padding: 2px 6px;
     background: white; cursor: pointer;
   }
   .task-repeat-end-input:focus { outline: none; border-color: var(--accent); }
   .task-repeat-apply-btn {
     font-family: 'DM Sans', sans-serif; font-size: 11px; font-weight: 600;
-    color: white; background: var(--accent); border: none; border-radius: 4px;
+    color: white; background: var(--accent); border: none; border-radius: 6px;
     padding: 3px 10px; cursor: pointer; transition: opacity 0.15s;
   }
   .task-repeat-apply-btn:hover { opacity: 0.85; }
@@ -447,8 +455,8 @@
   /* CONTEXT MENU */
   .task-ctx-menu {
     position: fixed; z-index: 9999;
-    background: var(--paper); border: 1px solid var(--border); border-radius: 8px;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.15); overflow: hidden; min-width: 140px;
+    background: var(--paper); border: 1px solid var(--border); border-radius: var(--radius-md);
+    box-shadow: 0 8px 24px var(--shadow-lg); overflow: hidden; min-width: 140px;
   }
   .task-ctx-btn {
     display: block; width: 100%; padding: 9px 14px; border: none; background: none;
@@ -466,7 +474,7 @@
   /* WEEK REVIEW */
   .week-review {
     flex-shrink: 0; background: var(--cream);
-    border-top: 2px solid var(--border); padding: 16px 20px;
+    border-top: 1px solid var(--border); padding: 18px 24px;
     display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
   }
   .review-section {}
@@ -475,8 +483,8 @@
     color: var(--ink); margin-bottom: 6px;
   }
   .review-textarea {
-    width: 100%; border: 1px solid var(--border); border-radius: 6px;
-    background: var(--paper); padding: 10px 12px; font-size: 12.5px;
+    width: 100%; border: 1px solid var(--border); border-radius: var(--radius-sm);
+    background: var(--paper); padding: 12px 14px; font-size: 12.5px;
     font-family: 'DM Sans', sans-serif; color: var(--ink); resize: vertical;
     min-height: 72px; line-height: 1.5; transition: border 0.15s;
   }
@@ -485,7 +493,7 @@
   /* ===================== HABIT TRACKER ===================== */
   .habit-sidebar {}
   .habit-qty-input {
-    width: 36px; border: 1px solid var(--border); border-radius: 4px;
+    width: 36px; border: 1px solid var(--border); border-radius: 6px;
     padding: 2px 4px; font-size: 11px; font-family: 'DM Mono', monospace;
     color: var(--ink); background: white; text-align: center;
     flex-shrink: 0;
@@ -496,8 +504,8 @@
   .date-nav-label { font-family: 'Playfair Display', serif; font-size: 15px; font-weight: 600; }
 
   .goal-item {
-    display: flex; align-items: center; gap: 8px; padding: 6px 8px;
-    border-radius: 6px; margin-bottom: 4px; transition: background 0.1s;
+    display: flex; align-items: center; gap: 8px; padding: 7px 10px;
+    border-radius: var(--radius-sm); margin-bottom: 4px; transition: background 0.1s;
     cursor: pointer; border: 1.5px solid transparent;
   }
   .goal-item:hover { background: var(--cream); }
@@ -507,7 +515,7 @@
     width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0;
   }
   .goal-check {
-    width: 18px; height: 18px; border-radius: 4px; border: 1.5px solid var(--border);
+    width: 18px; height: 18px; border-radius: 5px; border: 1.5px solid var(--border);
     cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
     transition: all 0.2s; background: white;
   }
@@ -524,16 +532,16 @@
   }
 
   /* HABIT CALENDAR */
-  .habit-main { flex: 1; display: flex; flex-direction: column; overflow-y: auto; padding: 16px 20px; background: var(--paper); }
+  .habit-main { flex: 1; display: flex; flex-direction: column; overflow-y: auto; padding: 20px 24px; background: var(--paper); }
   .habit-header { display: flex; align-items: center; justify-between: space-between; margin-bottom: 16px; gap: 16px; }
   .view-tabs { display: flex; gap: 4px; }
   .view-tab {
     padding: 5px 14px; border-radius: 20px; border: 1px solid var(--border);
-    background: white; font-size: 12px; cursor: pointer; transition: all 0.15s;
+    background: white; font-size: 12px; cursor: pointer; transition: all 0.2s;
     font-family: 'DM Mono', monospace; letter-spacing: 0.05em;
   }
   .view-tab.active { background: var(--ink); color: white; border-color: var(--ink); }
-  .view-tab:hover:not(.active) { border-color: var(--ink); }
+  .view-tab:hover:not(.active) { border-color: var(--ink-light); background: var(--cream); }
 
   .habit-cal-title {
     font-family: 'Playfair Display', serif; font-size: 22px; font-weight: 700; color: var(--ink);
@@ -547,7 +555,7 @@
     color: var(--ink-faint); padding: 4px 0; font-weight: 500;
   }
   .month-day-cell {
-    border: 1px solid var(--border); border-radius: 6px; background: white;
+    border: 1px solid var(--border); border-radius: var(--radius-sm); background: white;
     min-height: 80px; padding: 4px; position: relative; overflow: hidden;
     display: flex; flex-direction: column;
   }
@@ -595,11 +603,11 @@
   .daily-goals-grid { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 24px; justify-content: center; }
   .daily-goal-card {
     display: flex; flex-direction: column; align-items: center; gap: 8px;
-    padding: 16px 20px; border-radius: 12px; border: 2px solid var(--border);
+    padding: 16px 20px; border-radius: var(--radius-md); border: 2px solid var(--border);
     background: white; cursor: pointer; transition: all 0.2s; min-width: 100px;
   }
-  .daily-goal-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px var(--shadow); }
-  .daily-goal-card.checked-today { box-shadow: 0 4px 12px var(--shadow); }
+  .daily-goal-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px var(--shadow-md); }
+  .daily-goal-card.checked-today { box-shadow: 0 4px 12px var(--shadow-md); }
   .daily-goal-icon { width: 32px; height: 32px; border-radius: 50%; }
   .daily-goal-name { font-size: 12px; font-weight: 500; text-align: center; }
   .daily-goal-check-big {
@@ -610,8 +618,8 @@
   /* COLOR PICKER */
   .color-picker-popup {
     position: absolute; background: white; border: 1px solid var(--border);
-    border-radius: 8px; padding: 8px; z-index: 100; display: flex; gap: 6px;
-    box-shadow: 0 4px 12px var(--shadow); flex-wrap: wrap; width: 130px;
+    border-radius: var(--radius-md); padding: 10px; z-index: 100; display: flex; gap: 6px;
+    box-shadow: 0 4px 16px var(--shadow-md); flex-wrap: wrap; width: 130px;
     left: 0; top: 100%; margin-top: 4px;
   }
   .color-swatch {
@@ -623,22 +631,23 @@
 
   /* MODAL */
   .modal-overlay {
-    position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 200;
+    position: fixed; inset: 0; background: rgba(0,0,0,0.3); z-index: 200;
     display: flex; align-items: center; justify-content: center;
+    backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
   }
   .modal {
-    background: var(--paper); border-radius: 12px; padding: 24px; width: 340px;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+    background: var(--paper); border-radius: var(--radius-lg); padding: 28px; width: 340px;
+    box-shadow: 0 12px 48px rgba(0,0,0,0.15);
   }
   .modal-title { font-family: 'Playfair Display', serif; font-size: 18px; margin-bottom: 16px; }
   .modal-input {
-    width: 100%; border: 1px solid var(--border); border-radius: 6px;
+    width: 100%; border: 1px solid var(--border); border-radius: var(--radius-sm);
     padding: 10px 12px; font-size: 14px; font-family: 'DM Sans', sans-serif;
     outline: none; margin-bottom: 12px; background: white;
   }
   .modal-input:focus { border-color: var(--accent); }
   .modal-btns { display: flex; gap: 8px; justify-content: flex-end; }
-  .btn { padding: 8px 18px; border-radius: 6px; border: none; cursor: pointer; font-size: 13px; font-family: 'DM Sans', sans-serif; font-weight: 500; transition: all 0.15s; }
+  .btn { padding: 8px 18px; border-radius: var(--radius-sm); border: none; cursor: pointer; font-size: 13px; font-family: 'DM Sans', sans-serif; font-weight: 500; transition: all 0.15s; }
   .btn-primary { background: var(--accent); color: white; }
   .btn-primary:hover { background: #1e3d29; }
   .btn-secondary { background: var(--cream); color: var(--ink-light); border: 1px solid var(--border); }
@@ -646,7 +655,7 @@
 
   .goal-filter-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
   .goal-filter-chip {
-    padding: 3px 10px; border-radius: 12px; border: 1.5px solid var(--border);
+    padding: 4px 12px; border-radius: 14px; border: 1.5px solid var(--border);
     font-size: 11px; cursor: pointer; transition: all 0.15s; background: white;
     display: flex; align-items: center; gap: 4px;
   }
@@ -668,7 +677,7 @@
   .cal-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 
   /* ===================== MONTHLY CALENDAR ===================== */
-  .monthly-cal-wrap { padding: 16px 20px; min-width: 560px; }
+  .monthly-cal-wrap { padding: 20px 24px; min-width: 560px; }
   .monthly-cal-header {
     display: grid; grid-template-columns: repeat(7, 1fr);
     margin-bottom: 4px;
@@ -700,7 +709,7 @@
   }
   .monthly-cell-events { display: flex; flex-direction: column; gap: 2px; }
   .monthly-event-chip {
-    font-size: 10.5px; padding: 2px 5px; border-radius: 3px; cursor: pointer;
+    font-size: 10.5px; padding: 2px 6px; border-radius: 5px; cursor: pointer;
     font-family: 'DM Sans', sans-serif; color: var(--ink);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     transition: filter 0.1s;
@@ -719,15 +728,15 @@
   .month-event-time { color: var(--gold); }
   .month-event-title { font-size: 12px; color: var(--ink); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   /* MODAL */
-  .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 1000; display: flex; align-items: center; justify-content: center; }
-  .modal-box { background: var(--paper); border-radius: 10px; padding: 24px; width: 360px; box-shadow: 0 8px 32px rgba(0,0,0,0.2); display: flex; flex-direction: column; }
+  .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.3); z-index: 1000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+  .modal-box { background: var(--paper); border-radius: var(--radius-lg); padding: 28px; width: 360px; box-shadow: 0 12px 48px rgba(0,0,0,0.15); display: flex; flex-direction: column; }
   .modal-title { font-family: 'Playfair Display', serif; font-size: 16px; font-weight: 600; color: var(--ink); margin-bottom: 14px; }
-  .modal-input { width: 100%; border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; font-size: 13px; font-family: 'DM Sans', sans-serif; color: var(--ink); background: var(--cream); box-sizing: border-box; }
+  .modal-input { width: 100%; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px 12px; font-size: 13px; font-family: 'DM Sans', sans-serif; color: var(--ink); background: var(--cream); box-sizing: border-box; }
   .modal-input:focus { outline: none; border-color: var(--accent); }
-  .modal-textarea { width: 100%; border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; font-size: 12px; font-family: 'DM Sans', sans-serif; color: var(--ink); background: var(--cream); resize: vertical; margin-top: 8px; min-height: 72px; box-sizing: border-box; }
+  .modal-textarea { width: 100%; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px 12px; font-size: 12px; font-family: 'DM Sans', sans-serif; color: var(--ink); background: var(--cream); resize: vertical; margin-top: 8px; min-height: 72px; box-sizing: border-box; }
   .modal-textarea:focus { outline: none; border-color: var(--accent); }
   .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
-  .modal-btn { padding: 7px 16px; border-radius: 6px; border: none; cursor: pointer; font-size: 13px; font-family: 'DM Sans', sans-serif; font-weight: 500; transition: all 0.15s; }
+  .modal-btn { padding: 7px 16px; border-radius: var(--radius-sm); border: none; cursor: pointer; font-size: 13px; font-family: 'DM Sans', sans-serif; font-weight: 500; transition: all 0.15s; }
   .modal-btn.primary { background: var(--accent); color: white; }
   .modal-btn.primary:hover { background: #1e3d29; }
   .modal-btn.secondary { background: var(--cream); color: var(--ink); border: 1px solid var(--border); }
@@ -747,7 +756,7 @@
     width: 280px; flex-shrink: 0;
     background: var(--paper);
     display: flex; flex-direction: column; overflow-y: auto; overflow-x: hidden;
-    padding: 16px;
+    padding: 20px;
   }
   /* Only the weekly planner sidebar gets the collapse treatment */
   .sidebar-wrap > .sidebar {
@@ -770,7 +779,7 @@
   .sidebar-toggle-strip:hover { background: var(--cream); }
   .sidebar-toggle-btn {
     display: flex; align-items: center; justify-content: center;
-    width: 20px; height: 20px; border-radius: 4px; border: 1.5px solid var(--border);
+    width: 20px; height: 20px; border-radius: 6px; border: 1.5px solid var(--border);
     background: var(--paper); color: var(--ink-light); font-size: 12px;
     transition: all 0.15s; pointer-events: none;
   }
@@ -852,7 +861,7 @@
     }
     .mobile-day-tasks { flex: 1; overflow-y: auto; padding: 10px 12px; }
     .mobile-add-btn {
-      margin: 8px 12px; padding: 10px; border-radius: 8px;
+      margin: 8px 12px; padding: 10px; border-radius: var(--radius-sm);
       border: 1.5px dashed var(--border); background: none;
       color: var(--ink-faint); font-size: 13px; cursor: pointer; width: calc(100% - 24px);
       font-family: 'DM Sans', sans-serif; transition: all 0.15s;
@@ -952,7 +961,7 @@
   .mhc-metric-input {
     width: 100%; text-align: center; font-family: 'DM Mono', monospace;
     font-size: 14px; font-weight: 600; color: var(--ink);
-    border: 1px solid var(--border); border-radius: 6px; padding: 4px 6px;
+    border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 4px 6px;
     background: white; outline: none; box-sizing: border-box;
   }
   .mhc-metric-input:focus { border-color: var(--accent); }
@@ -970,7 +979,7 @@
   .monthly-habit-checklist-items { display: flex; flex-direction: column; gap: 6px; }
   .monthly-habit-check-row {
     display: flex; align-items: center; gap: 10px;
-    padding: 8px 12px; border-radius: 6px; cursor: pointer;
+    padding: 8px 12px; border-radius: var(--radius-sm); cursor: pointer;
     background: var(--cream); transition: all 0.15s;
   }
   .monthly-habit-check-row:hover { opacity: 0.85; }
@@ -4583,7 +4592,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v2.2.6</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v2.3.0</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
