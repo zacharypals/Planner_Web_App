@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v2.2.5 -->
+<!-- LP Planner v2.2.6 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -4583,7 +4583,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v2.2.5</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v2.2.6</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -5273,7 +5273,7 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
         onDragOver={e => handleDragOverPages(e, 'doc', doc.id)}
         onDrop={e => handleDropPages(e, 'doc', doc.id)}
       >
-        <span style={{fontSize:11, marginRight:5, opacity:0.45, flexShrink:0}}>📄</span>
+        <span style={{fontSize:12, marginRight:5, opacity:0.85, flexShrink:0}}>📄</span>
         <div style={{flex:1, minWidth:0}}>
           <div className="pages-list-item-title">{doc.title || 'Untitled'}</div>
           <div className="pages-list-item-date">{fmtDocDate(doc.lastModified || doc.createdAt)}</div>
@@ -5452,7 +5452,7 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
               style={{paddingLeft:10}}
               onClick={() => { setSelectedId(doc.id); setMobileView('editor'); }}
             >
-              <span style={{fontSize:11, marginRight:5, opacity:0.45, flexShrink:0}}>📄</span>
+              <span style={{fontSize:12, marginRight:5, opacity:0.85, flexShrink:0}}>📄</span>
               <div style={{flex:1, minWidth:0}}>
                 <div className="pages-list-item-title">{doc.title || 'Untitled'}</div>
                 <div className="pages-list-item-date">{fmtDocDate(doc.lastModified || doc.createdAt)}</div>
@@ -5510,7 +5510,7 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
                   style={{paddingLeft:10}}
                   onClick={() => { setSelectedId(doc.id); setMobileView('editor'); }}
                 >
-                  <span style={{fontSize:11, marginRight:5, opacity:0.45, flexShrink:0}}>📄</span>
+                  <span style={{fontSize:12, marginRight:5, opacity:0.85, flexShrink:0}}>📄</span>
                   <div style={{flex:1, minWidth:0}}>
                     <div className="pages-list-item-title">{doc.title || 'Untitled'}</div>
                     <div className="pages-list-item-date">{fmtDocDate(doc.lastModified || doc.createdAt)}</div>
