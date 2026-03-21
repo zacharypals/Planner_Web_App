@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v2.7.1 -->
+<!-- LP Planner v2.7.2 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -3121,7 +3121,7 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
         <div className="date-nav">
           <button className="nav-arrow" onClick={()=>setSelectedDate(d=>addDays(d,-1))}>‹</button>
           <span className="date-nav-label">
-            {MONTHS[selectedDate.getMonth()].slice(0,3)} {selectedDate.getDate()}, {selectedDate.getFullYear()}
+            {DAYS[selectedDate.getDay()].slice(0,3)}, {MONTHS[selectedDate.getMonth()].slice(0,3)} {selectedDate.getDate()}, {selectedDate.getFullYear()}
           </span>
           <button className="nav-arrow" onClick={()=>setSelectedDate(d=>addDays(d,1))}>›</button>
         </div>
@@ -3597,7 +3597,7 @@ function HabitNavArrows({view, date, onChange}) {
         const ws=getWeekStart(date);
         return `${fmtDisplay(ws)} – ${fmtDisplay(addDays(ws,6))}`;
       })()
-    : `${MONTHS[date.getMonth()].slice(0,3)} ${date.getDate()}, ${date.getFullYear()}`;
+    : `${DAYS[date.getDay()].slice(0,3)}, ${MONTHS[date.getMonth()].slice(0,3)} ${date.getDate()}, ${date.getFullYear()}`;
 
   function prev() {
     if(view==='daily') onChange(d=>addDays(d,-1));
@@ -4674,7 +4674,7 @@ function App() {
   useEffect(() => {
     if (!driveFileId) return;
     scheduleSave(driveFileId);
-  }, [weekData, navColor, calHeaderColor, habitGoals, habitCompletions, monthlyGoals, pagesData, foldersData, driveFileId]);
+  }, [weekData, navColor, calHeaderColor, habitGoals, habitCompletions, habitMetrics, habitQty, habitNotes, monthlyGoals, pagesData, foldersData, driveFileId]);
 
   // On mount: restore session from localStorage token or silent Worker refresh
   useEffect(() => {
@@ -4803,7 +4803,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v2.7.1</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v2.7.2</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
