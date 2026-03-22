@@ -2556,6 +2556,16 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
         </>
       )}
 
+      {/* PEOPLE PICKER MODAL */}
+      {showPeoplePicker && (
+        <PeoplePicker
+          directory={peopleDirectory||[]}
+          existingPersonIds={new Set((wd.people||[]).map(p=>p.personId).filter(Boolean))}
+          onAdd={handleAddPeople}
+          onClose={()=>setShowPeoplePicker(false)}
+        />
+      )}
+
     </div>
   );
 }
@@ -2806,16 +2816,6 @@ function PeoplePicker({ directory, existingPersonIds, onAdd, onClose }) {
           </button>
         </div>
       </div>
-      {/* PEOPLE PICKER MODAL */}
-      {showPeoplePicker && (
-        <PeoplePicker
-          directory={peopleDirectory||[]}
-          existingPersonIds={new Set((wd.people||[]).map(p=>p.personId).filter(Boolean))}
-          onAdd={handleAddPeople}
-          onClose={()=>setShowPeoplePicker(false)}
-        />
-      )}
-
     </div>
   );
 }
