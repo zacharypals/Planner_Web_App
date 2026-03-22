@@ -2818,6 +2818,7 @@ function PeoplePicker({ directory, existingPersonIds, onAdd, onClose }) {
     </div>
   );
 }
+function DayNote({ dayKey, note, onChange }) {
   const [expanded, setExpanded] = useState(!!note);
   const taRef = useRef();
 
