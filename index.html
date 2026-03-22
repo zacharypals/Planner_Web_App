@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v2.7.7 -->
+<!-- LP Planner v2.8.0 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -343,6 +343,20 @@
     background: var(--accent); border-color: var(--accent); color: white; font-weight: 600;
   }
   .habit-schedule-btn:hover:not(.active) { border-color: var(--accent); color: var(--accent); }
+
+  /* ── PEOPLE PICKER MODAL ── */
+  .people-picker-overlay {
+    position: fixed; inset: 0; z-index: 500;
+    display: flex; align-items: flex-start; justify-content: center;
+    padding-top: 80px; background: rgba(0,0,0,0.25);
+    backdrop-filter: blur(2px);
+  }
+  .people-picker-modal {
+    background: var(--paper); border-radius: var(--radius-lg);
+    box-shadow: 0 8px 32px var(--shadow-lg);
+    width: 300px; max-height: 440px; display: flex; flex-direction: column;
+    overflow: hidden;
+  }
 
   /* TASK CARDS */
   .task-card {
@@ -1889,7 +1903,7 @@ function SortableChecklist({ items, onUpdate, onAdd, onDelete, onReorder, placeh
   );
 }
 
-function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToHabit, calHeaderColor, setCalHeaderColor, habitGoals, habitCompletions, setHabitCompletions, habitQty, setHabitQty, habitNotes, setHabitNotes }) {
+function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToHabit, calHeaderColor, setCalHeaderColor, habitGoals, habitCompletions, setHabitCompletions, habitQty, setHabitQty, habitNotes, setHabitNotes, peopleDirectory, setPeopleDirectory }) {
   const today = new Date(); today.setHours(0,0,0,0);
   const [weekStart, setWeekStartRaw] = useState(() => {
     const saved = parseLocal(sessionStorage.getItem('lp_weekStart'));
@@ -1939,7 +1953,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
     return next;
   });
   const [sheetOpen, setSheetOpen] = useState(false);
-  const pendingTaskFocus = useRef(null); // {id, dayKey} — task to focus after render
+  const [showPeoplePicker, setShowPeoplePicker] = useState(false); // {id, dayKey} — task to focus after render
   const taskTitleRefs = useRef({}); // id -> input ref (desktop)
   const taskTitleRefsMobile = useRef({}); // id -> input ref (mobile)
   const [taskClipboard, setTaskClipboard] = useState(null); // copied task object
@@ -2097,17 +2111,20 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
   const weekDays = Array.from({length:7}, (_,i)=>addDays(weekStart,i));
   const weekLabel = `${fmtDisplay(weekDays[0])} – ${fmtDisplay(weekDays[6])}`;
 
-  // People checklist
-  function addPerson(afterId, newId) {
-    const newItem = {id: newId || Date.now().toString(), name:'', done:false};
-    setWD(w=>{
-      const list = w.people||[];
-      if (!afterId) return {...w, people:[...list, newItem]};
-      const idx = list.findIndex(p=>p.id===afterId);
-      const next = [...list];
-      next.splice(idx+1, 0, newItem);
-      return {...w, people:next};
-    });
+  // People to Connect With — new directory-backed model
+  // Each week entry: { id, personId?, name?(legacy), days:[], note:'' }
+  function handleAddPeople(selectedIds, newNames) {
+    const now = Date.now();
+    // Create new directory entries for new names
+    const newDirEntries = newNames.map((name,i) => ({id:'p'+(now+i), name}));
+    if (newDirEntries.length) setPeopleDirectory(d => [...(d||[]), ...newDirEntries]);
+    // Build week entries for both selected existing + new
+    const allEntries = [
+      ...selectedIds.map((personId,i) => ({id:(now+1000+i).toString(), personId, days:[], note:''})),
+      ...newDirEntries.map((dir,i) => ({id:(now+2000+i).toString(), personId:dir.id, days:[], note:''})),
+    ];
+    setWD(w => ({...w, people:[...(w.people||[]), ...allEntries]}));
+    setShowPeoplePicker(false);
   }
   function updatePerson(id,patch) { setWD(w=>({...w, people:(w.people||[]).map(p=>p.id===id?{...p,...patch}:p)})); }
   function deletePerson(id) { setWD(w=>({...w, people:(w.people||[]).filter(p=>p.id!==id)})); }
@@ -2280,16 +2297,21 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
       <div className="sidebar-section">
         <div className="checklist-header">
           <div className="sidebar-section-title">People to Connect With</div>
-          <button className="add-btn" onClick={()=>addPerson(null)}>+</button>
+          <button className="add-btn" onClick={()=>setShowPeoplePicker(true)} title="Add person">+</button>
         </div>
-        <SortableChecklist
+        <PeopleChecklist
           items={wd.people||[]}
+          weekDays={weekDays}
           onUpdate={updatePerson}
-          onAdd={addPerson}
           onDelete={deletePerson}
           onReorder={reorderPeople}
-          placeholder="Name…"
+          directory={peopleDirectory||[]}
         />
+        {(wd.people||[]).length === 0 && (
+          <div style={{fontSize:11,color:'var(--ink-faint)',fontStyle:'italic',padding:'2px 4px'}}>
+            Press + to add people
+          </div>
+        )}
       </div>
       <div className="sidebar-section">
         <div className="sidebar-section-title">Be-Word of the Week</div>
@@ -2537,7 +2559,265 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
   );
 }
 
-function DayNote({ dayKey, note, onChange }) {
+// ─────────────────────────────────────────────
+// PEOPLE CHECKLIST — replaces SortableChecklist for "People to Connect With"
+// Each entry: { id, personId, name(fallback), days:[], note }
+// ─────────────────────────────────────────────
+function PeopleChecklist({ items, weekDays, onUpdate, onDelete, onReorder, directory }) {
+  const [dragId, setDragId] = useState(null);
+  const [dragOverId, setDragOverId] = useState(null);
+  const [expandedIds, setExpandedIds] = useState({});
+  const [confirmId, setConfirmId] = useState(null);
+
+  function getPersonName(item) {
+    if (item.personId && directory) {
+      const dir = directory.find(p => p.id === item.personId);
+      if (dir) return dir.name;
+    }
+    return item.name || '';
+  }
+
+  function isDone(item) {
+    return Array.isArray(item.days) ? item.days.length > 0 : !!item.done;
+  }
+
+  function getDays(item) {
+    return Array.isArray(item.days) ? item.days : [];
+  }
+
+  function handleCheckToggle(item) {
+    // Checked → clear all days. Unchecked → add today's day index.
+    if (isDone(item)) {
+      onUpdate(item.id, { days: [], done: false });
+    } else {
+      const todayIdx = new Date().getDay();
+      onUpdate(item.id, { days: [todayIdx], done: true });
+    }
+  }
+
+  function toggleDay(item, dayIdx) {
+    const days = getDays(item);
+    const next = days.includes(dayIdx)
+      ? days.filter(d => d !== dayIdx)
+      : [...days, dayIdx].sort((a,b) => a-b);
+    onUpdate(item.id, { days: next, done: next.length > 0 });
+  }
+
+  function handleDelete(e, id) {
+    e.stopPropagation();
+    if (confirmId === id) { onDelete(id); setConfirmId(null); }
+    else setConfirmId(id);
+  }
+
+  if (!items || items.length === 0) return null;
+
+  return (
+    <div>
+      {items.map(item => {
+        const done = isDone(item);
+        const days = getDays(item);
+        const isExpanded = !!expandedIds[item.id];
+        const confirming = confirmId === item.id;
+        const name = getPersonName(item);
+        return (
+          <div key={item.id}
+            className={`checklist-item ${done?'checked':''} ${dragOverId===item.id?'drag-over':''} ${dragId===item.id?'dragging':''}`}
+            style={{flexDirection:'column', alignItems:'stretch', padding:0, gap:0, marginBottom:2}}
+            draggable
+            onDragStart={e=>{ setDragId(item.id); e.dataTransfer.effectAllowed='move'; }}
+            onDragOver={e=>{ e.preventDefault(); if(item.id!==dragId) setDragOverId(item.id); }}
+            onDrop={e=>{ e.preventDefault(); if(dragId&&dragId!==item.id) onReorder(dragId,item.id); setDragId(null); setDragOverId(null); }}
+            onDragEnd={()=>{ setDragId(null); setDragOverId(null); }}
+            onMouseLeave={()=>setConfirmId(null)}>
+            {/* Main row */}
+            <div style={{display:'flex', alignItems:'center', gap:6, padding:'5px 6px'}}>
+              <span className="checklist-drag-handle" style={{opacity:0.4, marginTop:0}}>⣿</span>
+              <div className={`check-box ${done?'checked':''}`}
+                onClick={()=>handleCheckToggle(item)} />
+              <span style={{
+                flex:1, fontSize:12.5, fontFamily:"'DM Sans',sans-serif",
+                color: done ? 'var(--ink-faint)' : 'var(--ink)',
+                textDecoration: done ? 'line-through' : 'none',
+                minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
+              }}>
+                {name || <span style={{color:'var(--ink-faint)',fontStyle:'italic'}}>Unnamed</span>}
+              </span>
+              {days.length > 0 && (
+                <span title="Days connected this week"
+                  style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:'var(--accent)',flexShrink:0,fontWeight:700}}>
+                  {days.length}×
+                </span>
+              )}
+              <button
+                style={{background:'none',border:'none',cursor:'pointer',fontSize:10,color:'var(--ink-faint)',padding:'0 2px',flexShrink:0,lineHeight:1}}
+                onClick={e=>{e.stopPropagation();setExpandedIds(ex=>({...ex,[item.id]:!ex[item.id]}));}}>
+                {isExpanded ? '▲' : '▼'}
+              </button>
+              <button className="delete-item-btn"
+                style={{opacity:confirming?1:undefined,color:confirming?'var(--red)':undefined,fontSize:confirming?11:14}}
+                onClick={e=>handleDelete(e,item.id)}>
+                {confirming ? 'Delete?' : '✕'}
+              </button>
+            </div>
+            {/* Expanded: day-dots + note */}
+            {isExpanded && (
+              <div style={{padding:'5px 10px 9px', borderTop:'1px solid var(--border)'}}
+                onClick={e=>e.stopPropagation()}>
+                <div style={{fontSize:9,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace",marginBottom:5,textTransform:'uppercase',letterSpacing:'0.05em'}}>Days connected:</div>
+                <div style={{display:'flex',gap:3,marginBottom:8}}>
+                  {['S','M','T','W','T','F','S'].map((d,i) => {
+                    const active = days.includes(i);
+                    return (
+                      <button key={i}
+                        className={`task-repeat-day-btn ${active?'active':''}`}
+                        style={{width:22,height:22,fontSize:9}}
+                        onClick={()=>toggleDay(item, i)}>
+                        {d}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div style={{fontSize:9,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace",marginBottom:3,textTransform:'uppercase',letterSpacing:'0.05em'}}>Note:</div>
+                <textarea rows={2}
+                  style={{width:'100%',fontSize:12,fontFamily:"'DM Sans',sans-serif",
+                    border:'1px solid var(--border)',borderRadius:4,padding:'4px 6px',
+                    resize:'vertical',outline:'none',background:'white',color:'var(--ink)',boxSizing:'border-box'}}
+                  placeholder="How did you connect?"
+                  value={item.note||''}
+                  onChange={e=>onUpdate(item.id,{note:e.target.value})}
+                />
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// PEOPLE PICKER — modal for adding people to the week
+// ─────────────────────────────────────────────
+function PeoplePicker({ directory, existingPersonIds, onAdd, onClose }) {
+  const [search, setSearch] = useState('');
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [newName, setNewName] = useState('');
+  const searchRef = useRef();
+
+  useEffect(() => { setTimeout(() => searchRef.current?.focus(), 50); }, []);
+
+  const available = (directory || []).filter(p =>
+    !existingPersonIds.has(p.id) &&
+    p.name.toLowerCase().includes(search.toLowerCase())
+  );
+
+  function toggleSelect(id) {
+    setSelectedIds(s => {
+      const next = new Set(s);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function handleAdd() {
+    const newNames = newName.trim()
+      ? newName.split(',').map(n => n.trim()).filter(Boolean)
+      : [];
+    if (selectedIds.size === 0 && newNames.length === 0) return;
+    onAdd(Array.from(selectedIds), newNames);
+  }
+
+  const hasSelection = selectedIds.size > 0 || newName.trim().length > 0;
+
+  return (
+    <div className="people-picker-overlay" onClick={onClose}>
+      <div className="people-picker-modal" onClick={e=>e.stopPropagation()}>
+        {/* Header */}
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',
+          padding:'14px 16px 10px',borderBottom:'1px solid var(--border)',flexShrink:0}}>
+          <span style={{fontFamily:"'DM Sans',sans-serif",fontWeight:700,fontSize:14,color:'var(--ink)'}}>Add People</span>
+          <button onClick={onClose}
+            style={{background:'none',border:'none',cursor:'pointer',fontSize:16,color:'var(--ink-faint)',lineHeight:1,padding:'0 2px'}}>✕</button>
+        </div>
+        {/* Search existing */}
+        <div style={{padding:'8px 12px 4px',flexShrink:0}}>
+          <input ref={searchRef}
+            value={search} onChange={e=>setSearch(e.target.value)}
+            placeholder="Search previous people…"
+            style={{width:'100%',fontSize:12,fontFamily:"'DM Sans',sans-serif",
+              border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',
+              padding:'5px 9px',outline:'none',background:'white',color:'var(--ink)',boxSizing:'border-box'}}
+          />
+        </div>
+        {/* Directory list */}
+        <div style={{flex:1,overflowY:'auto',padding:'4px 8px'}}>
+          {directory.length > 0 && available.length === 0 && (
+            <div style={{fontSize:12,color:'var(--ink-faint)',fontStyle:'italic',padding:'8px 4px'}}>No matches</div>
+          )}
+          {directory.length === 0 && (
+            <div style={{fontSize:12,color:'var(--ink-faint)',fontStyle:'italic',padding:'8px 4px'}}>No previous people yet — add new below</div>
+          )}
+          {available.map(p => (
+            <div key={p.id}
+              style={{display:'flex',alignItems:'center',gap:8,padding:'6px 6px',borderRadius:6,cursor:'pointer',transition:'background 0.1s'}}
+              onClick={()=>toggleSelect(p.id)}
+              onMouseEnter={e=>e.currentTarget.style.background='var(--cream)'}
+              onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+              <div style={{
+                width:15,height:15,border:'1.5px solid',flexShrink:0,borderRadius:3,
+                borderColor: selectedIds.has(p.id) ? 'var(--accent)' : 'var(--border)',
+                background: selectedIds.has(p.id) ? 'var(--accent)' : 'white',
+                display:'flex',alignItems:'center',justifyContent:'center',transition:'all 0.12s',
+              }}>
+                {selectedIds.has(p.id) && <span style={{color:'white',fontSize:9,lineHeight:1}}>✓</span>}
+              </div>
+              <span style={{fontSize:13,fontFamily:"'DM Sans',sans-serif",color:'var(--ink)'}}>{p.name}</span>
+            </div>
+          ))}
+        </div>
+        {/* New person input */}
+        <div style={{padding:'8px 12px 6px',borderTop:'1px solid var(--border)',flexShrink:0}}>
+          <div style={{fontSize:9,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace",marginBottom:4,textTransform:'uppercase',letterSpacing:'0.05em'}}>+ New person:</div>
+          <input value={newName} onChange={e=>setNewName(e.target.value)}
+            onKeyDown={e=>{ if(e.key==='Enter' && hasSelection) handleAdd(); if(e.key==='Escape') onClose(); }}
+            placeholder="Name (comma-separate for multiple)"
+            style={{width:'100%',fontSize:12,fontFamily:"'DM Sans',sans-serif",
+              border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',
+              padding:'5px 9px',outline:'none',background:'white',color:'var(--ink)',boxSizing:'border-box'}}
+          />
+        </div>
+        {/* Footer */}
+        <div style={{padding:'6px 12px 12px',display:'flex',gap:8,justifyContent:'flex-end',flexShrink:0}}>
+          <button onClick={onClose}
+            style={{background:'none',border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',
+              padding:'5px 14px',cursor:'pointer',fontSize:12,fontFamily:"'DM Sans',sans-serif",color:'var(--ink-light)'}}>
+            Cancel
+          </button>
+          <button onClick={handleAdd} disabled={!hasSelection}
+            style={{
+              background: hasSelection ? 'var(--accent)' : 'var(--border)',
+              border:'none', borderRadius:'var(--radius-sm)', padding:'5px 16px',
+              cursor: hasSelection ? 'pointer' : 'default', fontSize:12, fontWeight:600,
+              fontFamily:"'DM Sans',sans-serif",
+              color: hasSelection ? 'white' : 'var(--ink-faint)', transition:'all 0.15s',
+            }}>
+            Add{selectedIds.size > 0 ? ` (${selectedIds.size})` : ''}
+          </button>
+        </div>
+      </div>
+      {/* PEOPLE PICKER MODAL */}
+      {showPeoplePicker && (
+        <PeoplePicker
+          directory={peopleDirectory||[]}
+          existingPersonIds={new Set((wd.people||[]).map(p=>p.personId).filter(Boolean))}
+          onAdd={handleAddPeople}
+          onClose={()=>setShowPeoplePicker(false)}
+        />
+      )}
+
+    </div>
+  );
+}
   const [expanded, setExpanded] = useState(!!note);
   const taRef = useRef();
 
@@ -4557,7 +4837,7 @@ function MetricsView({ metrics, weightTarget, setWeightTarget, calsTarget, setCa
 // ─────────────────────────────────────────────
 // APP ROOT
 // ─────────────────────────────────────────────
-const ALL_STORAGE_KEYS = ['weekData','habitGoals','habitCompletions','habitMetrics','habitQty','habitNotes','monthlyGoals','navColor','calHeaderColor','pagesData','foldersData','weightTarget','calsTarget'];
+const ALL_STORAGE_KEYS = ['weekData','habitGoals','habitCompletions','habitMetrics','habitQty','habitNotes','monthlyGoals','navColor','calHeaderColor','pagesData','foldersData','weightTarget','calsTarget','peopleDirectory'];
 
 function App() {
   const [page, setPageRaw] = useState(() => sessionStorage.getItem('lp_page') || 'planner');
@@ -4579,6 +4859,7 @@ function App() {
   const [weightTarget, setWeightTarget] = useStorage('weightTarget', '');
   const [calsTarget, setCalsTarget] = useStorage('calsTarget', '');
   const [monthlyGoals, setMonthlyGoals] = useStorage('monthlyGoals', {});
+  const [peopleDirectory, setPeopleDirectory] = useStorage('peopleDirectory', []); // [{id, name}] — master list across weeks
 
   // Auth state
   const [authUser, setAuthUser] = useState(null); // {name, email, picture}
@@ -4617,6 +4898,7 @@ function App() {
       if (data.monthlyGoals) setMonthlyGoals(data.monthlyGoals);
       if (data.pagesData) setPagesData(data.pagesData);
       if (data.foldersData) setFoldersData(data.foldersData);
+      if (data.peopleDirectory) setPeopleDirectory(data.peopleDirectory);
       setDriveFileId(fileId); // set last to arm the save effect
       setAuthError(false);
       setSaveStatus('saved');
@@ -4684,7 +4966,7 @@ function App() {
   useEffect(() => {
     if (!driveFileId) return;
     scheduleSave(driveFileId);
-  }, [weekData, navColor, calHeaderColor, habitGoals, habitCompletions, habitMetrics, habitQty, habitNotes, monthlyGoals, pagesData, foldersData, driveFileId]);
+  }, [weekData, navColor, calHeaderColor, habitGoals, habitCompletions, habitMetrics, habitQty, habitNotes, monthlyGoals, pagesData, foldersData, peopleDirectory, driveFileId]);
 
   // On mount: restore session from localStorage token or silent Worker refresh
   useEffect(() => {
@@ -4813,7 +5095,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v2.7.7</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v2.8.0</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -4913,7 +5195,7 @@ function App() {
           pullDeltaY.current = 0;
           pullActive.current = false;
         }}>
-      {page==='planner' && <WeeklyPlanner weekData={weekData} setWeekData={setWeekData} pagesData={pagesData} setPagesData={setPagesData} onGoToHabit={()=>setPage('habit')} calHeaderColor={calHeaderColor} setCalHeaderColor={setCalHeaderColor} habitGoals={habitGoals} habitCompletions={habitCompletions} setHabitCompletions={setHabitCompletions} habitQty={habitQty} setHabitQty={setHabitQty} habitNotes={habitNotes} setHabitNotes={setHabitNotes} />}
+      {page==='planner' && <WeeklyPlanner weekData={weekData} setWeekData={setWeekData} pagesData={pagesData} setPagesData={setPagesData} onGoToHabit={()=>setPage('habit')} calHeaderColor={calHeaderColor} setCalHeaderColor={setCalHeaderColor} habitGoals={habitGoals} habitCompletions={habitCompletions} setHabitCompletions={setHabitCompletions} habitQty={habitQty} setHabitQty={setHabitQty} habitNotes={habitNotes} setHabitNotes={setHabitNotes} peopleDirectory={peopleDirectory} setPeopleDirectory={setPeopleDirectory} />}
       {page==='monthly' && <MonthlyCalendar weekData={weekData} setWeekData={setWeekData} monthlyGoals={monthlyGoals} setMonthlyGoals={setMonthlyGoals} />}
       {page==='habit' && <HabitTracker
         goals={habitGoals} setGoals={setHabitGoals}
