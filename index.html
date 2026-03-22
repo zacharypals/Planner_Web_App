@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v2.7.5 -->
+<!-- LP Planner v2.7.6 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -257,7 +257,7 @@
     grid-template-rows: auto 1fr;
     min-width: 900px;
     min-height: 100%;
-    column-gap: 4px;
+    column-gap: 2px;
   }
   .cal-header-cell {
     padding: 10px 8px; text-align: center;
@@ -364,7 +364,7 @@
   .task-check.done::after { content: '✓'; font-size: 9px; }
   .task-title-input {
     flex: 1; background: transparent; border: none; outline: none;
-    font-size: 12px; font-weight: 500; font-family: 'DM Sans', sans-serif;
+    font-size: 11px; font-weight: 500; font-family: 'DM Sans', sans-serif;
     cursor: text;
   }
   .task-expand-btn {
@@ -4813,7 +4813,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v2.7.5</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v2.7.6</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
