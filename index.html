@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v2.8.1 -->
+<!-- LP Planner v2.8.2 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -2307,6 +2307,9 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
           onDelete={deletePerson}
           onReorder={reorderPeople}
           directory={peopleDirectory||[]}
+          onRenameDirectory={(personId, newName) =>
+            setPeopleDirectory(d => d.map(p => p.id===personId ? {...p, name:newName} : p))
+          }
         />
         {(wd.people||[]).length === 0 && (
           <div style={{fontSize:11,color:'var(--ink-faint)',fontStyle:'italic',padding:'2px 4px'}}>
@@ -2574,7 +2577,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
 // PEOPLE CHECKLIST — replaces SortableChecklist for "People to Connect With"
 // Each entry: { id, personId, name(fallback), days:[], note }
 // ─────────────────────────────────────────────
-function PeopleChecklist({ items, weekDays, onUpdate, onDelete, onReorder, directory }) {
+function PeopleChecklist({ items, weekDays, onUpdate, onDelete, onReorder, directory, onRenameDirectory }) {
   const [dragId, setDragId] = useState(null);
   const [dragOverId, setDragOverId] = useState(null);
   const [expandedIds, setExpandedIds] = useState({});
@@ -2670,10 +2673,23 @@ function PeopleChecklist({ items, weekDays, onUpdate, onDelete, onReorder, direc
                 {confirming ? 'Delete?' : '✕'}
               </button>
             </div>
-            {/* Expanded: day-dots + note */}
+            {/* Expanded: name edit + day-dots + note */}
             {isExpanded && (
               <div style={{padding:'5px 10px 9px', borderTop:'1px solid var(--border)'}}
                 onClick={e=>e.stopPropagation()}>
+                {onRenameDirectory && item.personId && (
+                  <div style={{marginBottom:8}}>
+                    <div style={{fontSize:9,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace",marginBottom:3,textTransform:'uppercase',letterSpacing:'0.05em'}}>Name:</div>
+                    <input
+                      style={{width:'100%',fontSize:12.5,fontFamily:"'DM Sans',sans-serif",
+                        border:'1px solid var(--border)',borderRadius:4,padding:'3px 7px',
+                        outline:'none',background:'white',color:'var(--ink)',boxSizing:'border-box'}}
+                      value={name}
+                      onChange={e=>onRenameDirectory(item.personId, e.target.value)}
+                      onClick={e=>e.stopPropagation()}
+                    />
+                  </div>
+                )}
                 <div style={{fontSize:9,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace",marginBottom:5,textTransform:'uppercase',letterSpacing:'0.05em'}}>Days connected:</div>
                 <div style={{display:'flex',gap:3,marginBottom:8}}>
                   {['S','M','T','W','T','F','S'].map((d,i) => {
