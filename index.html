@@ -1953,7 +1953,8 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
     return next;
   });
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [showPeoplePicker, setShowPeoplePicker] = useState(false); // {id, dayKey} — task to focus after render
+  const [showPeoplePicker, setShowPeoplePicker] = useState(false);
+  const pendingTaskFocus = useRef(null); // {id, dayKey} — task to focus after render
   const taskTitleRefs = useRef({}); // id -> input ref (desktop)
   const taskTitleRefsMobile = useRef({}); // id -> input ref (mobile)
   const [taskClipboard, setTaskClipboard] = useState(null); // copied task object
