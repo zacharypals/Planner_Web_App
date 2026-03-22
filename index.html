@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v2.7.3 -->
+<!-- LP Planner v2.7.4 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -2168,19 +2168,26 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
   }
 
   function moveTaskBetweenDays(fromDayKey, toDayKey, taskId, targetId) {
-    const task = getTasks(fromDayKey).find(t => t.id === taskId);
-    if (!task) return;
+    // Capture task reference for calendar sync (needs to happen outside updater)
+    const taskForSync = getTasks(fromDayKey).find(t => t.id === taskId);
     setWD(w => {
       const allTasks = w.tasks || {};
-      const srcTasks = (allTasks[fromDayKey] || []).filter(t => t.id !== taskId);
-      const dstTasks = [...(allTasks[toDayKey] || [])];
+      const srcList = allTasks[fromDayKey] || [];
+      // Find task from FRESH state — if already moved (double-fire guard), bail out
+      const task = srcList.find(t => t.id === taskId);
+      if (!task) return w;
+      const srcTasks = srcList.filter(t => t.id !== taskId);
+      const dstList = allTasks[toDayKey] || [];
+      // If task somehow already in destination, bail out (idempotency guard)
+      if (dstList.some(t => t.id === taskId)) return w;
+      const dstTasks = [...dstList];
       const insertAt = targetId ? dstTasks.findIndex(t => t.id === targetId) : dstTasks.length;
       dstTasks.splice(insertAt === -1 ? dstTasks.length : insertAt, 0, task);
       return { ...w, tasks: { ...allTasks, [fromDayKey]: srcTasks, [toDayKey]: dstTasks } };
     });
     // Sync date change to Google Calendar
-    if (task.isEvent && task.gcalId && getToken()) {
-      updateEventInCalendar(task.gcalId, task, toDayKey)
+    if (taskForSync?.isEvent && taskForSync?.gcalId && getToken()) {
+      updateEventInCalendar(taskForSync.gcalId, taskForSync, toDayKey)
         .catch(e => console.error('Calendar move failed:', e));
     }
   }
@@ -2366,6 +2373,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
                         isDragOver={dragOver?.dayKey===dk && dragOver?.id===task.id}
                         onDragStart={()=>setDragging({dayKey:dk, id:task.id})}
                         onDragOver={()=>setDragOver({dayKey:dk, id:task.id})}
+                        onDragEnd={()=>{ setDragging(null); setDragOver(null); }}
                         onDrop={()=>{
                           if(dragging) {
                             if(dragging.dayKey === dk) reorderTasks(dk, dragging.id, task.id);
@@ -2689,7 +2697,7 @@ const EVENT_COLORS = [
   '#ffe4e6', // blush
   '#ecfdf5', // aqua mist
 ];
-function TaskCard({ task, onUpdate, onBlurSync, onDelete, onEnterKey, titleRef, deleteIfEmpty, onCopy, hasCopied, onPasteBelow, onShowCtxMenu, onDragStart, onDragOver, onDrop, isDragOver, onApplyRepeat, onReschedule, weekDays, currentDayKey }) {
+function TaskCard({ task, onUpdate, onBlurSync, onDelete, onEnterKey, titleRef, deleteIfEmpty, onCopy, hasCopied, onPasteBelow, onShowCtxMenu, onDragStart, onDragOver, onDragEnd, onDrop, isDragOver, onApplyRepeat, onReschedule, weekDays, currentDayKey }) {
   const textareaRef = useRef();
   const [confirming, setConfirming] = useState(false);
   const [mobileConfirming, setMobileConfirming] = useState(false);
@@ -2747,6 +2755,7 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onEnterKey, titleRef, 
       draggable
       onDragStart={onDragStart}
       onDragOver={e=>{e.preventDefault();onDragOver();}}
+      onDragEnd={onDragEnd}
       onDrop={e=>{e.preventDefault();e.stopPropagation();onDrop();}}
       onMouseLeave={handleMouseLeave}
       onTouchStart={onReschedule ? handleCardTouchStart : undefined}
@@ -4803,7 +4812,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v2.7.3</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v2.7.4</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
