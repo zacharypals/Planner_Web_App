@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v2.7.6 -->
+<!-- LP Planner v2.7.7 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -353,7 +353,7 @@
   }
   .task-card:hover { box-shadow: 0 4px 12px var(--shadow-md), 0 0 0 1px rgba(0,0,0,0.03); }
   .task-card-header {
-    display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+    display: flex; align-items: center; gap: 5px; padding: 7px 8px;
     font-size: 12px; font-weight: 500;
   }
   .task-check {
@@ -417,7 +417,7 @@
   /* TASK COLOR PICKER */
   .task-type-btn {
     background: none; border: none; cursor: pointer;
-    font-size: 14px; padding: 0 2px; flex-shrink: 0;
+    font-size: 14px; padding: 0; flex-shrink: 0;
     transition: all 0.15s; color: var(--ink-faint); line-height: 1;
     opacity: 0.5;
   }
@@ -4813,7 +4813,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v2.7.6</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v2.7.7</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
