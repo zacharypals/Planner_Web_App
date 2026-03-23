@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v2.8.2 -->
+<!-- LP Planner v2.8.3 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -5113,7 +5113,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v2.8.2</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v2.8.3</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -5525,7 +5525,8 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
       const block = node.nodeType === 3 ? node.parentElement : node;
       const blockEl = block?.closest('p,div,h1,h2,h3') || block;
       if (blockEl && !blockEl.closest('ul,ol,blockquote') && bodyRef.current.contains(blockEl)) {
-        if ((blockEl.textContent || '').trim() === '-') {
+        const text = (blockEl.textContent || '').trim();
+        if (text === '-') {
           e.preventDefault();
           const r = document.createRange();
           r.selectNodeContents(blockEl);
@@ -5533,6 +5534,17 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
           sel.addRange(r);
           document.execCommand('delete');
           document.execCommand('insertUnorderedList');
+          setTimeout(() => onBodyInput(), 0);
+          return;
+        }
+        if (text === '1.') {
+          e.preventDefault();
+          const r = document.createRange();
+          r.selectNodeContents(blockEl);
+          sel.removeAllRanges();
+          sel.addRange(r);
+          document.execCommand('delete');
+          document.execCommand('insertOrderedList');
           setTimeout(() => onBodyInput(), 0);
           return;
         }
