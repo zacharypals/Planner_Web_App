@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v2.8.5 -->
+<!-- LP Planner v2.8.6 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -4626,6 +4626,19 @@ function MetricsView({ metrics, weightTarget, setWeightTarget, calsTarget, setCa
     return vals.map(v => (v !== null && v >= lo && v <= hi) ? v : null);
   }
 
+  // For axis bounds only: strip outliers using standard 1.5×IQR so extreme values
+  // (e.g. fasting zeros) don't dominate the scale. Data points still plot, just off-screen.
+  function boundsVals(vals) {
+    const nums = vals.filter(v => v !== null);
+    if (nums.length < 4) return nums;
+    const sorted = [...nums].sort((a,b)=>a-b);
+    const q1 = sorted[Math.floor(sorted.length*0.25)];
+    const q3 = sorted[Math.floor(sorted.length*0.75)];
+    const iqr = q3 - q1;
+    const lo = q1 - 1.5*iqr, hi = q3 + 1.5*iqr;
+    return nums.filter(v => v >= lo && v <= hi);
+  }
+
   // 3-day simple moving average
   function sma3(vals) {
     return vals.map((_, i) => {
@@ -4634,12 +4647,14 @@ function MetricsView({ metrics, weightTarget, setWeightTarget, calsTarget, setCa
     });
   }
 
-  // Compute smart Y-axis bounds: pad 10% around actual data range, floor at 0 for cals
+  // Compute tight Y-axis bounds: ~10% pad around the non-outlier data range
   function yBounds(vals, floorZero) {
-    const nums = vals.filter(v => v !== null);
+    const nums = boundsVals(vals);
     if (nums.length === 0) return floorZero ? {min:0, max:100} : {min:0, max:100};
     const lo = Math.min(...nums), hi = Math.max(...nums);
-    const pad = Math.max((hi - lo) * 0.5, floorZero ? hi*0.15 : Math.abs(hi)*0.1, 5);
+    const range = hi - lo;
+    // Pad: 12% of range, minimum 2 units so a flat line still shows context
+    const pad = Math.max(range * 0.12, 2);
     return {
       min: floorZero ? Math.max(0, Math.floor(lo - pad)) : Math.floor(lo - pad),
       max: Math.ceil(hi + pad)
@@ -5113,7 +5128,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v2.8.5</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v2.8.6</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
