@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v2.8.4 -->
+<!-- LP Planner v2.8.5 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -5113,7 +5113,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v2.8.4</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v2.8.5</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -6153,20 +6153,38 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
                   }
                   const li = e.target.closest('li.pages-chk-li');
                   if(li){
-                    // Prevent browser from placing cursor (it defaults to before the checkbox)
+                    // If clicking directly on a text node, let the browser place the cursor naturally
+                    if(e.target.nodeType === 3 || e.target.closest('span,b,i,u,strong,em')){
+                      return;
+                    }
+                    // Clicking on the li itself or its label area (not on text):
+                    // check if the click is past the end of the text content
+                    const range = document.caretRangeFromPoint
+                      ? document.caretRangeFromPoint(e.clientX, e.clientY)
+                      : null;
+                    // If browser can place a caret at the click point inside this li, let it
+                    if(range && li.contains(range.startContainer) && range.startContainer.nodeType === 3){
+                      return; // browser will place cursor correctly between characters
+                    }
+                    // Otherwise (click is in whitespace past end of text, or on the li padding):
+                    // prevent the default and move cursor to end of text
                     e.preventDefault();
                     bodyRef.current?.focus();
-                    // Place cursor at end of the text content in this li
-                    const textNodes = Array.from(li.childNodes).filter(n => n.nodeType === 3);
-                    const lastText = textNodes[textNodes.length - 1];
+                    const walker = document.createTreeWalker(li, NodeFilter.SHOW_TEXT, null);
+                    let lastText = null;
+                    while(walker.nextNode()) lastText = walker.currentNode;
+                    const r = document.createRange();
                     if(lastText){
-                      const r = document.createRange();
                       r.setStart(lastText, lastText.length);
-                      r.collapse(true);
-                      const s = window.getSelection();
-                      s.removeAllRanges();
-                      s.addRange(r);
+                    } else {
+                      // Empty li — place after the checkbox
+                      r.selectNodeContents(li);
+                      r.collapse(false);
                     }
+                    r.collapse(true);
+                    const s = window.getSelection();
+                    s.removeAllRanges();
+                    s.addRange(r);
                   }
                 }}
                 onTouchStart={e=>{ bodyRef._touchStartX = e.touches[0].clientX; bodyRef._touchStartY = e.touches[0].clientY; }}
