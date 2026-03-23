@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v2.8.6 -->
+<!-- LP Planner v2.8.7 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -4685,6 +4685,16 @@ function MetricsView({ metrics, weightTarget, setWeightTarget, calsTarget, setCa
     const wBounds = yBounds(weightVals, false);
     const cBounds = yBounds(calsVals, true);
 
+    // Weight: floor the min so target is always visible (1 unit below target)
+    if (!isNaN(wTarget)) {
+      wBounds.min = Math.min(wBounds.min, Math.floor(wTarget - 1));
+    }
+    // Cals: ensure target line is always within the visible range
+    if (!isNaN(cTarget)) {
+      cBounds.min = Math.min(cBounds.min, Math.floor(cTarget * 0.95));
+      cBounds.max = Math.max(cBounds.max, Math.ceil(cTarget * 1.05));
+    }
+
     const commonOpts = {
       responsive: true,
       maintainAspectRatio: false,
@@ -5128,7 +5138,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v2.8.6</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v2.8.7</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
