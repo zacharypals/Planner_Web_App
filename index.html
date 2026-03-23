@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v2.8.3 -->
+<!-- LP Planner v2.8.4 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -5113,7 +5113,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v2.8.3</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v2.8.4</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -5518,33 +5518,32 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
   function handleBodyKeyDown(e) {
     const sel = window.getSelection();
 
-    // Space shortcut: typing Space when block contains only "-" → bullet list
+    // Space shortcut: "- " at start of line → bullet list, "1. " → numbered list
+    // Works even if there's text after the cursor — that text becomes the list item content
     if (e.key === ' ' && sel && sel.rangeCount > 0 && bodyRef.current) {
       const range = sel.getRangeAt(0);
       const node = range.startContainer;
       const block = node.nodeType === 3 ? node.parentElement : node;
       const blockEl = block?.closest('p,div,h1,h2,h3') || block;
       if (blockEl && !blockEl.closest('ul,ol,blockquote') && bodyRef.current.contains(blockEl)) {
-        const text = (blockEl.textContent || '').trim();
-        if (text === '-') {
+        // Get text from the very start of the block up to the cursor
+        const preRange = document.createRange();
+        preRange.setStart(blockEl, 0);
+        preRange.setEnd(range.startContainer, range.startOffset);
+        const textBeforeCursor = preRange.toString();
+
+        let listCmd = null;
+        if (textBeforeCursor === '-') listCmd = 'insertUnorderedList';
+        else if (textBeforeCursor === '1.') listCmd = 'insertOrderedList';
+
+        if (listCmd) {
           e.preventDefault();
-          const r = document.createRange();
-          r.selectNodeContents(blockEl);
+          // Select just the prefix ("-" or "1.") and delete it, leaving rest of text intact
           sel.removeAllRanges();
-          sel.addRange(r);
+          sel.addRange(preRange);
           document.execCommand('delete');
-          document.execCommand('insertUnorderedList');
-          setTimeout(() => onBodyInput(), 0);
-          return;
-        }
-        if (text === '1.') {
-          e.preventDefault();
-          const r = document.createRange();
-          r.selectNodeContents(blockEl);
-          sel.removeAllRanges();
-          sel.addRange(r);
-          document.execCommand('delete');
-          document.execCommand('insertOrderedList');
+          // Now convert the block (with remaining text) into a list item
+          document.execCommand(listCmd);
           setTimeout(() => onBodyInput(), 0);
           return;
         }
