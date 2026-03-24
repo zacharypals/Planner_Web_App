@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v2.9.0 -->
+<!-- LP Planner v2.9.1 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -5245,7 +5245,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v2.9.0</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v2.9.1</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -5602,8 +5602,23 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
       sel.removeAllRanges();
       sel.addRange(r);
     } else {
-      // Add new checklist item right after this one
+      // Split the li at cursor: text after cursor moves to new li
+      const range = sel.getRangeAt(0);
+      const afterRange = document.createRange();
+      afterRange.setStart(range.startContainer, range.startOffset);
+      afterRange.setEnd(li, li.childNodes.length);
+      const afterFragment = afterRange.extractContents();
+      // Collect only text (strip any checkbox inputs swept up by extractContents)
+      let afterText = '';
+      const tw = document.createTreeWalker(afterFragment, NodeFilter.SHOW_TEXT, null);
+      while (tw.nextNode()) afterText += tw.currentNode.textContent;
+
       const newLi = makeChkLi();
+      if (newLi.lastChild && newLi.lastChild.nodeType === 3) {
+        newLi.lastChild.textContent = afterText;
+      } else {
+        newLi.appendChild(document.createTextNode(afterText));
+      }
       li.parentNode.insertBefore(newLi, li.nextSibling);
       const textNode = newLi.lastChild;
       const r = document.createRange();
