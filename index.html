@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v3.4.4 -->
+<!-- LP Planner v3.4.5 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -438,12 +438,14 @@
     flex-shrink: 0;
   }
   .set-check {
-    width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid var(--border);
+    width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--ink-faint);
     display: flex; align-items: center; justify-content: center;
     cursor: pointer; flex-shrink: 0; transition: all 0.12s; margin-left: auto;
+    background: white;
   }
+  .set-check:hover { border-color: var(--accent); background: var(--accent-light); }
   .set-check.done { background: var(--accent); border-color: var(--accent); }
-  .set-check.done::after { content: '✓'; color: white; font-size: 9px; }
+  .set-check.done::after { content: '✓'; color: white; font-size: 10px; font-weight: 700; }
   /* Exercise library in sidebar */
   .ex-lib-item {
     display: flex; align-items: center; gap: 6px;
@@ -5547,7 +5549,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.4.4</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.4.5</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
