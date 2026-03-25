@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v3.5.0 -->
+<!-- LP Planner v3.5.1 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-512.png">
-<meta name="theme-color" content="#a54eed">
+<meta name="theme-color" content="#7c3f6e">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="LP Planner">
@@ -22,8 +22,8 @@
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
-    --cream: #f4f2ee;
-    --paper: #faf9f7;
+    --cream: #f5edf3;
+    --paper: #fdf9fc;
     --ink: #2c2418;
     --ink-light: #78716a;
     --ink-faint: #bfb8ad;
@@ -60,7 +60,7 @@
   /* LAYOUT */
   .app { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
   .nav-bar {
-    background: linear-gradient(135deg, #1a3528 0%, #2a5038 100%);
+    background: linear-gradient(135deg, #5c2d52 0%, #7c3f6e 100%);
     color: var(--paper);
     display: flex; align-items: center; justify-content: space-between;
     padding: 0 24px; height: 48px; flex-shrink: 0;
@@ -5149,8 +5149,8 @@ const ALL_STORAGE_KEYS = ['weekData','habitGoals','habitCompletions','habitMetri
 function App() {
   const [page, setPageRaw] = useState(() => sessionStorage.getItem('lp_page') || 'planner');
   const setPage = (p) => { sessionStorage.setItem('lp_page', p); setPageRaw(p); };
-  const [navColor, setNavColor] = useStorage('navColor', '#1e3d29');
-  const [calHeaderColor, setCalHeaderColor] = useStorage('calHeaderColor', '#2d5a3d');
+  const [navColor, setNavColor] = useStorage('navColor', '#5c2d52');
+  const [calHeaderColor, setCalHeaderColor] = useStorage('calHeaderColor', '#7c3f6e');
   const [weekData, setWeekData] = useStorage('weekData', {});
   const [pagesData, setPagesData] = useStorage('pagesData', []); // [{id,title,body,createdAt,lastModified,folderId,order,tasks:[]}]
   const [foldersData, setFoldersData] = useStorage('foldersData', []); // [{id,name,expanded,order}]
@@ -5595,7 +5595,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.5.0</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.5.1</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
