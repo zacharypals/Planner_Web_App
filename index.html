@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v3.4.7 -->
+<!-- LP Planner v3.5.0 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -1754,19 +1754,37 @@ async function loadFromDrive() {
     `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`
   );
   const text = await res.text();
-  try { return { data: JSON.parse(text), fileId }; }
-  catch { return { data: {}, fileId }; }
+  let data = {};
+  try { data = JSON.parse(text); } catch {}
+
+  // Multi-device conflict detection:
+  // If we have a local _lp_savedAt that is NEWER than what's in Drive,
+  // it means this device made changes that were never uploaded (e.g. network drop,
+  // or another device saved over them). Warn before overwriting.
+  const driveSavedAt = data._savedAt || null;
+  const localSavedAt = (() => { try { return localStorage.getItem('_lp_savedAt'); } catch { return null; } })();
+
+  let conflict = false;
+  if (driveSavedAt && localSavedAt && localSavedAt > driveSavedAt) {
+    // Local is newer than Drive — possible data loss
+    conflict = true;
+  }
+
+  return { data, fileId, driveSavedAt, localSavedAt, conflict };
 }
 
 async function saveToDrive(fileId, allData) {
+  const payload = { ...allData, _savedAt: new Date().toISOString() };
   await driveRequest(
     `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`,
     {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(allData),
+      body: JSON.stringify(payload),
     }
   );
+  // Record when we last successfully saved so multi-device conflict detection works
+  try { localStorage.setItem('_lp_savedAt', payload._savedAt); } catch {}
 }
 
 // ── CALENDAR HELPERS ──
@@ -5168,11 +5186,23 @@ function App() {
   const pendingSaveRef = useRef(false); // true while a save is debounced but not yet flushed
 
   // Load all data from Drive after sign-in
-  async function loadAllFromDrive() {
+  async function loadAllFromDrive(forceOverwrite) {
     _loadingFromDrive = true;
     setSaveStatus('saving');
     try {
-      const { data, fileId } = await loadFromDrive();
+      const { data, fileId, conflict, driveSavedAt, localSavedAt } = await loadFromDrive();
+
+      // Warn about multi-device conflict before overwriting local data
+      if (conflict && !forceOverwrite) {
+        _loadingFromDrive = false;
+        setSaveStatus('');
+        const msg = `⚠️ Conflict detected: this device has local changes from ${new Date(localSavedAt).toLocaleString()} that are newer than Drive (${new Date(driveSavedAt).toLocaleString()}).\n\nLoad from Drive anyway? (Your local changes will be lost)\n\nClick Cancel to keep local data (Drive will be overwritten on next save).`;
+        if (!window.confirm(msg)) {
+          // User wants to keep local — trigger a save to push local → Drive
+          setDriveFileId(fileId);
+          return;
+        }
+      }
       ALL_STORAGE_KEYS.forEach(k => {
         if (data[k] !== undefined) {
           try { localStorage.setItem(k, JSON.stringify(data[k])); } catch {}
@@ -5214,7 +5244,7 @@ function App() {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     pendingSaveRef.current = true;
     setSaveStatus('saving');
-    saveTimerRef.current = setTimeout(async () => {
+    saveTimerRef.current = setTimeout(async () => { // 1500ms debounce
       pendingSaveRef.current = false;
       const allData = {};
       ALL_STORAGE_KEYS.forEach(k => {
@@ -5253,7 +5283,7 @@ function App() {
           // Don't auto-clear save errors — user must see them
         }
       }
-    }, 2500);
+    }, 1500);
   }, []);
 
   // Flush any pending save immediately — used by beforeunload and visibilitychange
@@ -5366,11 +5396,25 @@ function App() {
   useEffect(() => {
     function handleBeforeUnload(e) {
       if (pendingSaveRef.current && driveFileId) {
-        // Attempt a synchronous-ish flush (best effort — browsers may not honor async here)
-        flushSave();
-        // Show browser's native "leave page?" dialog to give user a chance to wait
+        // sendBeacon is synchronous-compatible and survives page close better than async fetch
+        const allData = {};
+        ALL_STORAGE_KEYS.forEach(k => {
+          try { const s = localStorage.getItem(k); if (s) allData[k] = JSON.parse(s); } catch {}
+        });
+        allData._savedAt = new Date().toISOString();
+        try { localStorage.setItem('_lp_savedAt', allData._savedAt); } catch {}
+        const token = getToken();
+        if (token) {
+          // Use sendBeacon to the Drive upload endpoint — fires reliably on page close
+          // (Falls back to the async flushSave if sendBeacon isn't available)
+          const beaconUrl = `https://www.googleapis.com/upload/drive/v3/files/${driveFileId}?uploadType=media`;
+          const blob = new Blob([JSON.stringify(allData)], { type: 'application/json' });
+          const sent = navigator.sendBeacon && navigator.sendBeacon(beaconUrl, blob);
+          if (!sent) flushSave(); // fallback
+        }
+        // Show browser dialog to give any async saves a chance to complete
         e.preventDefault();
-        e.returnValue = 'You have unsaved changes. Please wait a moment before closing.';
+        e.returnValue = 'Saving your data…';
         return e.returnValue;
       }
     }
@@ -5551,7 +5595,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.4.7</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.5.0</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -6873,8 +6917,8 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
     const id = 'doc_' + Date.now();
     const now = new Date().toISOString();
     const siblings = pagesData.filter(d => (d.folderId || null) === (folderId || null));
-    const maxOrder = siblings.reduce((m, d) => Math.max(m, d.order ?? 0), -1);
-    const newDoc = { id, title: '', body: '', createdAt: now, lastModified: now, folderId: folderId || null, order: maxOrder + 1, tasks: [] };
+    const minOrder = siblings.reduce((m, d) => Math.min(m, d.order ?? 0), 0);
+    const newDoc = { id, title: '', body: '', createdAt: now, lastModified: now, folderId: folderId || null, order: minOrder - 1, tasks: [] };
     setPagesData(p => [...p, newDoc]);
     setSelectedId(id);
     setMobileView('editor');
