@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v3.5.1 -->
+<!-- LP Planner v3.5.2 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -28,7 +28,7 @@
     --ink-light: #78716a;
     --ink-faint: #bfb8ad;
     --accent: #2d6b4a;
-    --accent-light: #eaf5ef;
+    --accent-light: #f5edf3;
     --gold: #c4960e;
     --gold-light: #fdf8ec;
     --border: #e8e4dd;
@@ -276,7 +276,7 @@
     padding: 10px; position: relative; background: var(--paper);
     transition: background 0.15s, box-shadow 0.15s; min-height: 200px;
   }
-  .cal-day:hover { background: #f8f5ef; box-shadow: inset 0 0 0 1px var(--border); }
+  .cal-day:hover { background: #f5edf3; box-shadow: inset 0 0 0 1px var(--border); }
   .cal-day.today { background: var(--gold-light); }
   .add-task-btn {
     width: 100%; border: 1.5px dashed var(--border); border-radius: var(--radius-sm);
@@ -316,7 +316,7 @@
     background: var(--accent-light); border-radius: var(--radius-sm) var(--radius-sm) 0 0;
     font-weight: 600; transition: background 0.1s;
   }
-  .habit-task-label:hover { background: #d0edda; }
+  .habit-task-label:hover { background: #edd9e8; }
   .habit-task-row {
     background: white;
     border-bottom: 1px solid rgba(0,0,0,0.04);
@@ -507,7 +507,7 @@
     background: linear-gradient(180deg, #2d6b4a 0%, #256042 100%);
     border-radius: var(--radius-md) var(--radius-md) 0 0;
   }
-  .fitness-week-col.today .fitness-week-col-hdr { background: linear-gradient(180deg, #3a8a60 0%, #256042 100%); }
+  .fitness-week-col.today .fitness-week-col-hdr { background: linear-gradient(180deg, #9a4f87 0%, #7c3f6e 100%); }
   .fitness-week-col-day { font-size: 9px; color: rgba(255,255,255,0.65); font-family: 'DM Mono',monospace; text-transform: uppercase; letter-spacing: 0.06em; }
   .fitness-week-col-date { font-size: 16px; color: white; font-family: 'Playfair Display',serif; font-weight: 600; }
   .fitness-week-col.today .fitness-week-col-date { color: var(--gold); }
@@ -946,7 +946,7 @@
     background: var(--paper);
     box-shadow: 0 0 0 1px rgba(0,0,0,0.06);
   }
-  .monthly-cell:hover { background: #f8f5ef; box-shadow: 0 0 0 1px var(--border), 0 2px 8px var(--shadow); }
+  .monthly-cell:hover { background: #f5edf3; box-shadow: 0 0 0 1px var(--border), 0 2px 8px var(--shadow); }
   .monthly-cell.empty { background: var(--cream); cursor: default; min-height: 110px; box-shadow: none; }
   .monthly-cell.today { background: var(--gold-light); }
   .monthly-cell.today .monthly-cell-date { color: var(--gold); font-weight: 700; }
@@ -5595,7 +5595,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.5.1</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.5.2</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
