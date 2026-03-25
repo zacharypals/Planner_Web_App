@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v3.4.6 -->
+<!-- LP Planner v3.4.7 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -479,7 +479,9 @@
   /* Mobile fitness */
   @media (max-width: 767px) {
     .fitness-sidebar { display: none; }
-    .fitness-main { padding: 12px 14px; }
+    .fitness-main { padding: 10px 12px; }
+    .fitness-view-tabs { width: 100%; }
+    .fitness-view-tab { padding: 5px 8px; font-size: 11px; }
   }
   /* ── FITNESS PHASE 2 ── */
   .fitness-view-tabs {
@@ -5549,7 +5551,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.4.6</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.4.7</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -5919,27 +5921,35 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
     const {actual,periodPct,targetPace,expectedAtPace,aheadBehind}=goalProgressFull(goal,refDate);
     const pct=Math.min(100,(actual/goal.target)*100),done=pct>=100,ahead=aheadBehind>=0;
     return (
-      <div key={goal.id} style={{marginBottom:12}}>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:3}}>
-          <span style={{fontSize:12,fontFamily:"'DM Sans',sans-serif",fontWeight:600,color:'var(--ink)'}}>{exName(goal.exerciseId)}</span>
-          <div style={{display:'flex',gap:8,alignItems:'center'}}>
-            <span style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:'var(--ink-light)'}}>{actual.toLocaleString()} / {goal.target.toLocaleString()} {goal.unit}</span>
-            <span style={{fontSize:10,fontFamily:"'DM Mono',monospace",fontWeight:700,color:ahead?'var(--accent)':'var(--red)'}}>
-              {ahead?'▲':'▼'}{Math.abs(Math.round(aheadBehind))} vs target
+      <div key={goal.id} style={{
+        padding:'10px 12px', marginBottom:8,
+        background:'white', borderRadius:'var(--radius-sm)',
+        border:`1px solid ${done?'var(--gold)':ahead?'var(--accent)':'var(--border)'}`,
+        boxShadow:'0 1px 3px var(--shadow)',
+      }}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:5}}>
+          <span style={{fontSize:12,fontFamily:"'DM Sans',sans-serif",fontWeight:700,color:'var(--ink)'}}>{exName(goal.exerciseId)}</span>
+          <div style={{display:'flex',gap:6,alignItems:'center'}}>
+            <span style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:'var(--ink-light)',fontWeight:600}}>{actual.toLocaleString()} / {goal.target.toLocaleString()} {goal.unit}</span>
+            <span style={{fontSize:10,fontFamily:"'DM Mono',monospace",fontWeight:700,
+              padding:'1px 5px',borderRadius:3,
+              background:ahead?'var(--accent-light)':'rgba(220,74,58,0.1)',
+              color:ahead?'var(--accent)':'var(--red)'}}>
+              {ahead?'▲':'▼'}{Math.abs(Math.round(aheadBehind))}
             </span>
             {done&&<span>🎉</span>}
           </div>
         </div>
-        <div className="fitness-goal-bar-bg" style={{position:'relative',height:8,borderRadius:4}}>
-          <div style={{position:'absolute',top:0,left:0,height:'100%',width:`${periodPct}%`,background:'rgba(0,0,0,0.08)',borderRadius:4,zIndex:0}}/>
+        <div className="fitness-goal-bar-bg" style={{position:'relative',height:7,borderRadius:4}}>
+          <div style={{position:'absolute',top:0,left:0,height:'100%',width:`${periodPct}%`,background:'rgba(0,0,0,0.07)',borderRadius:4,zIndex:0}}/>
           <div className={`fitness-goal-bar-fill ${done?'done':''}`} style={{width:`${Math.min(100,pct)}%`,height:'100%',borderRadius:4,position:'relative',zIndex:1}}/>
         </div>
-        <div style={{display:'flex',justifyContent:'space-between',marginTop:3,gap:8}}>
+        <div style={{display:'flex',justifyContent:'space-between',marginTop:4,gap:8}}>
           <span style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)'}}>
-            Should be at: <b style={{color:ahead?'var(--accent)':'var(--red)'}}>{targetPace.toLocaleString()}</b>
+            Should be: <b style={{color:ahead?'var(--accent)':'var(--red)'}}>{targetPace.toLocaleString()}</b>
           </span>
-          <span style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)',fontStyle:'italic'}}>
-            On pace for: <b style={{color:'var(--ink)',fontStyle:'normal'}}>{expectedAtPace.toLocaleString()}</b> / {goal.target.toLocaleString()}
+          <span style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)'}}>
+            On pace for: <b style={{color:'var(--ink)'}}>{expectedAtPace.toLocaleString()}</b> / {goal.target.toLocaleString()}
           </span>
         </div>
       </div>
@@ -6126,25 +6136,40 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
 
       {/* MAIN */}
       <div className="fitness-main">
-        <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
-          <div style={{flex:1,minWidth:0}}>
-            <div className="fitness-day-label">
-              {fitView==='day'?`${DAYS[selectedDate.getDay()]}, ${MONTHS[selectedDate.getMonth()].slice(0,3)} ${selectedDate.getDate()}, ${viewYear}`
-               :fitView==='week'?`Week of ${MONTHS[weekStart.getMonth()].slice(0,3)} ${weekStart.getDate()}`
-               :fitView==='month'?`${MONTHS[viewMonth]} ${viewYear}`
-               :String(viewYear)}
-            </div>
+        {/* View tabs row — full width on mobile */}
+        <div className="fitness-view-tabs" style={{alignSelf:'stretch'}}>
+          {['day','week','month','year'].map(v=>(
+            <button key={v} className={`fitness-view-tab ${fitView===v?'active':''}`}
+              onClick={()=>setFitView(v)} style={{flex:1}}>
+              {v.charAt(0).toUpperCase()+v.slice(1)}
+            </button>
+          ))}
+        </div>
+        {/* Date nav + add button row */}
+        <div style={{display:'flex',alignItems:'center',gap:8}}>
+          <button className="nav-arrow" style={{flexShrink:0}} onClick={()=>{
+            if(fitView==='day') setSelectedDate(d=>addDays(d,-1));
+            else if(fitView==='week') setSelectedDate(d=>addDays(d,-7));
+            else if(fitView==='month') setSelectedDate(d=>new Date(d.getFullYear(),d.getMonth()-1,1));
+            else setSelectedDate(d=>new Date(d.getFullYear()-1,0,1));
+          }}>‹</button>
+          <div className="fitness-day-label" style={{flex:1,fontSize:14}}>
+            {fitView==='day'?`${DAYS[selectedDate.getDay()]}, ${MONTHS[selectedDate.getMonth()].slice(0,3)} ${selectedDate.getDate()}, ${viewYear}`
+             :fitView==='week'?`${MONTHS[weekStart.getMonth()].slice(0,3)} ${weekStart.getDate()} – ${MONTHS[addDays(weekStart,6).getMonth()].slice(0,3)} ${addDays(weekStart,6).getDate()}`
+             :fitView==='month'?`${MONTHS[viewMonth]} ${viewYear}`
+             :String(viewYear)}
           </div>
-          <div className="fitness-view-tabs">
-            {['day','week','month','year'].map(v=>(
-              <button key={v} className={`fitness-view-tab ${fitView===v?'active':''}`} onClick={()=>setFitView(v)}>
-                {v.charAt(0).toUpperCase()+v.slice(1)}
-              </button>
-            ))}
-          </div>
+          <button className="nav-arrow" style={{flexShrink:0}} onClick={()=>{
+            if(fitView==='day') setSelectedDate(d=>addDays(d,1));
+            else if(fitView==='week') setSelectedDate(d=>addDays(d,7));
+            else if(fitView==='month') setSelectedDate(d=>new Date(d.getFullYear(),d.getMonth()+1,1));
+            else setSelectedDate(d=>new Date(d.getFullYear()+1,0,1));
+          }}>›</button>
           {fitView==='day'&&(
             <button onClick={()=>setShowExPicker({dk:dateKey})}
-              style={{background:'var(--accent)',color:'white',border:'none',borderRadius:'var(--radius-md)',padding:'7px 16px',cursor:'pointer',fontSize:12,fontWeight:600,fontFamily:"'DM Sans',sans-serif",flexShrink:0}}>
+              style={{background:'var(--accent)',color:'white',border:'none',borderRadius:'var(--radius-md)',
+                padding:'7px 14px',cursor:'pointer',fontSize:12,fontWeight:600,
+                fontFamily:"'DM Sans',sans-serif",flexShrink:0}}>
               + Exercise
             </button>
           )}
@@ -6188,8 +6213,11 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
             if(!wGoals.length) return null;
             return (
               <div style={{background:'var(--paper)',borderRadius:'var(--radius-md)',border:'1px solid var(--border)',padding:'12px 16px',marginTop:4}}>
-                <div style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)',textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:8}}>
-                  Weekly Goals — {Math.round((weekDays.filter(d=>d<=today).length/7)*100)}% of week elapsed
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
+                  <span style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)',textTransform:'uppercase',letterSpacing:'0.06em'}}>
+                    Weekly Goals — {Math.round((weekDays.filter(d=>d<=today).length/7)*100)}% of week elapsed
+                  </span>
+                  <button className="add-btn" onClick={()=>setShowGoalManager(true)} title="Manage goals">+</button>
                 </div>
                 {wGoals.map(goal=>renderGoalBar(goal,today,false))}
               </div>
@@ -6232,8 +6260,11 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
             if(!mGoals.length) return null;
             return (
               <div style={{background:'var(--paper)',borderRadius:'var(--radius-md)',border:'1px solid var(--border)',padding:'12px 16px',marginTop:12}}>
-                <div style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)',textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:8}}>
-                  Monthly Goals — {Math.round(Math.min(today.getDate(),daysInMonth)/daysInMonth*100)}% of month elapsed
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
+                  <span style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)',textTransform:'uppercase',letterSpacing:'0.06em'}}>
+                    Monthly Goals — {Math.round(Math.min(today.getDate(),daysInMonth)/daysInMonth*100)}% of month elapsed
+                  </span>
+                  <button className="add-btn" onClick={()=>setShowGoalManager(true)} title="Manage goals">+</button>
                 </div>
                 {mGoals.map(goal=>renderGoalBar(goal,today,false))}
               </div>
@@ -6250,10 +6281,13 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
           const yearPct=Math.round((dayOfYear/totalDaysInYear)*100);
           return (
             <div style={{display:'flex',flexDirection:'column',gap:16}}>
-              <div style={{fontSize:11,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)'}}>{viewYear} · {yearPct}% elapsed · {dayOfYear} of {totalDaysInYear} days</div>
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                <div style={{fontSize:11,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)'}}>{viewYear} · {yearPct}% elapsed · {dayOfYear} of {totalDaysInYear} days</div>
+                <button className="add-btn" onClick={()=>setShowGoalManager(true)} title="Manage goals">+</button>
+              </div>
               {yGoals.length===0&&(
                 <div style={{textAlign:'center',padding:'40px 20px',color:'var(--ink-faint)',fontSize:13,fontStyle:'italic'}}>
-                  No yearly goals set.<br/><span style={{fontSize:11}}>Click + in the sidebar to add one.</span>
+                  No yearly goals set.<br/><span style={{fontSize:11}}>Tap + above to add one.</span>
                 </div>
               )}
               {yGoals.map(goal=>{
