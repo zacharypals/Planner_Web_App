@@ -4,8 +4,8 @@
   "description": "Weekly planner, habit tracker, and monthly calendar",
   "start_url": "/Planner_Web_App/",
   "display": "standalone",
-  "background_color": "#3b1f5e",
-  "theme_color": "#3b1f5e",
+  "background_color": "#bd7af5",
+  "theme_color": "#bd7af5",
   "orientation": "portrait-primary",
   "icons": [
     {
