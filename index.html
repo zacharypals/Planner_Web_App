@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v3.5.2 -->
+<!-- LP Planner v3.5.3 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -512,6 +512,11 @@
   .fitness-week-col-date { font-size: 16px; color: white; font-family: 'Playfair Display',serif; font-weight: 600; }
   .fitness-week-col.today .fitness-week-col-date { color: var(--gold); }
   .fitness-week-col-body { padding: 6px; min-height: 60px; }
+  .fitness-week-col.drag-over { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-light); }
+  .fitness-week-col.drag-over .fitness-week-col-body { background: var(--accent-light); }
+  .fitness-month-cell.drag-over { border-color: var(--accent) !important; background: var(--accent-light) !important; box-shadow: 0 0 0 2px var(--accent-light); }
+  .fitness-week-workout-pill[draggable] { cursor: grab; }
+  .fitness-week-workout-pill[draggable]:active { cursor: grabbing; opacity: 0.6; }
   .fitness-week-workout-pill {
     background: var(--accent-light); color: var(--accent); border-radius: 4px;
     padding: 3px 6px; font-size: 10px; font-family: 'DM Sans',sans-serif; font-weight: 600;
@@ -1805,11 +1810,13 @@ async function pushEventToCalendar(event, dateKey) {
     start = { date: dateStr };
     end = { date: nextStr };
   }
+  const inviteeList = (event.invitees||[]).filter(Boolean);
   const body = {
     summary: event.title || 'Untitled Event',
     description: event.details || '',
     start, end,
     extendedProperties: { private: { plannerId: event.id } },
+    ...(inviteeList.length > 0 ? { attendees: inviteeList.map(email=>({email})) } : {}),
   };
   const res = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
     method: 'POST',
@@ -1862,6 +1869,7 @@ async function updateEventInCalendar(gcalId, event, dateKey) {
     description: event.details || '',
     start,
     end,
+    ...(((event.invitees||[]).filter(Boolean).length > 0) ? { attendees: event.invitees.filter(Boolean).map(email=>({email})) } : {}),
   };
   console.log('updateEventInCalendar PUT body:', JSON.stringify({gcalId, start, end, summary: body.summary}));
   const res = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${gcalId}`, {
@@ -4436,7 +4444,7 @@ function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals 
   const [selectedDate, setSelectedDate] = useState(null);
   const [showEventModal, setShowEventModal] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null); // {dayKey, taskId} or null
-  const [eventForm, setEventForm] = useState({title:'', time:'', date:'', details:''});
+  const [eventForm, setEventForm] = useState({title:'', time:'', date:'', details:'', invitees:''});
   const [dragInfo, setDragInfo] = useState(null); // {eventId, fromDayKey}
   const [dragOverDay, setDragOverDay] = useState(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -4530,13 +4538,13 @@ function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals 
   function openAddEvent(dateKey) {
     setSelectedDate(dateKey);
     setEditingEvent(null);
-    setEventForm({title:'', time:'', date:dateKey, details:''});
+    setEventForm({title:'', time:'', date:dateKey, details:'', invitees:''});
     setShowEventModal(true);
   }
 
   function openEditEvent(ev) {
     setEditingEvent({dayKey: ev.dayKey, taskId: ev.id});
-    setEventForm({title: ev.title||'', time: ev.eventTime||'', date: ev.dayKey||'', details: ev.details||''});
+    setEventForm({title: ev.title||'', time: ev.eventTime||'', date: ev.dayKey||'', details: ev.details||'', invitees:(ev.invitees||[]).join(', ')});
     setShowEventModal(true);
   }
 
@@ -4553,7 +4561,7 @@ function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals 
           if (tasks) {
             const idx = tasks.findIndex(t => t.id === editingEvent.taskId);
             if (idx !== -1) {
-              const updatedTask = {...tasks[idx], title:eventForm.title, eventTime:eventForm.time, details:eventForm.details};
+              const updatedTask = {...tasks[idx], title:eventForm.title, eventTime:eventForm.time, details:eventForm.details, invitees:eventForm.invitees.split(',').map(s=>s.trim()).filter(Boolean)};
               if (dateChanged) {
                 // Remove from old day
                 updated[wk].tasks[editingEvent.dayKey] = tasks.filter(t => t.id !== editingEvent.taskId);
@@ -4580,7 +4588,7 @@ function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals 
       const dateObj = new Date(targetDate + 'T00:00:00');
       const weekKey = fmt(getWeekStart(dateObj));
       const newTask = {
-        id: Date.now().toString(), title: eventForm.title, details: eventForm.details,
+        id: Date.now().toString(), title: eventForm.title, details: eventForm.details, invitees:eventForm.invitees.split(',').map(s=>s.trim()).filter(Boolean),
         done: false, expanded: false, colorIndex: 3, isEvent: true, eventTime: eventForm.time,
         gcalId: null,
       };
@@ -4792,6 +4800,18 @@ function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals 
             </div>
             <textarea className="modal-textarea" placeholder="Details (optional)…"
               value={eventForm.details} onChange={e=>setEventForm(f=>({...f,details:e.target.value}))} rows={3} />
+            <div style={{marginTop:8}}>
+              <label style={{fontSize:12,color:'var(--ink-faint)',display:'block',marginBottom:4}}>
+                Invite (comma-separated emails):
+              </label>
+              <input className="modal-input" placeholder="friend@email.com, other@email.com…"
+                value={eventForm.invitees}
+                onChange={e=>setEventForm(f=>({...f,invitees:e.target.value}))}
+                style={{marginTop:0,fontSize:12}} />
+              <div style={{fontSize:10,color:'var(--ink-faint)',marginTop:3,fontStyle:'italic'}}>
+                Google Calendar will send invitations to these addresses.
+              </div>
+            </div>
             <div className="modal-actions">
               {editingEvent && (
                 <button className="modal-btn danger" onClick={()=>{
@@ -5595,7 +5615,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.5.2</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.5.3</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -5723,6 +5743,8 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
   const [selectedDate, setSelectedDate] = useState(today);
   const [fitView, setFitView] = useState('week');
   const [showExPicker, setShowExPicker] = useState(null);
+  const [dragEx, setDragEx] = useState(null); // {exId, fromDk, exerciseId}
+  const [dragOverDk, setDragOverDk] = useState(null);
   const [showLibManager, setShowLibManager] = useState(false);
   const [showGoalManager, setShowGoalManager] = useState(false);
   const [goalsCollapsed, setGoalsCollapsed] = useState(false);
@@ -5883,6 +5905,20 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
     if (fitView!=='day') { setSelectedDate(new Date(dk+'T00:00:00')); setFitView('day'); }
   }
   function deleteExercise(dk, exId) { setDayExs(dk, exs=>exs.filter(e=>e.id!==exId)); }
+  function moveExercise(fromDk, toDk, exId) {
+    if (fromDk===toDk) return;
+    setFitnessLog(log => {
+      const fromExs = (()=>{ const r=log[fromDk]||[]; return (r[0]&&Array.isArray(r[0].exercises))?r.flatMap(w=>w.exercises||[]):r; })();
+      const toExs   = (()=>{ const r=log[toDk]||[];   return (r[0]&&Array.isArray(r[0].exercises))?r.flatMap(w=>w.exercises||[]):r; })();
+      const ex = fromExs.find(e=>e.id===exId);
+      if (!ex) return log;
+      return {
+        ...log,
+        [fromDk]: fromExs.filter(e=>e.id!==exId),
+        [toDk]:   [...toExs, {...ex, id:'ex'+Date.now()}],
+      };
+    });
+  }
   function updateSet(dk, exId, setId, patch) {
     setDayExs(dk, exs=>exs.map(e=>e.id!==exId?e:{...e,sets:e.sets.map(s=>s.id!==setId?s:{...s,...patch})}));
   }
@@ -6236,15 +6272,31 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
             {weekDays.map(d=>{
               const dk=fmt(d),isToday=isSameDay(d,today);
               const dayExs=getDayExercises(dk);
+              const isDragOver=dragOverDk===dk;
               return (
-                <div key={dk} className={`fitness-week-col ${isToday?'today':''}`} onClick={()=>{setSelectedDate(d);setFitView('day');}}>
+                <div key={dk} className={`fitness-week-col ${isToday?'today':''} ${isDragOver?'drag-over':''}`}
+                  onClick={()=>{if(!dragEx){setSelectedDate(d);setFitView('day');}}}
+                  onDragOver={e=>{e.preventDefault();setDragOverDk(dk);}}
+                  onDragLeave={()=>setDragOverDk(null)}
+                  onDrop={e=>{
+                    e.preventDefault();
+                    if(dragEx && dragEx.fromDk!==dk){moveExercise(dragEx.fromDk,dk,dragEx.exId);}
+                    setDragEx(null);setDragOverDk(null);
+                  }}>
                   <div className="fitness-week-col-hdr">
                     <div className="fitness-week-col-day">{DAYS[d.getDay()].slice(0,3)}</div>
                     <div className="fitness-week-col-date">{d.getDate()}</div>
                   </div>
                   <div className="fitness-week-col-body">
-                    {dayExs.map(ex=><div key={ex.id} className="fitness-week-workout-pill" title={exName(ex.exerciseId)}>{exName(ex.exerciseId)}</div>)}
-                    {dayExs.length===0&&<div style={{fontSize:9,color:'var(--ink-faint)',fontStyle:'italic',padding:'4px 0',textAlign:'center'}}>Rest</div>}
+                    {dayExs.map(ex=>(
+                      <div key={ex.id} className="fitness-week-workout-pill" title={exName(ex.exerciseId)}
+                        draggable={true}
+                        onDragStart={e=>{e.stopPropagation();setDragEx({exId:ex.id,fromDk:dk,exerciseId:ex.exerciseId});}}
+                        onDragEnd={()=>{setDragEx(null);setDragOverDk(null);}}>
+                        {exName(ex.exerciseId)}
+                      </div>
+                    ))}
+                    {dayExs.length===0&&<div style={{fontSize:9,color:'var(--ink-faint)',fontStyle:'italic',padding:'4px 0',textAlign:'center'}}>{isDragOver?'Drop here':'Rest'}</div>}
                     <button className="fitness-week-add" onClick={e=>{e.stopPropagation();setShowExPicker({dk});}}>+ Add</button>
                   </div>
                 </div>
@@ -6282,13 +6334,23 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
                 const isToday=isSameDay(d,today),isPast=d<today&&!isToday;
                 const dayExs=getDayExercises(dk);
                 return (
-                  <div key={dk} className={`fitness-month-cell ${isToday?'today':''}`}
+                  <div key={dk} className={`fitness-month-cell ${isToday?'today':''} ${dragOverDk===dk?'drag-over':''}`}
                     style={{opacity:isPast?0.6:1,background:isPast&&dayExs.length===0?'var(--cream)':undefined}}
-                    onClick={()=>{setSelectedDate(d);setFitView('day');}}>
+                    onClick={()=>{if(!dragEx){setSelectedDate(d);setFitView('day');}}}
+                    onDragOver={e=>{e.preventDefault();setDragOverDk(dk);}}
+                    onDragLeave={()=>setDragOverDk(null)}
+                    onDrop={e=>{
+                      e.preventDefault();
+                      if(dragEx && dragEx.fromDk!==dk){moveExercise(dragEx.fromDk,dk,dragEx.exId);}
+                      setDragEx(null);setDragOverDk(null);
+                    }}>
                     <div className="fitness-month-cell-num">{i+1}</div>
                     <div style={{marginTop:3}}>
                       {dayExs.map(ex=>(
-                        <div key={ex.id} className="fitness-week-workout-pill" style={{fontSize:9,padding:'1px 4px',marginBottom:1}} title={exName(ex.exerciseId)}>
+                        <div key={ex.id} className="fitness-week-workout-pill" style={{fontSize:9,padding:'1px 4px',marginBottom:1}} title={exName(ex.exerciseId)}
+                          draggable={true}
+                          onDragStart={e=>{e.stopPropagation();setDragEx({exId:ex.id,fromDk:dk,exerciseId:ex.exerciseId});}}
+                          onDragEnd={()=>{setDragEx(null);setDragOverDk(null);}}>
                           {exName(ex.exerciseId)}
                         </div>
                       ))}
