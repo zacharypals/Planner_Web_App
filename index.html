@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v3.5.4 -->
+<!-- LP Planner v3.5.5 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -1939,7 +1939,7 @@ async function pullNewFromCalendar(weekData) {
   const oneYearAgo = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
   const oneYearFwd = new Date(now.getFullYear() + 1, now.getMonth(), now.getDate());
   const res = await fetch(
-    `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${oneYearAgo.toISOString()}&timeMax=${oneYearFwd.toISOString()}&singleEvents=true&maxResults=500&fields=items(id,summary,description,start,end,extendedProperties,attendees,organizer)`,
+    `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${oneYearAgo.toISOString()}&timeMax=${oneYearFwd.toISOString()}&singleEvents=true&maxResults=500&showHiddenInvitations=true&fields=items(id,summary,description,start,end,extendedProperties,attendees,organizer)`,
     { headers: { 'Authorization': `Bearer ${token}` } }
   );
   if (!res.ok) {
@@ -3402,6 +3402,39 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onEnterKey, titleRef, 
             <div style={{display:'flex',alignItems:'center',gap:6,paddingTop:4}} onClick={e=>e.stopPropagation()}>
               <span style={{fontSize:10,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace"}}>Time:</span>
               <TimeSelect value={task.eventTime||''} onChange={v=>onUpdate({eventTime:v})} />
+            </div>
+          )}
+          {task.isEvent && task.calendarInvite && (
+            <div style={{paddingTop:6,borderTop:'1px solid rgba(0,0,0,0.07)',marginTop:4}} onClick={e=>e.stopPropagation()}>
+              {task.responseStatus==='needsAction' ? (<>
+                <div style={{fontSize:10,color:'var(--gold)',fontFamily:"'DM Mono',monospace",marginBottom:5}}>📨 You've been invited — respond:</div>
+                <div className="invite-response-btns">
+                  <button className="invite-btn accept" onClick={e=>{
+                    e.stopPropagation();
+                    respondToCalendarInvite(task.gcalId,'accepted')
+                      .then(()=>onUpdate({responseStatus:'accepted'}))
+                      .catch(err=>alert('Could not respond: '+err.message));
+                  }}>✓ Accept</button>
+                  <button className="invite-btn tentative" onClick={e=>{
+                    e.stopPropagation();
+                    respondToCalendarInvite(task.gcalId,'tentative')
+                      .then(()=>onUpdate({responseStatus:'tentative'}))
+                      .catch(err=>alert('Could not respond: '+err.message));
+                  }}>? Maybe</button>
+                  <button className="invite-btn decline" onClick={e=>{
+                    e.stopPropagation();
+                    respondToCalendarInvite(task.gcalId,'declined')
+                      .then(()=>onUpdate({responseStatus:'declined'}))
+                      .catch(err=>alert('Could not respond: '+err.message));
+                  }}>✗ Decline</button>
+                </div>
+              </>) : (
+                <div style={{fontSize:10,fontFamily:"'DM Mono',monospace"}}>
+                  <span className={`invite-badge ${task.responseStatus||'needsAction'}`}>
+                    {task.responseStatus==='accepted'?'✓ accepted':task.responseStatus==='declined'?'✗ declined':task.responseStatus==='tentative'?'? maybe':'📨 invited'}
+                  </span>
+                </div>
+              )}
             </div>
           )}
           <div style={{display:'flex',alignItems:'center',gap:6,paddingTop:6}}>
@@ -5693,7 +5726,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.5.4</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.5.5</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
