@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v3.5.9 -->
+<!-- LP Planner v3.5.10 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -1703,8 +1703,17 @@ function requestToken(onSuccess, onError) {
   }
   window.addEventListener('message', onMessage);
   const check = setInterval(() => {
-    if (popup.closed) { clearInterval(check); if (!done) { done=true; window.removeEventListener('message', onMessage); } }
-  }, 1000);
+    if (popup.closed) {
+      clearInterval(check);
+      if (!done) {
+        // Popup closed — but postMessage may have been queued just before close.
+        // Give it a 2-second grace period to arrive before removing the listener.
+        setTimeout(() => {
+          if (!done) { done = true; window.removeEventListener('message', onMessage); }
+        }, 2000);
+      }
+    }
+  }, 500); // check every 500ms instead of 1000ms for faster detection
 }
 
 // Silent refresh via Worker — no popup, no user interaction needed
@@ -5785,7 +5794,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.5.9</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.5.10</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
