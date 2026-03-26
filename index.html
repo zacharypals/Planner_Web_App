@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v3.5.5 -->
+<!-- LP Planner v3.5.6 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -3404,6 +3404,18 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onEnterKey, titleRef, 
               <TimeSelect value={task.eventTime||''} onChange={v=>onUpdate({eventTime:v})} />
             </div>
           )}
+          {task.isEvent && (
+            <div style={{paddingTop:5}} onClick={e=>e.stopPropagation()}>
+              <div style={{fontSize:10,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace",marginBottom:3}}>Invite (emails):</div>
+              <input type="text" placeholder="friend@email.com, other@…"
+                value={(task.invitees||[]).join(', ')}
+                onChange={e=>onUpdate({invitees:e.target.value.split(',').map(s=>s.trim()).filter(Boolean)})}
+                style={{width:'100%',fontSize:11,fontFamily:"'DM Sans',sans-serif",
+                  border:'1px solid var(--border)',borderRadius:4,padding:'4px 7px',
+                  background:'white',color:'var(--ink)',outline:'none',boxSizing:'border-box'}}
+              />
+            </div>
+          )}
           {task.isEvent && task.calendarInvite && (
             <div style={{paddingTop:6,borderTop:'1px solid rgba(0,0,0,0.07)',marginTop:4}} onClick={e=>e.stopPropagation()}>
               {task.responseStatus==='needsAction' ? (<>
@@ -4894,7 +4906,26 @@ function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals 
       <button className="mobile-fab" onClick={()=>setSheetOpen(o=>!o)} title="Monthly goals & events">☰</button>
 
       {/* EVENT MODAL */}
-      {showEventModal && (
+      {showEventModal && (()=>{
+        const editTask = editingEvent
+          ? Object.values(weekData).flatMap(wd=>Object.values(wd.tasks||{}).flat()).find(t=>t.id===editingEvent.taskId)
+          : null;
+        const isPending = editTask?.calendarInvite && editTask?.responseStatus==='needsAction';
+        function handleModalRespond(response) {
+          if (!editTask?.gcalId) return;
+          respondToCalendarInvite(editTask.gcalId, response).then(()=>{
+            setWeekData(wd=>{
+              const updated=JSON.parse(JSON.stringify(wd));
+              Object.values(updated).forEach(week=>Object.values(week.tasks||{}).forEach(tasks=>{
+                const t=tasks.find(t=>t.gcalId===editTask.gcalId);
+                if(t){t.responseStatus=response;t.calendarInvite=true;}
+              }));
+              return updated;
+            });
+            setShowEventModal(false);
+          }).catch(err=>alert('Could not respond: '+err.message));
+        }
+        return (
         <div className="modal-backdrop" onClick={()=>setShowEventModal(false)}>
           <div className="modal-box" onClick={e=>e.stopPropagation()}>
             <div className="modal-title">{editingEvent ? 'Edit Event' : `Add Event — ${selectedDate}`}</div>
@@ -4923,6 +4954,32 @@ function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals 
                 Google Calendar will send invitations to these addresses.
               </div>
             </div>
+            {editTask?.calendarInvite && (
+              <div style={{marginTop:10,padding:'8px 10px',borderRadius:'var(--radius-sm)',
+                background: isPending?'var(--gold-light)':'var(--accent-light)',
+                border:`1px solid ${isPending?'var(--gold)':'var(--accent)'}`}}>
+                {isPending ? (<>
+                  <div style={{fontSize:11,fontFamily:"'DM Mono',monospace",color:'var(--gold)',fontWeight:700,marginBottom:6}}>
+                    📨 You've been invited — respond:
+                  </div>
+                  <div className="invite-response-btns">
+                    <button className="invite-btn accept" onClick={()=>handleModalRespond('accepted')}>✓ Accept</button>
+                    <button className="invite-btn tentative" onClick={()=>handleModalRespond('tentative')}>? Maybe</button>
+                    <button className="invite-btn decline" onClick={()=>handleModalRespond('declined')}>✗ Decline</button>
+                  </div>
+                </>) : (
+                  <div style={{fontSize:11,fontFamily:"'DM Mono',monospace"}}>
+                    Your RSVP: <span className={`invite-badge ${editTask.responseStatus}`}>
+                      {editTask.responseStatus==='accepted'?'✓ accepted':editTask.responseStatus==='declined'?'✗ declined':'? maybe'}
+                    </span>
+                    <button style={{marginLeft:8,fontSize:10,background:'none',border:'none',cursor:'pointer',color:'var(--ink-faint)',textDecoration:'underline'}}
+                      onClick={()=>setWeekData(wd=>{const u=JSON.parse(JSON.stringify(wd));Object.values(u).forEach(wk=>Object.values(wk.tasks||{}).forEach(ts=>{const t=ts.find(t=>t.gcalId===editTask.gcalId);if(t)t.responseStatus='needsAction';}));return u;})}>
+                      Change
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
             <div className="modal-actions">
               {editingEvent && (
                 <button className="modal-btn danger" onClick={()=>{
@@ -4935,7 +4992,8 @@ function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals 
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
@@ -5726,7 +5784,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.5.5</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.5.6</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
