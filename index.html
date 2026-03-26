@@ -979,6 +979,17 @@
     border-radius: 5px; cursor: pointer; transition: background 0.1s;
   }
   .month-event-item:hover { background: var(--cream); }
+  .month-event-item.pending { border-left: 3px solid var(--gold); background: var(--gold-light); }
+  .month-event-item.pending:hover { background: #faefd8; }
+  .invite-badge { font-size: 9px; font-family: 'DM Mono',monospace; font-weight: 700; padding: 1px 5px; border-radius: 3px; flex-shrink: 0; }
+  .invite-badge.needsAction { background: var(--gold-light); color: var(--gold); border: 1px solid var(--gold); }
+  .invite-badge.accepted { background: var(--accent-light); color: var(--accent); border: 1px solid var(--accent); }
+  .invite-badge.declined { background: var(--red-light); color: var(--red); border: 1px solid var(--red); }
+  .invite-response-btns { display: flex; gap: 4px; margin-top: 4px; }
+  .invite-btn { font-size: 10px; font-family: 'DM Sans',sans-serif; font-weight: 600; padding: 2px 8px; border-radius: 4px; border: none; cursor: pointer; transition: opacity 0.1s; }
+  .invite-btn.accept { background: var(--accent); color: white; }
+  .invite-btn.decline { background: var(--red-light); color: var(--red); border: 1px solid var(--red); }
+  .invite-btn.tentative { background: var(--gold-light); color: var(--gold); border: 1px solid var(--gold); }
   .month-event-date { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--ink-faint); flex-shrink: 0; min-width: 64px; }
   .month-event-time { color: var(--gold); }
   .month-event-title { font-size: 12px; color: var(--ink); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1818,7 +1829,7 @@ async function pushEventToCalendar(event, dateKey) {
     extendedProperties: { private: { plannerId: event.id } },
     ...(inviteeList.length > 0 ? { attendees: inviteeList.map(email=>({email})) } : {}),
   };
-  const res = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
+  const res = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events?sendUpdates=all', {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -1841,6 +1852,25 @@ async function deleteEventFromCalendar(gcalId) {
     method: 'DELETE',
     headers: { 'Authorization': `Bearer ${token}` },
   });
+}
+
+async function respondToCalendarInvite(gcalId, response) {
+  // response: 'accepted' | 'declined' | 'tentative'
+  const token = getToken();
+  if (!token || !gcalId) return;
+  const email = getSavedEmail();
+  if (!email) return;
+  // PATCH only the attendee entry for this user
+  const res = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${gcalId}?sendUpdates=all`, {
+    method: 'PATCH',
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ attendees: [{ email, responseStatus: response }] }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(()=>({}));
+    throw new Error(`Calendar respond failed: ${res.status} ${err?.error?.message||''}`);
+  }
+  return response;
 }
 
 async function updateEventInCalendar(gcalId, event, dateKey) {
@@ -1872,7 +1902,7 @@ async function updateEventInCalendar(gcalId, event, dateKey) {
     ...(((event.invitees||[]).filter(Boolean).length > 0) ? { attendees: event.invitees.filter(Boolean).map(email=>({email})) } : {}),
   };
   console.log('updateEventInCalendar PUT body:', JSON.stringify({gcalId, start, end, summary: body.summary}));
-  const res = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${gcalId}`, {
+  const res = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${gcalId}?sendUpdates=all`, {
     method: 'PUT',
     headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -1909,7 +1939,7 @@ async function pullNewFromCalendar(weekData) {
   const oneYearAgo = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
   const oneYearFwd = new Date(now.getFullYear() + 1, now.getMonth(), now.getDate());
   const res = await fetch(
-    `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${oneYearAgo.toISOString()}&timeMax=${oneYearFwd.toISOString()}&singleEvents=true&maxResults=500`,
+    `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${oneYearAgo.toISOString()}&timeMax=${oneYearFwd.toISOString()}&singleEvents=true&maxResults=500&fields=items(id,summary,description,start,end,extendedProperties,attendees,organizer)`,
     { headers: { 'Authorization': `Bearer ${token}` } }
   );
   if (!res.ok) {
@@ -1958,8 +1988,13 @@ async function pullNewFromCalendar(weekData) {
       const newWeekKey = fmt(getWeekStart(newDateObj));
       if (!newWeekData[newWeekKey]) newWeekData[newWeekKey] = {proverb:'',toCreate:[],weekGoals:[],people:[],beWord:'',proud:'',story:'',tasks:{}};
       if (!newWeekData[newWeekKey].tasks[newDateStr]) newWeekData[newWeekKey].tasks[newDateStr] = [];
+      // Find my responseStatus if I'm an attendee
+      const myEmail = typeof getSavedEmail === 'function' ? getSavedEmail() : null;
+      const myAttendee = myEmail && (ev.attendees||[]).find(a => a.email?.toLowerCase()===myEmail.toLowerCase());
+      const responseStatus = myAttendee?.responseStatus || null;
       newWeekData[newWeekKey].tasks[newDateStr].push({
         ...task, title: ev.summary||'', details: ev.description||'', eventTime: newTimeStr,
+        responseStatus, calendarInvite: !!myAttendee,
       });
     } else {
       // Net new event — add it
@@ -1970,11 +2005,15 @@ async function pullNewFromCalendar(weekData) {
       const newWeekKey = fmt(getWeekStart(newDateObj));
       if (!newWeekData[newWeekKey]) newWeekData[newWeekKey] = {proverb:'',toCreate:[],weekGoals:[],people:[],beWord:'',proud:'',story:'',tasks:{}};
       if (!newWeekData[newWeekKey].tasks[newDateStr]) newWeekData[newWeekKey].tasks[newDateStr] = [];
+      const myEmail2 = typeof getSavedEmail === 'function' ? getSavedEmail() : null;
+      const myAttendee2 = myEmail2 && (ev.attendees||[]).find(a => a.email?.toLowerCase()===myEmail2.toLowerCase());
+      const responseStatus2 = myAttendee2?.responseStatus || null;
       newWeekData[newWeekKey].tasks[newDateStr].push({
         id: 'gcal_' + ev.id, gcalId: ev.id,
         title: ev.summary||'', details: ev.description||'',
         done: false, expanded: false, colorIndex: 3,
         isEvent: true, eventTime: newTimeStr,
+        responseStatus: responseStatus2, calendarInvite: !!myAttendee2,
       });
     }
   });
@@ -3290,6 +3329,9 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onEnterKey, titleRef, 
             onClick={e=>{e.stopPropagation();onUpdate({isEvent:!task.isEvent});}}>
             {task.isEvent ? '📅' : '⠿'}
           </button>
+        )}
+        {task.isEvent && task.calendarInvite && task.responseStatus==='needsAction' && (
+          <span className="invite-badge needsAction" style={{fontSize:8,padding:'1px 4px'}}>📨</span>
         )}
         <div className={`task-check ${task.done?'done':''}`}
           style={{borderColor: task.done ? '#2d5a3d' : undefined, color: task.done ? '#2d5a3d' : undefined, background: task.done ? '#e8f0eb' : undefined}}
@@ -4685,21 +4727,57 @@ function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals 
         {monthEvents.length === 0 && (
           <div style={{fontSize:11,color:'var(--ink-faint)',fontStyle:'italic',marginTop:4}}>No events yet</div>
         )}
-        {monthEvents.map(ev=>(
-          <div key={ev.id} className="month-event-item" onClick={()=>openEditEvent(ev)}>
-            <div className="month-event-date">
-              {MONTHS[ev.date.getMonth()].slice(0,3)} {ev.date.getDate()}
-              {ev.eventTime && <span className="month-event-time"> {ev.eventTime}</span>}
+        {monthEvents.map(ev=>{
+          const isPending = ev.calendarInvite && ev.responseStatus === 'needsAction';
+          const isDeclined = ev.responseStatus === 'declined';
+          function handleRespond(response, e) {
+            e.stopPropagation();
+            if (!ev.gcalId) return;
+            respondToCalendarInvite(ev.gcalId, response).then(() => {
+              setWeekData(wd => {
+                const updated = JSON.parse(JSON.stringify(wd));
+                Object.values(updated).forEach(week => {
+                  Object.values(week.tasks || {}).forEach(tasks => {
+                    const t = tasks.find(t => t.gcalId === ev.gcalId);
+                    if (t) { t.responseStatus = response; t.calendarInvite = true; }
+                  });
+                });
+                return updated;
+              });
+            }).catch(err => alert('Could not respond: ' + err.message));
+          }
+          return (
+            <div key={ev.id} className={`month-event-item ${isPending?'pending':''}`} onClick={()=>openEditEvent(ev)}>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{display:'flex',alignItems:'center',gap:6}}>
+                  <div className="month-event-date">
+                    {MONTHS[ev.date.getMonth()].slice(0,3)} {ev.date.getDate()}
+                    {ev.eventTime && <span className="month-event-time"> {ev.eventTime}</span>}
+                  </div>
+                  {ev.calendarInvite && (
+                    <span className={`invite-badge ${ev.responseStatus||'needsAction'}`}>
+                      {ev.responseStatus==='accepted'?'✓ accepted':ev.responseStatus==='declined'?'✗ declined':ev.responseStatus==='tentative'?'? maybe':'📨 invited'}
+                    </span>
+                  )}
+                </div>
+                <div className="month-event-title" style={{opacity:isDeclined?0.45:1}}>{ev.title||<em style={{opacity:0.5}}>Untitled</em>}</div>
+                {isPending && (
+                  <div className="invite-response-btns" onClick={e=>e.stopPropagation()}>
+                    <button className="invite-btn accept" onClick={e=>handleRespond('accepted',e)}>✓ Accept</button>
+                    <button className="invite-btn tentative" onClick={e=>handleRespond('tentative',e)}>? Maybe</button>
+                    <button className="invite-btn decline" onClick={e=>handleRespond('declined',e)}>✗ Decline</button>
+                  </div>
+                )}
+              </div>
+              <button className="delete-item-btn" style={{marginLeft:'auto',flexShrink:0,opacity:0.4,fontSize:13,color:'var(--red)',alignSelf:'flex-start'}}
+                onMouseEnter={e=>e.currentTarget.style.opacity=1} onMouseLeave={e=>e.currentTarget.style.opacity=0.4}
+                onClick={e=>{
+                  e.stopPropagation();
+                  if(window.confirm(`Delete "${ev.title||'Untitled'}"?`)) deleteEvent(ev);
+                }}>✕</button>
             </div>
-            <div className="month-event-title">{ev.title||<em style={{opacity:0.5}}>Untitled</em>}</div>
-            <button className="delete-item-btn" style={{marginLeft:'auto',flexShrink:0,opacity:0.4,fontSize:13,color:'var(--red)'}}
-              onMouseEnter={e=>e.currentTarget.style.opacity=1} onMouseLeave={e=>e.currentTarget.style.opacity=0.4}
-              onClick={e=>{
-                e.stopPropagation();
-                if(window.confirm(`Delete "${ev.title||'Untitled'}"?`)) deleteEvent(ev);
-              }}>✕</button>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </>
   );
