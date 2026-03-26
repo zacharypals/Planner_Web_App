@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v3.5.11 -->
+<!-- LP Planner v3.5.12 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -2722,7 +2722,6 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
           <DailyHabitsSection dayKey={mobileDayKey}
             habitGoals={habitGoals} habitCompletions={habitCompletions} setHabitCompletions={setHabitCompletions}
             habitQty={habitQty} setHabitQty={setHabitQty} habitNotes={habitNotes} setHabitNotes={setHabitNotes} />
-          <DayNote dayKey={mobileDayKey} note={getDayNote(mobileDayKey)} onChange={note=>setDayNote(mobileDayKey,note)} />
           {mobileDayTasks.map(task=>(
             <div key={task.id} data-task-id={task.id}
               style={{
@@ -2764,6 +2763,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
             </div>
           ))}
           <button className="mobile-add-btn" onClick={()=>addTask(mobileDayKey)}>+ Add task</button>
+          <DayNote dayKey={mobileDayKey} note={getDayNote(mobileDayKey)} onChange={note=>setDayNote(mobileDayKey,note)} />
         </div>
         {/* Week dot row */}
         <div className="mobile-week-dots">
@@ -5795,7 +5795,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.5.11</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.5.12</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
