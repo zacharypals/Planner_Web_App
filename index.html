@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v3.5.6 -->
+<!-- LP Planner v3.5.8 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -5784,7 +5784,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.5.6</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.5.8</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -5914,6 +5914,7 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
   const [showExPicker, setShowExPicker] = useState(null);
   const [dragEx, setDragEx] = useState(null); // {exId, fromDk, exerciseId}
   const [dragOverDk, setDragOverDk] = useState(null);
+  const [dragOverExId, setDragOverExId] = useState(null); // for day-view reorder
   const [showLibManager, setShowLibManager] = useState(false);
   const [showGoalManager, setShowGoalManager] = useState(false);
   const [goalsCollapsed, setGoalsCollapsed] = useState(false);
@@ -6074,6 +6075,18 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
     if (fitView!=='day') { setSelectedDate(new Date(dk+'T00:00:00')); setFitView('day'); }
   }
   function deleteExercise(dk, exId) { setDayExs(dk, exs=>exs.filter(e=>e.id!==exId)); }
+  function reorderExercises(dk, fromExId, toExId) {
+    if (fromExId === toExId) return;
+    setDayExs(dk, exs => {
+      const from = exs.findIndex(e=>e.id===fromExId);
+      const to   = exs.findIndex(e=>e.id===toExId);
+      if (from===-1||to===-1) return exs;
+      const next = [...exs];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
+  }
   function moveExercise(fromDk, toDk, exId) {
     if (fromDk===toDk) return;
     setFitnessLog(log => {
@@ -6206,13 +6219,42 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
   }
 
   // ── Exercise block renderer ──────────────────────────────────────────────
-  function renderExerciseBlock(dk, ex) {
+  function renderExerciseBlock(dk, ex, isDayView) {
     const stats=exStats(ex);
     const libEx=fitnessExercises.find(e=>e.id===ex.exerciseId);
     const isCardio=libEx?.category==='Cardio';
+    const isDropTarget = isDayView && dragOverExId===ex.id && dragEx?.exId!==ex.id;
     return (
-      <div key={ex.id} className="workout-card">
+      <div key={ex.id}
+        style={{position:'relative'}}
+        onDragOver={isDayView ? e=>{e.preventDefault();setDragOverExId(ex.id);} : undefined}
+        onDragLeave={isDayView ? ()=>setDragOverExId(null) : undefined}
+        onDrop={isDayView ? e=>{
+          e.preventDefault();
+          if(dragEx?.exId) reorderExercises(dk, dragEx.exId, ex.id);
+          setDragEx(null); setDragOverExId(null);
+        } : undefined}>
+        {/* Drop indicator line above */}
+        {isDropTarget && (
+          <div style={{position:'absolute',top:-6,left:0,right:0,height:3,
+            background:'var(--accent)',borderRadius:2,zIndex:10,
+            boxShadow:'0 0 0 2px var(--accent-light)'}}/>
+        )}
+        <div className="workout-card">
         <div className="workout-card-header">
+          {isDayView && (
+            <span
+              draggable={true}
+              onDragStart={e=>{e.stopPropagation();setDragEx({exId:ex.id,fromDk:dk,exerciseId:ex.exerciseId});}}
+              onDragEnd={()=>{setDragEx(null);setDragOverExId(null);}}
+              title="Drag to reorder"
+              style={{cursor:'grab',color:'var(--ink-faint)',fontSize:14,padding:'0 4px 0 0',
+                lineHeight:1,flexShrink:0,opacity:0.4,userSelect:'none'}}
+              onMouseEnter={e=>e.currentTarget.style.opacity='0.9'}
+              onMouseLeave={e=>e.currentTarget.style.opacity='0.4'}>
+              ⣿
+            </span>
+          )}
           <span style={{fontFamily:"'DM Sans',sans-serif",fontSize:13,fontWeight:700,color:'var(--accent)',flex:1}}>{exName(ex.exerciseId)}</span>
           {stats.done>0&&<span className="fitness-stat-pill">{stats.done}/{stats.total} sets{stats.volume>0&&` · ${stats.volume.toLocaleString()} ${stats.hasWeight?'lbs':'reps'}`}</span>}
           <button onClick={()=>deleteExercise(dk,ex.id)}
@@ -6261,6 +6303,7 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
             </button>
           </div>
         </div>
+      </div>
       </div>
     );
   }
@@ -6430,7 +6473,7 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
           return (
             <div style={{display:'flex',flexDirection:'column',gap:12}}>
               {exs.length===0&&<div style={{textAlign:'center',padding:'40px 20px',color:'var(--ink-faint)',fontSize:13,fontStyle:'italic'}}>No exercises logged.<br/><span style={{fontSize:11}}>Tap "+ Exercise" to start.</span></div>}
-              {exs.map(ex=>renderExerciseBlock(dateKey,ex))}
+              {exs.map(ex=>renderExerciseBlock(dateKey,ex,true))}
             </div>
           );
         })()}
