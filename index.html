@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v3.5.12 -->
+<!-- LP Planner v3.5.13 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -479,7 +479,7 @@
   /* Mobile fitness */
   @media (max-width: 767px) {
     .fitness-sidebar { display: none; }
-    .fitness-main { padding: 10px 12px; }
+    .fitness-main { padding: 10px 12px 80px; }
     .fitness-view-tabs { width: 100%; }
     .fitness-view-tab { padding: 5px 8px; font-size: 11px; }
   }
@@ -5795,7 +5795,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.5.12</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.5.13</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
