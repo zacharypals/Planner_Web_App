@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v3.6.0 -->
+<!-- LP Planner v3.6.1 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -5796,7 +5796,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.6.0</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.6.1</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -6141,25 +6141,31 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
   // ── Progress calculation ─────────────────────────────────────────────────
   function goalProgressFull(goal, refDate) {
     const now = refDate||new Date(); if(!refDate) now.setHours(0,0,0,0);
-    let startDk, endDk, totalDays, elapsedDays;
+    let startDk, endDk, totalDays, periodStartDate, periodEndDate;
     if (goal.period==='week') {
       const ws=getWeekStart(now);
-      startDk=fmt(ws); endDk=fmt(addDays(ws,6));
-      totalDays=7; elapsedDays=Math.min(7,Math.floor((now-ws)/86400000)+1);
+      periodStartDate=ws; periodEndDate=addDays(ws,6);
+      startDk=fmt(ws); endDk=fmt(periodEndDate);
+      totalDays=7;
     } else if (goal.period==='month') {
       const y=now.getFullYear(),m=now.getMonth();
-      const first=new Date(y,m,1),last=new Date(y,m+1,0);
-      startDk=fmt(first); endDk=fmt(last);
-      totalDays=last.getDate(); elapsedDays=Math.min(totalDays,now.getDate());
+      periodStartDate=new Date(y,m,1); periodEndDate=new Date(y,m+1,0);
+      startDk=fmt(periodStartDate); endDk=fmt(periodEndDate);
+      totalDays=periodEndDate.getDate();
     } else {
-      const first=new Date(now.getFullYear(),0,1),last=new Date(now.getFullYear(),11,31);
-      startDk=fmt(first); endDk=fmt(last);
+      periodStartDate=new Date(now.getFullYear(),0,1); periodEndDate=new Date(now.getFullYear(),11,31);
+      startDk=fmt(periodStartDate); endDk=fmt(periodEndDate);
       totalDays=365+(now.getFullYear()%4===0?1:0);
-      elapsedDays=Math.floor((now-first)/86400000)+1;
     }
     // Clamp to goal's own startDate/endDate
     if (goal.startDate && goal.startDate>startDk) startDk=goal.startDate;
     if (goal.endDate && goal.endDate<endDk) endDk=goal.endDate;
+    // Elapsed days: use today clamped to the viewed period so past periods show 100%,
+    // future periods show 0%, and the current period shows actual progress.
+    const todayMs=today.getTime();
+    const elapsedDays = todayMs < periodStartDate.getTime() ? 0
+      : todayMs > periodEndDate.getTime() ? totalDays
+      : Math.floor((todayMs - periodStartDate.getTime()) / 86400000) + 1;
     let total=0;
     const sessionDays=new Set(); // for 'sessions' unit — track unique days with ≥1 done set
     Object.entries(fitnessLog).forEach(([dk,raw])=>{
@@ -6544,15 +6550,18 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
             const pStart=periodStart('week',selectedDate),pEnd=periodEnd('week',selectedDate);
             const wGoals=getGoalsForPeriod('week',pStart,pEnd);
             if(!wGoals.length) return null;
+            const isCurrentWeek=fmt(getWeekStart(today))===fmt(getWeekStart(selectedDate));
+            const elapsedPct=isCurrentWeek?Math.round((weekDays.filter(d=>d<=today).length/7)*100):
+              selectedDate<today?100:0;
             return (
               <div style={{background:'var(--paper)',borderRadius:'var(--radius-md)',border:'1px solid var(--border)',padding:'12px 16px',marginTop:4}}>
                 <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
                   <span style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)',textTransform:'uppercase',letterSpacing:'0.06em'}}>
-                    Weekly Goals — {Math.round((weekDays.filter(d=>d<=today).length/7)*100)}% of week elapsed
+                    Weekly Goals — {elapsedPct}% of week elapsed
                   </span>
                   <button className="add-btn" onClick={()=>setShowGoalManager(true)} title="Manage goals">+</button>
                 </div>
-                {wGoals.map(goal=>renderGoalBar(goal,today,false))}
+                {wGoals.map(goal=>renderGoalBar(goal,selectedDate,false))}
               </div>
             );
           })()}
@@ -6605,15 +6614,18 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
             const pStart=periodStart('month',selectedDate),pEnd=periodEnd('month',selectedDate);
             const mGoals=getGoalsForPeriod('month',pStart,pEnd);
             if(!mGoals.length) return null;
+            const isCurrentMonth=viewYear===today.getFullYear()&&viewMonth===today.getMonth();
+            const monthElapsedPct=isCurrentMonth?Math.round(Math.min(today.getDate(),daysInMonth)/daysInMonth*100):
+              selectedDate<today?100:0;
             return (
               <div style={{background:'var(--paper)',borderRadius:'var(--radius-md)',border:'1px solid var(--border)',padding:'12px 16px',marginTop:12}}>
                 <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
                   <span style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)',textTransform:'uppercase',letterSpacing:'0.06em'}}>
-                    Monthly Goals — {Math.round(Math.min(today.getDate(),daysInMonth)/daysInMonth*100)}% of month elapsed
+                    Monthly Goals — {monthElapsedPct}% of month elapsed
                   </span>
                   <button className="add-btn" onClick={()=>setShowGoalManager(true)} title="Manage goals">+</button>
                 </div>
-                {mGoals.map(goal=>renderGoalBar(goal,today,false))}
+                {mGoals.map(goal=>renderGoalBar(goal,selectedDate,false))}
               </div>
             );
           })()}
@@ -6623,9 +6635,12 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
         {fitView==='year'&&(()=>{
           const pStart=periodStart('year',selectedDate),pEnd=periodEnd('year',selectedDate);
           const yGoals=getGoalsForPeriod('year',pStart,pEnd);
-          const dayOfYear=Math.floor((today-new Date(viewYear,0,1))/86400000)+1;
           const totalDaysInYear=365+(viewYear%4===0?1:0);
-          const yearPct=Math.round((dayOfYear/totalDaysInYear)*100);
+          const isCurrentYear=viewYear===today.getFullYear();
+          const isFutureYear=viewYear>today.getFullYear();
+          const dayOfYear=isCurrentYear?Math.floor((today-new Date(viewYear,0,1))/86400000)+1:
+            isFutureYear?0:totalDaysInYear;
+          const yearPct=isCurrentYear?Math.round((dayOfYear/totalDaysInYear)*100):isFutureYear?0:100;
           return (
             <div style={{display:'flex',flexDirection:'column',gap:16}}>
               <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
@@ -6638,7 +6653,7 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
                 </div>
               )}
               {yGoals.map(goal=>{
-                const {actual,periodPct,targetPace,expectedAtPace,aheadBehind}=goalProgressFull(goal,today);
+                const {actual,periodPct,targetPace,expectedAtPace,aheadBehind}=goalProgressFull(goal,selectedDate);
                 const pct=Math.min(100,(actual/goal.target)*100),done=pct>=100,ahead=aheadBehind>=0;
                 // Build monthly breakdown
                 const monthlyData=Array.from({length:12},(_,mi)=>{
