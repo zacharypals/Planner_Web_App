@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v3.7.0 -->
+<!-- LP Planner v3.7.1 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -5691,7 +5691,7 @@ function App() {
   useEffect(() => {
     if (!driveFileId) return;
     scheduleSave(driveFileId);
-  }, [weekData, navColor, calHeaderColor, habitGoals, habitCompletions, habitMetrics, habitQty, habitNotes, monthlyGoals, pagesData, foldersData, peopleDirectory, fitnessLog, fitnessExercises, fitnessGoals, driveFileId]);
+  }, [weekData, navColor, calHeaderColor, habitGoals, habitCompletions, habitMetrics, habitQty, habitNotes, monthlyGoals, pagesData, foldersData, peopleDirectory, fitnessLog, fitnessExercises, fitnessGoals, countdowns, driveFileId]);
 
   // Fitness → Habit sync (runs at App level so it fires on ALL pages, not just Habit page)
   useEffect(() => {
@@ -5984,7 +5984,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.7.0</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.7.1</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
