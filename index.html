@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v3.6.1 -->
+<!-- LP Planner v3.7.0 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -745,6 +745,61 @@
 
   /* ===================== HABIT TRACKER ===================== */
   .habit-sidebar {}
+  /* Countdown cards */
+  .countdown-section-title {
+    font-family: 'DM Mono', monospace; font-size: 10px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-light);
+    margin-bottom: 6px;
+  }
+  .countdown-card {
+    background: white; border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    border-left-width: 3px;
+    padding: 8px 10px 8px 10px;
+    margin-bottom: 6px; position: relative;
+    box-shadow: 0 1px 3px var(--shadow);
+    transition: box-shadow 0.15s;
+  }
+  .countdown-card:hover { box-shadow: 0 2px 8px var(--shadow-md); }
+  .countdown-card-row { display: flex; align-items: flex-start; gap: 8px; }
+  .countdown-number {
+    font-family: 'Playfair Display', serif; font-size: 30px; font-weight: 700;
+    line-height: 1; flex-shrink: 0; min-width: 44px;
+  }
+  .countdown-number.done { font-size: 22px; }
+  .countdown-info { flex: 1; min-width: 0; }
+  .countdown-unit {
+    font-family: 'DM Mono', monospace; font-size: 8px; text-transform: uppercase;
+    letter-spacing: 0.08em; color: var(--ink-faint); margin-top: 2px;
+  }
+  .countdown-title {
+    font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 600;
+    color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .countdown-dates {
+    font-family: 'DM Mono', monospace; font-size: 9px; color: var(--ink-faint); margin-top: 1px;
+  }
+  .countdown-progress-bg {
+    height: 4px; background: var(--border); border-radius: 2px; margin-top: 6px;
+  }
+  .countdown-progress-fill { height: 100%; border-radius: 2px; transition: width 0.4s; }
+  .countdown-delete {
+    position: absolute; top: 5px; right: 5px; background: none; border: none;
+    cursor: pointer; font-size: 10px; color: var(--ink-faint); opacity: 0;
+    transition: opacity 0.15s; line-height: 1; padding: 2px 3px; border-radius: 3px;
+  }
+  .countdown-card:hover .countdown-delete { opacity: 1; }
+  .countdown-delete:hover { background: var(--red-light); color: var(--red); opacity: 1 !important; }
+  .countdown-add-form {
+    background: var(--cream); border-radius: var(--radius-sm); border: 1px solid var(--border);
+    padding: 10px; margin-bottom: 8px; display: flex; flex-direction: column; gap: 7px;
+  }
+  .countdown-color-swatch {
+    width: 16px; height: 16px; border-radius: 50%; cursor: pointer; flex-shrink: 0;
+    transition: transform 0.1s;
+  }
+  .countdown-color-swatch:hover { transform: scale(1.2); }
+  .countdown-color-swatch.selected { outline: 2px solid var(--ink); outline-offset: 2px; }
   .habit-qty-input {
     width: 36px; border: 1px solid var(--border); border-radius: 6px;
     padding: 2px 4px; font-size: 11px; font-family: 'DM Mono', monospace;
@@ -1579,6 +1634,7 @@ const { useState, useEffect, useRef, useCallback } = React;
 
 // ── CONSTANTS ──
 const GOAL_COLORS = ['#2d5a3d','#c0392b','#e0a800','#2471a3','#7d3c98','#d35400','#148f77','#e91e8c'];
+const COUNTDOWN_COLORS = ['#8b4aac','#2e7eb8','#1a9c82','#c4960e','#dc4a3a','#2d6b4a','#d35400','#e91e8c'];
 const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
@@ -3625,7 +3681,7 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onEnterKey, titleRef, 
 // ─────────────────────────────────────────────
 // HABIT TRACKER
 // ─────────────────────────────────────────────
-function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completions, setCompletions, metrics, setMetrics, qty, setQty, notes, setNotes, fitnessLog, fitnessExercises }) {
+function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completions, setCompletions, metrics, setMetrics, qty, setQty, notes, setNotes, fitnessLog, fitnessExercises, countdowns, setCountdowns }) {
   const today = new Date(); today.setHours(0,0,0,0);
   const [selectedDate, setSelectedDateRaw] = useState(() => {
     const saved = parseLocal(sessionStorage.getItem('lp_habitDate'));
@@ -3643,6 +3699,112 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
   const [expandedGoals, setExpandedGoals] = useState({}); // {goalId: bool} for sidebar
   const [dragGoalId, setDragGoalId] = useState(null);
   const [dragOverGoalId, setDragOverGoalId] = useState(null);
+  // Countdown state
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [addingCountdown, setAddingCountdown] = useState(false);
+  const [newCdTitle, setNewCdTitle] = useState('');
+  const [newCdStart, setNewCdStart] = useState(fmt(new Date()));
+  const [newCdEnd, setNewCdEnd] = useState('');
+  const [newCdColor, setNewCdColor] = useState(COUNTDOWN_COLORS[0]);
+
+  function saveCountdown() {
+    if (!newCdTitle.trim() || !newCdEnd) return;
+    const cd = { id: 'cd'+Date.now(), title: newCdTitle.trim(), startDate: newCdStart, endDate: newCdEnd, color: newCdColor };
+    setCountdowns(cs => [...cs, cd]);
+    setNewCdTitle(''); setNewCdEnd(''); setNewCdStart(fmt(new Date())); setNewCdColor(COUNTDOWN_COLORS[0]);
+    setAddingCountdown(false);
+  }
+  function deleteCountdown(id) { setCountdowns(cs => cs.filter(c => c.id !== id)); }
+
+  function renderCountdownCards() {
+    if (!countdowns || countdowns.length === 0) return null;
+    return countdowns.map(cd => {
+      const end = parseLocal(cd.endDate);
+      const start = cd.startDate ? parseLocal(cd.startDate) : null;
+      const daysLeft = Math.ceil((end - today) / 86400000);
+      const isDone = daysLeft <= 0;
+      const pct = start ? Math.min(100, Math.max(0, (today - start) / (end - start) * 100)) : null;
+      const color = cd.color || COUNTDOWN_COLORS[0];
+      const [ey, em, ed] = cd.endDate.split('-').map(Number);
+      const endDisplay = MONTHS[em-1].slice(0,3)+' '+ed+', '+ey;
+      const totalDays = start ? Math.round((end - start) / 86400000) : null;
+      return (
+        <div key={cd.id} className="countdown-card" style={{borderLeftColor: color}}>
+          <button className="countdown-delete" onClick={()=>deleteCountdown(cd.id)}>✕</button>
+          <div className="countdown-card-row">
+            <div>
+              <div className={`countdown-number${isDone?' done':''}`} style={{color: isDone?'var(--gold)':color}}>
+                {isDone ? '🎉' : daysLeft}
+              </div>
+              <div className="countdown-unit">{isDone ? 'done!' : 'days left'}</div>
+            </div>
+            <div className="countdown-info">
+              <div className="countdown-title">{cd.title}</div>
+              <div className="countdown-dates">
+                {start ? `${cd.startDate} → ` : ''}{endDisplay}
+                {totalDays ? ` (${totalDays}d)` : ''}
+              </div>
+            </div>
+          </div>
+          {pct !== null && (
+            <div className="countdown-progress-bg">
+              <div className="countdown-progress-fill" style={{width: pct+'%', background: color}}/>
+            </div>
+          )}
+        </div>
+      );
+    });
+  }
+
+  function renderCountdownAddForm() {
+    return addingCountdown ? (
+      <div className="countdown-add-form">
+        <input
+          placeholder="Title (e.g. 100 Days of Practice)"
+          value={newCdTitle} onChange={e=>setNewCdTitle(e.target.value)}
+          style={{width:'100%',fontSize:12,fontFamily:"'DM Sans',sans-serif",border:'1px solid var(--border)',
+            borderRadius:4,padding:'4px 7px',outline:'none',background:'white',color:'var(--ink)',boxSizing:'border-box'}}
+          onKeyDown={e=>e.key==='Enter'&&saveCountdown()}
+        />
+        <div style={{display:'flex',gap:6}}>
+          <div style={{flex:1,display:'flex',flexDirection:'column',gap:2}}>
+            <label style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)',textTransform:'uppercase',letterSpacing:'0.05em'}}>Start</label>
+            <input type="date" value={newCdStart} onChange={e=>setNewCdStart(e.target.value)}
+              style={{width:'100%',fontSize:11,border:'1px solid var(--border)',borderRadius:4,padding:'3px 5px',outline:'none',background:'white',boxSizing:'border-box'}}/>
+          </div>
+          <div style={{flex:1,display:'flex',flexDirection:'column',gap:2}}>
+            <label style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)',textTransform:'uppercase',letterSpacing:'0.05em'}}>End *</label>
+            <input type="date" value={newCdEnd} onChange={e=>setNewCdEnd(e.target.value)}
+              style={{width:'100%',fontSize:11,border:'1px solid var(--border)',borderRadius:4,padding:'3px 5px',outline:'none',background:'white',boxSizing:'border-box'}}/>
+          </div>
+        </div>
+        <div style={{display:'flex',gap:4,alignItems:'center'}}>
+          {COUNTDOWN_COLORS.map(c=>(
+            <div key={c} className={`countdown-color-swatch${newCdColor===c?' selected':''}`}
+              style={{background:c}} onClick={()=>setNewCdColor(c)}/>
+          ))}
+        </div>
+        <div style={{display:'flex',gap:6}}>
+          <button onClick={saveCountdown} disabled={!newCdTitle.trim()||!newCdEnd}
+            style={{flex:1,background:newCdTitle.trim()&&newCdEnd?'var(--accent)':'var(--border)',color:newCdTitle.trim()&&newCdEnd?'white':'var(--ink-faint)',
+              border:'none',borderRadius:4,padding:'5px 0',cursor:newCdTitle.trim()&&newCdEnd?'pointer':'default',
+              fontSize:12,fontWeight:600,fontFamily:"'DM Sans',sans-serif"}}>Save</button>
+          <button onClick={()=>{setAddingCountdown(false);setNewCdTitle('');setNewCdEnd('');}}
+            style={{background:'none',border:'1px solid var(--border)',borderRadius:4,padding:'5px 10px',
+              cursor:'pointer',fontSize:12,fontFamily:"'DM Sans',sans-serif",color:'var(--ink-light)'}}>Cancel</button>
+        </div>
+      </div>
+    ) : (
+      <button onClick={()=>setAddingCountdown(true)}
+        style={{width:'100%',background:'none',border:'1px dashed var(--border)',borderRadius:'var(--radius-sm)',
+          padding:'5px 0',cursor:'pointer',fontSize:11,color:'var(--ink-faint)',fontFamily:"'DM Sans',sans-serif",
+          marginBottom:8,transition:'all 0.15s'}}
+        onMouseEnter={e=>{e.target.style.borderColor='var(--accent)';e.target.style.color='var(--accent)';}}
+        onMouseLeave={e=>{e.target.style.borderColor='var(--border)';e.target.style.color='var(--ink-faint)';}}>
+        + Add countdown
+      </button>
+    );
+  }
 
   // ── Fitness → Habit sync is handled at App level ──────────────────────
 
@@ -3779,6 +3941,15 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
             📈
           </button>
         </div>
+
+        <div className="checklist-header" style={{marginBottom:8}}>
+          <div>
+            <div className="sidebar-section-title">Countdowns</div>
+          </div>
+          <button className="add-btn" onClick={()=>setAddingCountdown(a=>!a)}>+</button>
+        </div>
+        {renderCountdownCards()}
+        {renderCountdownAddForm()}
 
         <div className="checklist-header" style={{marginBottom:8}}>
           <div>
@@ -3996,6 +4167,21 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
           onToggle={(gid)=>toggleCompletion(gid,fmt(selectedDate))} />}
       </div>
       );})()}
+
+      {/* Mobile FAB + sheet for countdowns */}
+      <div className={`mobile-sheet-overlay ${sheetOpen?'open':''}`} onClick={()=>setSheetOpen(false)} />
+      <div className={`mobile-sheet ${sheetOpen?'open':''}`}>
+        <div className="mobile-sheet-handle" />
+        <div className="mobile-sheet-header">
+          <span className="mobile-sheet-title">Countdowns</span>
+          <button className="mobile-sheet-close" onClick={()=>setSheetOpen(false)}>✕</button>
+        </div>
+        <div className="mobile-sheet-body">
+          {renderCountdownCards()}
+          {renderCountdownAddForm()}
+        </div>
+      </div>
+      <button className="mobile-fab" onClick={()=>setSheetOpen(o=>!o)} title="Countdowns">⏳</button>
     </div>
   );
 }
@@ -5345,7 +5531,7 @@ function MetricsView({ metrics, weightTarget, setWeightTarget, calsTarget, setCa
 // ─────────────────────────────────────────────
 // APP ROOT
 // ─────────────────────────────────────────────
-const ALL_STORAGE_KEYS = ['weekData','habitGoals','habitCompletions','habitMetrics','habitQty','habitNotes','monthlyGoals','navColor','calHeaderColor','pagesData','foldersData','weightTarget','calsTarget','peopleDirectory','fitnessLog','fitnessExercises','fitnessGoals'];
+const ALL_STORAGE_KEYS = ['weekData','habitGoals','habitCompletions','habitMetrics','habitQty','habitNotes','monthlyGoals','navColor','calHeaderColor','pagesData','foldersData','weightTarget','calsTarget','peopleDirectory','fitnessLog','fitnessExercises','fitnessGoals','countdowns'];
 
 function App() {
   const [page, setPageRaw] = useState(() => sessionStorage.getItem('lp_page') || 'planner');
@@ -5371,6 +5557,7 @@ function App() {
   const [fitnessLog, setFitnessLog] = useStorage('fitnessLog', {}); // {[dateKey]: [{id, name, exercises:[{id, exerciseId, sets:[{id,reps,weight,done}]}]}]}
   const [fitnessExercises, setFitnessExercises] = useStorage('fitnessExercises', []); // [{id, name, category}] library
   const [fitnessGoals, setFitnessGoals] = useStorage('fitnessGoals', []); // [{id, exerciseId, period, target, unit}]
+  const [countdowns, setCountdowns] = useStorage('countdowns', []); // [{id, title, startDate, endDate, color}]
 
   // Auth state
   const [authUser, setAuthUser] = useState(null); // {name, email, picture}
@@ -5426,6 +5613,7 @@ function App() {
       if (data.fitnessLog) setFitnessLog(data.fitnessLog);
       if (data.fitnessExercises) setFitnessExercises(data.fitnessExercises);
       if (data.fitnessGoals) setFitnessGoals(data.fitnessGoals);
+      if (data.countdowns) setCountdowns(data.countdowns);
       setDriveFileId(fileId); // set last to arm the save effect
       setAuthError(false);
       setSaveStatus('saved');
@@ -5796,7 +5984,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.6.1</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.7.0</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -5874,6 +6062,7 @@ function App() {
         qty={habitQty} setQty={setHabitQty}
         notes={habitNotes} setNotes={setHabitNotes}
         fitnessLog={fitnessLog} fitnessExercises={fitnessExercises}
+        countdowns={countdowns} setCountdowns={setCountdowns}
         onGoToPlanner={()=>setPage('planner')}
         onGoToMetrics={()=>setPage('metrics')} />}
       {page==='metrics' && <MetricsView
