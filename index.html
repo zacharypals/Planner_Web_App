@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v3.7.2 -->
+<!-- LP Planner v3.7.3 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -522,7 +522,7 @@
     padding: 3px 6px; font-size: 10px; font-family: 'DM Sans',sans-serif; font-weight: 600;
     margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
-  .fitness-week-workout-pill.cardio { background: var(--teal-light); color: var(--teal); }
+  .fitness-week-workout-pill.cardio { background: var(--gold-light); color: var(--gold); border: 1px solid rgba(196,150,14,0.25); }
   .fitness-week-add {
     background: none; border: 1px dashed var(--border); border-radius: 4px;
     color: var(--ink-faint); font-size: 10px; cursor: pointer; width: 100%;
@@ -5992,7 +5992,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.7.2</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.7.3</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -6396,6 +6396,26 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
   }
   function exName(exerciseId) { return fitnessExercises.find(e=>e.id===exerciseId)?.name||'Unknown'; }
 
+  // Parse "M:SS" or legacy decimal string → decimal minutes
+  function parseTimeInput(val) {
+    if (!val && val !== 0) return 0;
+    const s = String(val).trim();
+    if (s.includes(':')) {
+      const parts = s.split(':');
+      const mins = parseFloat(parts[0]) || 0;
+      const secs = parseFloat(parts[1]) || 0;
+      return mins + secs / 60;
+    }
+    return parseFloat(s) || 0;
+  }
+  // Format decimal minutes → "M:SS"
+  function formatPace(decimalMins) {
+    if (!decimalMins || decimalMins <= 0) return null;
+    const mins = Math.floor(decimalMins);
+    const secs = Math.round((decimalMins - mins) * 60);
+    return `${mins}:${String(secs).padStart(2,'0')}`;
+  }
+
   const categorized=FITNESS_CATEGORIES.reduce((acc,cat)=>{
     const items=fitnessExercises.filter(e=>(e.category||UNCATEGORIZED)===cat);
     if(items.length) acc[cat]=items;
@@ -6488,24 +6508,24 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
           <div style={{display:'flex',alignItems:'center',gap:6,padding:'2px 0 4px',borderBottom:'1px solid var(--border)',marginBottom:2}}>
             <span className="set-num"></span>
             {isCardio?(<><span className="set-label" style={{width:60,textAlign:'center'}}>Dist (mi)</span>
-              <span className="set-label" style={{width:60,textAlign:'center',marginLeft:6}}>Time (min)</span>
+              <span className="set-label" style={{width:60,textAlign:'center',marginLeft:6}}>Time (M:SS)</span>
               <span className="set-label" style={{width:56,textAlign:'center',marginLeft:6}}>min/mi</span></>)
             :(<><span className="set-label" style={{width:52,textAlign:'center'}}>Reps</span>
               <span className="set-label" style={{width:52,textAlign:'center',marginLeft:18}}>Weight</span></>)}
             <span className="set-label" style={{marginLeft:'auto',marginRight:2}}>Done</span>
           </div>
           {ex.sets.map((set,si)=>{
-            const dist=parseFloat(set.dist)||0,time=parseFloat(set.time)||0;
-            const pace=(dist>0&&time>0)?(time/dist).toFixed(2):null;
+            const dist=parseFloat(set.dist)||0,timeDec=parseTimeInput(set.time);
+            const pace=(dist>0&&timeDec>0)?formatPace(timeDec/dist):null;
             return (
               <div key={set.id} className={`set-row ${set.done?'done':''}`}>
                 <span className="set-num">{si+1}</span>
                 {isCardio?(<>
                   <input type="number" min="0" step="0.01" className="set-input" placeholder="—" value={set.dist||''}
                     onChange={e=>updateSet(dk,ex.id,set.id,{dist:e.target.value})} style={{width:60,opacity:set.done?0.6:1}}/>
-                  <input type="number" min="0" step="0.1" className="set-input" placeholder="—" value={set.time||''}
+                  <input type="text" inputMode="numeric" className="set-input" placeholder="M:SS" value={set.time||''}
                     onChange={e=>updateSet(dk,ex.id,set.id,{time:e.target.value})} style={{width:60,marginLeft:6,opacity:set.done?0.6:1}}/>
-                  <span className="set-label" style={{width:56,textAlign:'center',fontWeight:pace?700:400,color:pace?'var(--accent)':'var(--ink-faint)',fontSize:pace?11:9}}>{pace||'—'}</span>
+                  <span className="set-label" style={{width:56,textAlign:'center',fontWeight:pace?700:400,color:pace?'var(--gold)':'var(--ink-faint)',fontSize:pace?11:9}}>{pace||'—'}</span>
                 </>):(<>
                   <input type="number" min="0" className="set-input" placeholder="—" value={set.reps||''}
                     onChange={e=>updateSet(dk,ex.id,set.id,{reps:e.target.value})} style={{opacity:set.done?0.6:1}}/>
