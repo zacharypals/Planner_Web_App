@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v3.7.1 -->
+<!-- LP Planner v3.7.2 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -1681,6 +1681,9 @@ const REDIRECT_URI = 'https://zacharypals.github.io/Planner_Web_App/oauth.html';
 const WORKER_URL = 'https://planner-auth.plannertracker.workers.dev';
 
 let _loadingFromDrive = false;
+// Pages body flush: PagesView registers a synchronous flush fn here so App can
+// call it before any Drive save (beforeunload, visibilitychange, manual sync).
+const _bodyFlushRef = { fn: null };
 // Debounce timers for calendar sync — keyed by task id
 const _calSyncTimers = {};
 function debouncedCalSync(id, fn, delay = 2500) {
@@ -5784,8 +5787,9 @@ function App() {
   // Flush pending saves when tab is closed, refreshed, or hidden (mobile home button etc.)
   useEffect(() => {
     function handleBeforeUnload(e) {
+      // Always flush any pending Pages body save synchronously first
+      _bodyFlushRef.fn?.();
       if (pendingSaveRef.current && driveFileId) {
-        // sendBeacon is synchronous-compatible and survives page close better than async fetch
         const allData = {};
         ALL_STORAGE_KEYS.forEach(k => {
           try { const s = localStorage.getItem(k); if (s) allData[k] = JSON.parse(s); } catch {}
@@ -5794,22 +5798,26 @@ function App() {
         try { localStorage.setItem('_lp_savedAt', allData._savedAt); } catch {}
         const token = getToken();
         if (token) {
-          // Use sendBeacon to the Drive upload endpoint — fires reliably on page close
-          // (Falls back to the async flushSave if sendBeacon isn't available)
+          // fetch with keepalive:true survives page unload AND supports auth headers.
+          // sendBeacon cannot send Authorization headers so Drive always rejected it with 401.
           const beaconUrl = `https://www.googleapis.com/upload/drive/v3/files/${driveFileId}?uploadType=media`;
-          const blob = new Blob([JSON.stringify(allData)], { type: 'application/json' });
-          const sent = navigator.sendBeacon && navigator.sendBeacon(beaconUrl, blob);
-          if (!sent) flushSave(); // fallback
+          fetch(beaconUrl, {
+            method: 'PATCH',
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify(allData),
+            keepalive: true,
+          }).catch(() => {});
         }
-        // Show browser dialog to give any async saves a chance to complete
         e.preventDefault();
         e.returnValue = 'Saving your data…';
         return e.returnValue;
       }
     }
     function handleVisibilityChange() {
-      if (document.visibilityState === 'hidden' && pendingSaveRef.current) {
-        flushSave();
+      if (document.visibilityState === 'hidden') {
+        // Flush any pending Pages body save to localStorage/state before Drive save
+        _bodyFlushRef.fn?.();
+        if (pendingSaveRef.current) flushSave();
       }
     }
     window.addEventListener('beforeunload', handleBeforeUnload);
@@ -5984,7 +5992,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.7.1</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.7.2</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -7372,6 +7380,9 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
   const bodyRef = useRef(null);
   const titleRef = useRef(null);
   const debounceRef = useRef(null);
+  // Always-current ref to selectedId so flush fn closure never goes stale
+  const selectedIdRef = useRef(selectedId);
+  useEffect(() => { selectedIdRef.current = selectedId; }, [selectedId]);
   const [wordCount, setWordCount] = useState(0);
   const [showNewMenu, setShowNewMenu] = useState(null); // null=closed, 'top'=top-level, folderId=folder menu
   const [expandedFolders, setExpandedFolders] = useState({});
@@ -7386,6 +7397,51 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
   const [dragOverId, setDragOverId] = useState(null);
   const [folderHoverTarget, setFolderHoverTarget] = useState(null);
   const folderHoverTimer = useRef(null);
+
+  // Register a synchronous body flush function so App can call it before any Drive save.
+  // This writes the current editor HTML directly to localStorage immediately, bypassing
+  // the 300ms debounce. Called by beforeunload, visibilitychange, and doc switching.
+  useEffect(() => {
+    _bodyFlushRef.fn = () => {
+      if (debounceRef.current) { clearTimeout(debounceRef.current); debounceRef.current = null; }
+      const id = selectedIdRef.current;
+      if (!id || !bodyRef.current) return;
+      const html = bodyRef.current.innerHTML;
+      const now = new Date().toISOString();
+      // Write directly to localStorage synchronously so beforeunload/beacon picks it up
+      try {
+        const stored = localStorage.getItem('pagesData');
+        const pages = stored ? JSON.parse(stored) : [];
+        const updated = pages.map(d => d.id === id ? {...d, body: html, lastModified: now} : d);
+        localStorage.setItem('pagesData', JSON.stringify(updated));
+      } catch {}
+      // Also update React state so the save effect triggers a Drive sync
+      setPagesData(p => p.map(d => d.id === id ? {...d, body: html, lastModified: now} : d));
+    };
+    return () => { _bodyFlushRef.fn = null; };
+  }, []); // eslint-disable-line — setPagesData is stable
+
+  // Flush body when switching documents so the previous doc's last keystrokes aren't lost
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+        debounceRef.current = null;
+        const id = selectedIdRef.current;
+        if (id && bodyRef.current) {
+          const html = bodyRef.current.innerHTML;
+          const now = new Date().toISOString();
+          try {
+            const stored = localStorage.getItem('pagesData');
+            const pages = stored ? JSON.parse(stored) : [];
+            const updated = pages.map(d => d.id === id ? {...d, body: html, lastModified: now} : d);
+            localStorage.setItem('pagesData', JSON.stringify(updated));
+          } catch {}
+          setPagesData(p => p.map(d => d.id === id ? {...d, body: html, lastModified: now} : d));
+        }
+      }
+    };
+  }, [selectedId]); // cleanup runs with OLD selectedId before switching to new one
 
   function countWords(text) {
     return text.trim() === '' ? 0 : text.trim().split(/\s+/).length;
@@ -7750,8 +7806,8 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
           blockEl.textContent = '';
           bodyRef.current.focus();
           document.execCommand('insertUnorderedList');
-          // Don't let the debounce save stale HTML
-          setTimeout(() => { if (bodyRef.current && selectedId) updateDoc(selectedId, { body: bodyRef.current.innerHTML }); }, 0);
+          // Don't let the debounce save stale HTML — use ref so closure is always current
+          setTimeout(() => { if (bodyRef.current && selectedIdRef.current) updateDoc(selectedIdRef.current, { body: bodyRef.current.innerHTML }); }, 0);
           return;
         }
       }
@@ -7761,7 +7817,7 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
       if (bodyRef.current && selectedId) {
         updateDoc(selectedId, { body: bodyRef.current.innerHTML });
       }
-    }, 800);
+    }, 300);
   }
 
   useEffect(() => {
