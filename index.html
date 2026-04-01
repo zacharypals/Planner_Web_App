@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v3.7.3 -->
+<!-- LP Planner v3.7.4 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -5250,7 +5250,8 @@ function MetricsView({ metrics, weightTarget, setWeightTarget, calsTarget, setCa
 
   function dflt30() {
     const end = new Date(); end.setHours(0,0,0,0);
-    const start = new Date(end); start.setDate(start.getDate() - 29);
+    // vvv this is where you set the days back default in the Weight/Cal Charts
+    const start = new Date(end); start.setDate(start.getDate() - 20); // 21 days total (today + 20 back)
     return { start: fmt(start), end: fmt(end) };
   }
   const [dateRange, setDateRange] = useState(dflt30);
@@ -5992,7 +5993,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.7.3</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.7.4</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
