@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v3.7.4 -->
+<!-- LP Planner v3.7.5 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -2036,6 +2036,7 @@ async function pullNewFromCalendar(weekData) {
 
   const newWeekData = JSON.parse(JSON.stringify(weekData));
   let added = 0, updated = 0;
+  const addedDates = [];
 
   gcalEvents.forEach(ev => {
     const newDateStr = ev.start?.date || ev.start?.dateTime?.slice(0, 10);
@@ -2071,6 +2072,7 @@ async function pullNewFromCalendar(weekData) {
       const plannerId = ev.extendedProperties?.private?.plannerId;
       if (plannerId && existingPlannerIds.has(plannerId)) return; // already tracked
       added++;
+      addedDates.push(newDateStr);
       const newDateObj = new Date(newDateStr + 'T00:00:00');
       const newWeekKey = fmt(getWeekStart(newDateObj));
       if (!newWeekData[newWeekKey]) newWeekData[newWeekKey] = {proverb:'',toCreate:[],weekGoals:[],people:[],beWord:'',proud:'',story:'',tasks:{}};
@@ -2088,7 +2090,7 @@ async function pullNewFromCalendar(weekData) {
     }
   });
 
-  return { added, updated, newWeekData };
+  return { added, updated, newWeekData, addedDates };
 }
 
 function useStorage(key, init) {
@@ -5865,10 +5867,38 @@ function App() {
         alert('Calendar sync failed: could not reach Google Calendar.\n\nMake sure:\n1. Google Calendar API is enabled in Cloud Console\n2. You signed in and approved Calendar access on the consent screen\n3. Try signing out and back in');
       } else if (result.added > 0 || result.updated > 0) {
         setWeekData(result.newWeekData);
+        // Save to Drive immediately — don't rely on the 1500ms debounce.
+        // setWeekData queues a React state update; localStorage may not yet reflect it
+        // when the debounce or beforeunload handler fires, causing synced events to be lost.
+        // We save here explicitly using result.newWeekData directly to avoid that race.
+        if (driveFileId && !_loadingFromDrive) {
+          if (saveTimerRef.current) { clearTimeout(saveTimerRef.current); saveTimerRef.current = null; }
+          pendingSaveRef.current = false;
+          const allData = { weekData: result.newWeekData };
+          ALL_STORAGE_KEYS.filter(k => k !== 'weekData').forEach(k => {
+            try { const s = localStorage.getItem(k); if (s) allData[k] = JSON.parse(s); } catch {}
+          });
+          try {
+            await saveToDrive(driveFileId, allData);
+            setSaveStatus('saved');
+            setTimeout(() => setSaveStatus(''), 2000);
+          } catch (saveErr) {
+            console.error('Sync Drive save failed:', saveErr?.message);
+            // Don't alert here — the data is in state/localStorage; debounce will retry
+          }
+        }
         const parts = [];
-        if (result.added > 0) parts.push(`${result.added} new event${result.added===1?'':'s'} added`);
+        if (result.added > 0) {
+          // Build human-readable date labels so the user knows where to navigate
+          const dateLabels = [...new Set(result.addedDates)].map(d => {
+            const o = parseLocal(d);
+            return o ? `${MONTHS[o.getMonth()].slice(0, 3)} ${o.getDate()}` : d;
+          });
+          parts.push(`${result.added} new event${result.added===1?'':'s'} added`);
+          if (dateLabels.length) parts.push(`(${dateLabels.join(', ')})`);
+        }
         if (result.updated > 0) parts.push(`${result.updated} event${result.updated===1?'':'s'} updated`);
-        alert('✓ ' + parts.join(', ') + ' from Google Calendar.');
+        alert('✓ ' + parts.join(' ') + ' from Google Calendar.');
       } else {
         alert('✓ All caught up — no changes to import from Google Calendar.');
       }
@@ -5993,7 +6023,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.7.4</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.7.5</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
