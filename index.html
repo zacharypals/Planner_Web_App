@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v3.7.6 -->
+<!-- LP Planner v3.7.7 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -2008,19 +2008,27 @@ async function pullNewFromCalendar(weekData) {
   const now = new Date();
   const oneYearAgo = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
   const oneYearFwd = new Date(now.getFullYear() + 1, now.getMonth(), now.getDate());
-  const res = await fetch(
-    `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${oneYearAgo.toISOString()}&timeMax=${oneYearFwd.toISOString()}&singleEvents=true&maxResults=500&showHiddenInvitations=true&fields=items(id,summary,description,start,end,extendedProperties,attendees,organizer)`,
-    { headers: { 'Authorization': `Bearer ${token}` } }
-  );
-  if (!res.ok) {
-    let detail = '';
-    try { const j = await res.clone().json(); detail = j?.error?.message || ''; } catch {}
-    console.error('Calendar pull failed:', res.status, detail);
-    throw new Error(`Calendar error ${res.status}${detail ? ': ' + detail : ''}`);
-  }
-  const data = await res.json();
-  const gcalEvents = data.items || [];
-  console.log('Calendar pull: fetched', gcalEvents.length, 'events');
+  const baseParams = `timeMin=${oneYearAgo.toISOString()}&timeMax=${oneYearFwd.toISOString()}&singleEvents=true&maxResults=2500&showHiddenInvitations=true&fields=items(id,summary,description,start,end,extendedProperties,attendees,organizer),nextPageToken`;
+
+  // Paginate through ALL results — maxResults=2500/page means a single request covers
+  // most calendars, but we keep paginating via nextPageToken for very large ones.
+  let gcalEvents = [];
+  let pageToken = null;
+  do {
+    const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events?${baseParams}${pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ''}`;
+    const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+    if (!res.ok) {
+      let detail = '';
+      try { const j = await res.clone().json(); detail = j?.error?.message || ''; } catch {}
+      console.error('Calendar pull failed:', res.status, detail);
+      throw new Error(`Calendar error ${res.status}${detail ? ': ' + detail : ''}`);
+    }
+    const data = await res.json();
+    gcalEvents = gcalEvents.concat(data.items || []);
+    pageToken = data.nextPageToken || null;
+  } while (pageToken);
+
+  console.log('Calendar pull: fetched', gcalEvents.length, 'events total');
 
   // Build a map of gcalId → local task for quick lookup
   const gcalIdToTask = {}; // gcalId → {task, wk, dayKey}
@@ -2040,7 +2048,10 @@ async function pullNewFromCalendar(weekData) {
 
   gcalEvents.forEach(ev => {
     const newDateStr = ev.start?.date || ev.start?.dateTime?.slice(0, 10);
-    if (!newDateStr) return;
+    if (!newDateStr) {
+      console.warn('Calendar sync: skipping event with no start date', ev.id, ev.summary);
+      return;
+    }
     const newTimeStr = ev.start?.dateTime ? ev.start.dateTime.slice(11, 16) : '';
 
     if (gcalIdToTask[ev.id]) {
@@ -2050,7 +2061,10 @@ async function pullNewFromCalendar(weekData) {
         task.details !== (ev.description||'') ||
         task.eventTime !== newTimeStr ||
         dayKey !== newDateStr;
-      if (!changed) return;
+      if (!changed) {
+        console.log('Calendar sync: already up-to-date', ev.id, ev.summary, 'on', dayKey);
+        return;
+      }
       updated++;
       // Remove from old location
       newWeekData[wk].tasks[dayKey] = (newWeekData[wk].tasks[dayKey] || []).filter(t => t.id !== task.id);
@@ -2070,7 +2084,10 @@ async function pullNewFromCalendar(weekData) {
     } else {
       // Net new event — add it
       const plannerId = ev.extendedProperties?.private?.plannerId;
-      if (plannerId && existingPlannerIds.has(plannerId)) return; // already tracked
+      if (plannerId && existingPlannerIds.has(plannerId)) {
+        console.log('Calendar sync: skipping (plannerId match)', ev.id, ev.summary);
+        return; // already tracked
+      }
       added++;
       addedDates.push(newDateStr);
       const newDateObj = new Date(newDateStr + 'T00:00:00');
@@ -6062,7 +6079,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.7.6</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.7.7</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
