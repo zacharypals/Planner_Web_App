@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v3.7.8 -->
+<!-- LP Planner v3.7.9 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -989,6 +989,7 @@
   .monthly-cal-wrap { padding: 20px 24px; min-width: 560px; }
   .monthly-cal-header {
     display: grid; grid-template-columns: repeat(7, 1fr);
+    column-gap: 2px; /* match monthly-cal-grid gap so DOW labels stay over their columns */
     margin-bottom: 4px;
   }
   .monthly-dow {
@@ -1030,6 +1031,7 @@
     font-family: 'DM Mono', monospace; font-size: 9px; opacity: 0.7; margin-right: 3px;
   }
   .monthly-event-more { font-size: 10px; color: var(--ink-faint); padding: 1px 4px; font-family: 'DM Mono', monospace; }
+  .mobile-month-nav { display: none; } /* shown only on mobile — desktop uses the sidebar */
   .month-event-item {
     display: flex; align-items: baseline; gap: 6px; padding: 5px 4px;
     border-radius: 5px; cursor: pointer; transition: background 0.1s;
@@ -1271,6 +1273,20 @@
 
     /* cal grid hidden on mobile — replaced by day view */
     .weekly-calendar { display: none; }
+
+    /* Monthly calendar: fill screen width, no horizontal scroll */
+    .monthly-cal-wrap { min-width: 0; padding: 0 8px 16px; }
+    .mobile-month-nav {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 6px 2px 10px;
+    }
+    .mobile-month-label {
+      font-family: 'Playfair Display', serif; font-size: 16px; font-weight: 600; color: var(--ink);
+    }
+    .monthly-cell { min-height: 62px; padding: 4px 3px 3px; }
+    .monthly-cell-date { font-size: 12px; margin-bottom: 2px; }
+    .monthly-event-chip { font-size: 9px; padding: 1px 4px; }
+    .monthly-event-more { font-size: 9px; }
   }
 
   /* Monthly habit checklist below calendar */
@@ -5065,6 +5081,12 @@ function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals 
       {/* MAIN CALENDAR GRID */}
       <div className="main-panel" style={{overflowY:'auto'}}>
         <div className="monthly-cal-wrap">
+          {/* Mobile month navigation — desktop uses the sidebar nav instead */}
+          <div className="mobile-month-nav">
+            <button className="nav-arrow" onClick={()=>setViewDate(d=>new Date(d.getFullYear(), d.getMonth()-1, 1))}>‹</button>
+            <span className="mobile-month-label">{MONTHS[month]} {year}</span>
+            <button className="nav-arrow" onClick={()=>setViewDate(d=>new Date(d.getFullYear(), d.getMonth()+1, 1))}>›</button>
+          </div>
           {/* Day-of-week headers */}
           <div className="monthly-cal-header">
             {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d=>(
@@ -6111,7 +6133,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.7.8</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.7.9</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
