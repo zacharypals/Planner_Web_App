@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v3.8.1 -->
+<!-- LP Planner v3.8.2 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -1275,8 +1275,8 @@
     /* cal grid hidden on mobile — replaced by day view */
     .weekly-calendar { display: none; }
 
-    /* Monthly calendar — constrain to screen, no horizontal scroll */
-    .monthly-cal-wrap { width: 100%; box-sizing: border-box; min-width: 0; padding: 0 8px 16px; }
+    /* Monthly calendar — hide separate header row; day labels live inside each tile instead */
+    .monthly-cal-wrap { padding: 8px 8px 16px; }
     .mobile-month-nav {
       display: flex; align-items: center; justify-content: space-between;
       padding: 6px 2px 10px;
@@ -1284,20 +1284,14 @@
     .mobile-month-label {
       font-family: 'Playfair Display', serif; font-size: 16px; font-weight: 600; color: var(--ink);
     }
-    .monthly-cal-header { display: none; } /* replaced by per-tile day labels */
-    /* min-width:0 overrides the CSS Grid default of min-width:auto on grid items.
-       Without it, cells refuse to shrink below content width and bust the grid wider than the screen. */
-    .monthly-cal-grid { min-width: 0; }
-    .monthly-cell { min-width: 0; min-height: 64px; padding: 4px 3px 3px; overflow: hidden; }
+    .monthly-cal-header { display: none; }
     .monthly-cell-dow {
       display: block; font-size: 7px; text-transform: uppercase; letter-spacing: 0.05em;
       font-family: 'DM Mono', monospace; color: var(--ink-faint);
-      text-align: center; margin-bottom: 1px; white-space: nowrap;
+      text-align: center; margin-bottom: 1px;
     }
     .monthly-cell.today .monthly-cell-dow { color: var(--gold); }
-    .monthly-cell-date { font-size: 11px; margin-bottom: 2px; text-align: center; }
-    .monthly-event-chip { font-size: 9px; padding: 1px 3px; }
-    .monthly-event-more { font-size: 8px; }
+    .monthly-cell-date { text-align: center; }
   }
 
   /* Monthly habit checklist below calendar */
@@ -6149,7 +6143,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.8.1</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.8.2</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
