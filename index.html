@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v3.7.7 -->
+<!-- LP Planner v3.7.8 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -1681,6 +1681,7 @@ const REDIRECT_URI = 'https://zacharypals.github.io/Planner_Web_App/oauth.html';
 const WORKER_URL = 'https://planner-auth.plannertracker.workers.dev';
 
 let _loadingFromDrive = false;
+let _lastCalSyncMs = 0; // timestamp of last auto calendar sync — throttles to once per 5 min
 // Pages body flush: PagesView registers a synchronous flush fn here so App can
 // call it before any Drive save (beforeunload, visibilitychange, manual sync).
 const _bodyFlushRef = { fn: null };
@@ -5599,6 +5600,35 @@ function App() {
   const lastDriveCheckRef = useRef(0); // timestamp of last Drive freshness check (multi-device sync)
 
   // Load all data from Drive after sign-in
+  // Silently sync Google Calendar events after every Drive load so events are always
+  // current on app open without requiring a manual "Sync Calendar" tap.
+  // Uses currentWeekData (the freshly loaded Drive data) rather than the React state,
+  // which isn't re-rendered yet at the moment this is called.
+  // Throttled to once per 5 minutes so frequent Drive refreshes don't spam the API.
+  async function autoSyncCalendar(currentWeekData, fileId) {
+    if (!getToken()) return;
+    const now = Date.now();
+    if (now - _lastCalSyncMs < 5 * 60 * 1000) return; // at most once per 5 min
+    _lastCalSyncMs = now;
+    try {
+      const result = await pullNewFromCalendar(currentWeekData);
+      if (!result || (result.added === 0 && result.updated === 0)) return;
+      setWeekData(result.newWeekData);
+      // Immediately persist the merged calendar events to Drive so they survive the next reload.
+      // We pass fileId directly because driveFileId React state isn't set yet at this point.
+      if (fileId) {
+        const allData = { weekData: result.newWeekData };
+        ALL_STORAGE_KEYS.filter(k => k !== 'weekData').forEach(k => {
+          try { const s = localStorage.getItem(k); if (s) allData[k] = JSON.parse(s); } catch {}
+        });
+        saveToDrive(fileId, allData).catch(e => console.log('Auto-sync Drive save failed:', e?.message));
+      }
+      console.log(`Auto calendar sync: ${result.added} added, ${result.updated} updated`);
+    } catch (e) {
+      console.log('Auto calendar sync skipped:', e?.message);
+    }
+  }
+
   async function loadAllFromDrive(forceOverwrite) {
     _loadingFromDrive = true;
     setSaveStatus('saving');
@@ -5643,6 +5673,8 @@ function App() {
       setAuthError(false);
       setSaveStatus('saved');
       setTimeout(() => { setSaveStatus(''); _loadingFromDrive = false; }, 2000);
+      // Auto-sync Google Calendar in background — non-blocking, silent
+      autoSyncCalendar(data.weekData || {}, fileId);
     } catch (e) {
       _loadingFromDrive = false;
       const msg = e?.message || 'Unknown error';
@@ -6079,7 +6111,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.7.7</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.7.8</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
