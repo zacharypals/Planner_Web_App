@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v3.7.5 -->
+<!-- LP Planner v3.7.6 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -5578,6 +5578,8 @@ function App() {
   const pullActive = useRef(false);
   const saveTimerRef = useRef(null);
   const pendingSaveRef = useRef(false); // true while a save is debounced but not yet flushed
+  const saveInProgressRef = useRef(false); // true while a saveToDrive fetch is actually in flight
+  const lastDriveCheckRef = useRef(0); // timestamp of last Drive freshness check (multi-device sync)
 
   // Load all data from Drive after sign-in
   async function loadAllFromDrive(forceOverwrite) {
@@ -5641,16 +5643,19 @@ function App() {
     setSaveStatus('saving');
     saveTimerRef.current = setTimeout(async () => { // 1500ms debounce
       pendingSaveRef.current = false;
+      saveInProgressRef.current = true; // Drive fetch is now in flight
       const allData = {};
       ALL_STORAGE_KEYS.forEach(k => {
         try { const s = localStorage.getItem(k); if (s) allData[k] = JSON.parse(s); } catch {}
       });
       try {
         await saveToDrive(fid, allData);
+        saveInProgressRef.current = false;
         setAuthError(false);
         setSaveStatus('saved');
         setTimeout(() => setSaveStatus(''), 2000);
       } catch (e) {
+        saveInProgressRef.current = false;
         const msg = e?.message || 'Save failed';
         const is401 = msg.includes('401') || msg.toLowerCase().includes('unauthorized') || msg.toLowerCase().includes('not authenticated');
         if (is401) {
@@ -5788,11 +5793,42 @@ function App() {
   }, []);
 
   // Flush pending saves when tab is closed, refreshed, or hidden (mobile home button etc.)
+  // Also re-check Drive for newer data when tab becomes visible (multi-device sync).
   useEffect(() => {
+    // Lightweight check: is Drive newer than our last save? If so, silently reload.
+    // Only runs when no local changes are pending, and at most once every 30 seconds.
+    async function checkAndRefreshFromDrive() {
+      if (!authUser || !driveFileId || _loadingFromDrive) return;
+      if (pendingSaveRef.current || saveInProgressRef.current) return; // local changes in flight — don't overwrite
+      const now = Date.now();
+      if (now - lastDriveCheckRef.current < 30000) return; // max once per 30s
+      lastDriveCheckRef.current = now;
+      try {
+        const token = getToken();
+        if (!token) return;
+        // Fetch just the modifiedTime — tiny request, no full file download
+        const metaRes = await fetch(
+          `https://www.googleapis.com/drive/v3/files/${driveFileId}?fields=modifiedTime`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (!metaRes.ok) return;
+        const { modifiedTime } = await metaRes.json();
+        const localSaved = localStorage.getItem('_lp_savedAt');
+        // If Drive modifiedTime is newer than our last successful save, reload
+        if (!modifiedTime || (localSaved && localSaved >= modifiedTime)) return;
+        // Drive is newer — reload silently (forceOverwrite=true: skip conflict dialog
+        // since we already verified no local changes are pending above)
+        await loadAllFromDrive(true);
+      } catch {} // silently ignore — don't surface network errors as UI noise
+    }
+
     function handleBeforeUnload(e) {
       // Always flush any pending Pages body save synchronously first
       _bodyFlushRef.fn?.();
-      if (pendingSaveRef.current && driveFileId) {
+      // Send keepalive if a save is debounced (pendingSaveRef) OR if a Drive fetch is
+      // mid-flight (saveInProgressRef) — the in-flight fetch will be cancelled by the
+      // browser on unload, so we need the keepalive to rescue the data.
+      if ((pendingSaveRef.current || saveInProgressRef.current) && driveFileId) {
         const allData = {};
         ALL_STORAGE_KEYS.forEach(k => {
           try { const s = localStorage.getItem(k); if (s) allData[k] = JSON.parse(s); } catch {}
@@ -5821,6 +5857,9 @@ function App() {
         // Flush any pending Pages body save to localStorage/state before Drive save
         _bodyFlushRef.fn?.();
         if (pendingSaveRef.current) flushSave();
+      } else if (document.visibilityState === 'visible') {
+        // Tab came back into focus — check if another device saved to Drive while we were away
+        checkAndRefreshFromDrive();
       }
     }
     window.addEventListener('beforeunload', handleBeforeUnload);
@@ -5829,7 +5868,7 @@ function App() {
       window.removeEventListener('beforeunload', handleBeforeUnload);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [flushSave, driveFileId]);
+  }, [flushSave, driveFileId, authUser]);
 
   function handleSignIn() {
     requestToken(
@@ -6023,7 +6062,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.7.5</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.7.6</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
