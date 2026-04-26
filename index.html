@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v3.7.9 -->
+<!-- LP Planner v3.8.0 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -1019,6 +1019,7 @@
     font-family: 'Playfair Display', serif; font-size: 14px; color: var(--ink);
     margin-bottom: 4px;
   }
+  .monthly-cell-dow { display: none; } /* mobile only — replaces the separate header row */
   .monthly-cell-events { display: flex; flex-direction: column; gap: 2px; }
   .monthly-event-chip {
     font-size: 10.5px; padding: 2px 6px; border-radius: 5px; cursor: pointer;
@@ -1274,8 +1275,8 @@
     /* cal grid hidden on mobile — replaced by day view */
     .weekly-calendar { display: none; }
 
-    /* Monthly calendar: fill screen width, no horizontal scroll */
-    .monthly-cal-wrap { min-width: 0; padding: 0 8px 16px; }
+    /* Monthly calendar — constrain to screen, no horizontal scroll */
+    .monthly-cal-wrap { width: 100%; box-sizing: border-box; min-width: 0; overflow: hidden; padding: 0 8px 16px; }
     .mobile-month-nav {
       display: flex; align-items: center; justify-content: space-between;
       padding: 6px 2px 10px;
@@ -1283,10 +1284,17 @@
     .mobile-month-label {
       font-family: 'Playfair Display', serif; font-size: 16px; font-weight: 600; color: var(--ink);
     }
-    .monthly-cell { min-height: 62px; padding: 4px 3px 3px; }
-    .monthly-cell-date { font-size: 12px; margin-bottom: 2px; }
-    .monthly-event-chip { font-size: 9px; padding: 1px 4px; }
-    .monthly-event-more { font-size: 9px; }
+    .monthly-cal-header { display: none; } /* replaced by per-tile day labels */
+    .monthly-cell-dow {
+      display: block; font-size: 7px; text-transform: uppercase; letter-spacing: 0.05em;
+      font-family: 'DM Mono', monospace; color: var(--ink-faint);
+      text-align: center; margin-bottom: 1px; white-space: nowrap;
+    }
+    .monthly-cell.today .monthly-cell-dow { color: var(--gold); }
+    .monthly-cell { min-height: 64px; padding: 4px 3px 3px; }
+    .monthly-cell-date { font-size: 11px; margin-bottom: 2px; text-align: center; }
+    .monthly-event-chip { font-size: 9px; padding: 1px 3px; }
+    .monthly-event-more { font-size: 8px; }
   }
 
   /* Monthly habit checklist below calendar */
@@ -5096,7 +5104,11 @@ function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals 
           {/* Grid */}
           <div className="monthly-cal-grid">
             {cells.map((d,i)=>{
-              if (!d) return <div key={'e'+i} className="monthly-cell empty" />;
+              if (!d) return (
+                <div key={'e'+i} className="monthly-cell empty">
+                  <div className="monthly-cell-dow">{['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][i%7]}</div>
+                </div>
+              );
               const dk = fmt(d);
               const isToday = isSameDay(d, today);
               const dayEvents = getEventsForDay(dk);
@@ -5108,6 +5120,7 @@ function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals 
                   onDragOver={e=>handleDragOver(e,dk)}
                   onDragLeave={()=>setDragOverDay(null)}
                   onDrop={e=>handleDrop(e,dk)}>
+                  <div className="monthly-cell-dow">{['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()]}</div>
                   <div className="monthly-cell-date">{d.getDate()}</div>
                   <div className="monthly-cell-events">
                     {dayEvents.slice(0,3).map(ev=>(
@@ -6133,7 +6146,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.7.9</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.8.0</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
