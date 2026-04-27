@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v3.8.2 -->
+<!-- LP Planner v3.8.3 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -603,6 +603,22 @@
     visibility: visible; opacity: 1; transition: none;
   }
   .task-delete-btn.confirming:hover { background: #96281b; }
+  /* Two-option confirm for repeat tasks (desktop) */
+  .task-delete-repeat-confirm {
+    position: absolute; top: 4px; right: 4px;
+    display: flex; align-items: center; gap: 3px; z-index: 10;
+  }
+  .task-delete-repeat-btn {
+    font-size: 10px; padding: 2px 6px; border-radius: 5px; border: none; cursor: pointer;
+    background: var(--red); color: white; font-family: 'DM Sans', sans-serif;
+    font-weight: 600; white-space: nowrap;
+  }
+  .task-delete-repeat-btn.all { background: var(--purple); }
+  .task-delete-repeat-btn:hover { opacity: 0.85; }
+  .task-delete-repeat-cancel {
+    font-size: 11px; padding: 2px 5px; border-radius: 5px; border: none; cursor: pointer;
+    background: var(--border); color: var(--ink-light); line-height: 1;
+  }
   @media (hover: none) { .task-delete-btn { display: none !important; } }
   .task-mobile-delete-btn {
     background: #e74c3c; border: none; border-radius: 6px; cursor: pointer;
@@ -2472,6 +2488,26 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
     setTasks(dayKey, t => t.filter(x=>x.id!==id));
   }
 
+  // Delete this instance and all future instances of a repeat task (same repeatId, on or after dayKey)
+  function deleteTaskAndFuture(dayKey, id) {
+    const task = getTasks(dayKey).find(t => t.id===id);
+    if (!task) return;
+    const repeatId = task.repeatId;
+    if (!repeatId) { deleteTask(dayKey, id); return; }
+    setWeekData(wd => {
+      const draft = JSON.parse(JSON.stringify(wd));
+      Object.keys(draft).forEach(wk => {
+        const tasks = draft[wk]?.tasks;
+        if (!tasks) return;
+        Object.keys(tasks).forEach(dk => {
+          if (dk < dayKey) return; // keep past instances
+          tasks[dk] = tasks[dk].filter(t => t.repeatId !== repeatId);
+        });
+      });
+      return draft;
+    });
+  }
+
   const weekDays = Array.from({length:7}, (_,i)=>addDays(weekStart,i));
   const weekLabel = `${fmtDisplay(weekDays[0])} – ${fmtDisplay(weekDays[6])}`;
 
@@ -2742,6 +2778,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
                         onUpdate={p=>updateTask(dk,task.id,p)}
                         onBlurSync={()=>syncTaskToCalendar(dk,task.id)}
                         onDelete={()=>deleteTask(dk,task.id)}
+                        onDeleteFuture={task.repeatId ? ()=>deleteTaskAndFuture(dk,task.id) : null}
                         onEnterKey={()=>addTask(dk,task.id)}
                         titleRef={el=>taskTitleRefs.current[task.id]=el}
                         deleteIfEmpty={()=>{if(!task.title.trim())deleteTask(dk,task.id);}}
@@ -2837,6 +2874,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
                     onUpdate={p=>updateTask(mobileDayKey,task.id,p)}
                     onBlurSync={()=>syncTaskToCalendar(mobileDayKey,task.id)}
                     onDelete={()=>deleteTask(mobileDayKey,task.id)}
+                    onDeleteFuture={task.repeatId ? ()=>deleteTaskAndFuture(mobileDayKey,task.id) : null}
                     onEnterKey={()=>addTask(mobileDayKey,task.id)}
                     titleRef={el=>taskTitleRefsMobile.current[task.id]=el}
                     deleteIfEmpty={()=>{if(!task.title.trim())deleteTask(mobileDayKey,task.id);}}
@@ -3360,7 +3398,7 @@ const EVENT_COLORS = [
   '#ffe4e6', // blush
   '#ecfdf5', // aqua mist
 ];
-function TaskCard({ task, onUpdate, onBlurSync, onDelete, onEnterKey, titleRef, deleteIfEmpty, onCopy, hasCopied, onPasteBelow, onShowCtxMenu, onDragStart, onDragOver, onDragEnd, onDrop, isDragOver, onApplyRepeat, onReschedule, weekDays, currentDayKey }) {
+function TaskCard({ task, onUpdate, onBlurSync, onDelete, onDeleteFuture, onEnterKey, titleRef, deleteIfEmpty, onCopy, hasCopied, onPasteBelow, onShowCtxMenu, onDragStart, onDragOver, onDragEnd, onDrop, isDragOver, onApplyRepeat, onReschedule, weekDays, currentDayKey }) {
   const textareaRef = useRef();
   const [confirming, setConfirming] = useState(false);
   const [mobileConfirming, setMobileConfirming] = useState(false);
@@ -3381,10 +3419,12 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onEnterKey, titleRef, 
 
   function handleDeleteClick(e) {
     e.stopPropagation();
-    if (confirming) {
-      onDelete();
+    if (!onDeleteFuture) {
+      // Non-repeat task: standard two-click confirm
+      if (confirming) { onDelete(); } else { setConfirming(true); }
     } else {
-      setConfirming(true);
+      // Repeat task: first click arms confirm, second click is handled by the two-button UI
+      if (!confirming) setConfirming(true);
     }
   }
 
@@ -3424,12 +3464,21 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onEnterKey, titleRef, 
       onTouchStart={onReschedule ? handleCardTouchStart : undefined}
       onTouchEnd={onReschedule ? handleCardTouchEnd : undefined}
       onTouchMove={onReschedule ? handleCardTouchMove : undefined}>
-      <button
-        className={`task-delete-btn ${confirming?'confirming':''}`}
-        title={confirming ? 'Click again to confirm delete' : 'Delete task'}
-        onClick={handleDeleteClick}>
-        {confirming ? 'Delete?' : '✕'}
-      </button>
+      {confirming && onDeleteFuture ? (
+        // Repeat task: offer "Just this" vs "All future"
+        <div className="task-delete-repeat-confirm" onClick={e=>e.stopPropagation()}>
+          <button className="task-delete-repeat-btn" onClick={e=>{e.stopPropagation();onDelete();}}>Just this</button>
+          <button className="task-delete-repeat-btn all" onClick={e=>{e.stopPropagation();onDeleteFuture();}}>All future</button>
+          <button className="task-delete-repeat-cancel" onClick={e=>{e.stopPropagation();setConfirming(false);}}>✕</button>
+        </div>
+      ) : (
+        <button
+          className={`task-delete-btn ${confirming?'confirming':''}`}
+          title={confirming ? 'Click again to confirm delete' : 'Delete task'}
+          onClick={handleDeleteClick}>
+          {confirming ? 'Delete?' : '✕'}
+        </button>
+      )}
       <div className="task-card-header">
         {task.isProjectTask ? (
           <span className="task-type-btn event" title={`From project: ${task.projectTitle||''}`}
@@ -3489,10 +3538,25 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onEnterKey, titleRef, 
         )}
         {mobileConfirming && onReschedule ? (
           <>
-            <button className="task-mobile-delete-btn"
-              onClick={e=>{e.stopPropagation();onDelete();}}>
-              Delete?
-            </button>
+            {onDeleteFuture ? (
+              // Repeat task: two options
+              <>
+                <button className="task-mobile-delete-btn"
+                  onClick={e=>{e.stopPropagation();setMobileConfirming(false);onDelete();}}>
+                  Just this
+                </button>
+                <button className="task-mobile-delete-btn"
+                  style={{background:'#8b4aac'}}
+                  onClick={e=>{e.stopPropagation();setMobileConfirming(false);onDeleteFuture();}}>
+                  All future
+                </button>
+              </>
+            ) : (
+              <button className="task-mobile-delete-btn"
+                onClick={e=>{e.stopPropagation();onDelete();}}>
+                Delete?
+              </button>
+            )}
             <button onClick={e=>{e.stopPropagation();setMobileConfirming(false);}}
               style={{background:'none',border:'none',cursor:'pointer',fontSize:13,
                       color:'var(--ink-faint)',padding:'0 4px',flexShrink:0}}>✕</button>
@@ -6143,7 +6207,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.8.2</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.8.3</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
