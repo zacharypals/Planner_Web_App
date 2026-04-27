@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v3.8.3 -->
+<!-- LP Planner v3.8.4 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -2333,6 +2333,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
   });
   const [sheetOpen, setSheetOpen] = useState(false);
   const [showPeoplePicker, setShowPeoplePicker] = useState(false);
+  const [showRepeatCleanup, setShowRepeatCleanup] = useState(false);
   const pendingTaskFocus = useRef(null); // {id, dayKey} — task to focus after render
   const taskTitleRefs = useRef({}); // id -> input ref (desktop)
   const taskTitleRefsMobile = useRef({}); // id -> input ref (mobile)
@@ -2410,6 +2411,54 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
           expanded: false,
           gcalId: null,
         }];
+      });
+      return draft;
+    });
+  }
+
+  // Scan all weekData and group repeat task instances.
+  // New tasks: keyed by repeatId. Legacy tasks (no repeatId): keyed by title+days combo.
+  function getRepeatGroups() {
+    const groups = {}; // key -> { key, title, days, endDate, count, instances:[{wk,dk,id}] }
+    Object.entries(weekData).forEach(([wk, wkData]) => {
+      Object.entries((wkData.tasks)||{}).forEach(([dk, tasks]) => {
+        (tasks||[]).forEach(t => {
+          if (!t.repeat?.days?.length && !t.repeatId) return; // not a repeat task
+          const key = t.repeatId
+            ? `id:${t.repeatId}`
+            : `legacy:${t.title}:${JSON.stringify((t.repeat?.days||[]).slice().sort())}`;
+          if (!groups[key]) {
+            groups[key] = {
+              key, title: t.title||'(untitled)',
+              days: t.repeat?.days || [],
+              endDate: t.repeat?.endDate || '',
+              repeatId: t.repeatId || null,
+              instances: [],
+            };
+          }
+          groups[key].instances.push({ wk, dk, id: t.id });
+        });
+      });
+    });
+    return Object.values(groups).filter(g => g.instances.length > 0)
+      .sort((a,b) => a.title.localeCompare(b.title));
+  }
+
+  // Delete ALL instances of a repeat group (regardless of date — used by cleanup tool)
+  function deleteRepeatGroup(groupKey, repeatId, title, days) {
+    setWeekData(wd => {
+      const draft = JSON.parse(JSON.stringify(wd));
+      Object.keys(draft).forEach(wk => {
+        const tasks = draft[wk]?.tasks;
+        if (!tasks) return;
+        Object.keys(tasks).forEach(dk => {
+          tasks[dk] = tasks[dk].filter(t => {
+            if (repeatId) return t.repeatId !== repeatId;
+            // Legacy match: same title and same days set
+            const sameDays = JSON.stringify((t.repeat?.days||[]).slice().sort()) === JSON.stringify((days||[]).slice().sort());
+            return !(t.title === title && sameDays);
+          });
+        });
       });
       return draft;
     });
@@ -2493,7 +2542,8 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
     const task = getTasks(dayKey).find(t => t.id===id);
     if (!task) return;
     const repeatId = task.repeatId;
-    if (!repeatId) { deleteTask(dayKey, id); return; }
+    const legacyTitle = task.title;
+    const legacyDays = (task.repeat?.days||[]).slice().sort();
     setWeekData(wd => {
       const draft = JSON.parse(JSON.stringify(wd));
       Object.keys(draft).forEach(wk => {
@@ -2501,7 +2551,12 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
         if (!tasks) return;
         Object.keys(tasks).forEach(dk => {
           if (dk < dayKey) return; // keep past instances
-          tasks[dk] = tasks[dk].filter(t => t.repeatId !== repeatId);
+          tasks[dk] = tasks[dk].filter(t => {
+            if (repeatId) return t.repeatId !== repeatId;
+            // Legacy: match by title + days
+            const sameDays = JSON.stringify((t.repeat?.days||[]).slice().sort()) === JSON.stringify(legacyDays);
+            return !(t.title === legacyTitle && sameDays);
+          });
         });
       });
       return draft;
@@ -2721,6 +2776,14 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
         <textarea className="sidebar-textarea" placeholder="Your be-word and how to apply it…"
           value={wd.beWord||''} onChange={e=>setWD(w=>({...w,beWord:e.target.value}))} rows={10} />
       </div>
+      <div className="sidebar-section" style={{borderTop:'1px solid var(--border)',paddingTop:12}}>
+        <button onClick={()=>setShowRepeatCleanup(true)}
+          style={{width:'100%',padding:'6px 10px',borderRadius:'var(--radius-sm)',border:'1px solid var(--border)',
+                  background:'var(--paper)',color:'var(--ink-light)',fontSize:11,cursor:'pointer',
+                  fontFamily:"'DM Sans',sans-serif",textAlign:'left'}}>
+          🔁 Manage repeat tasks…
+        </button>
+      </div>
     </>
   );
 
@@ -2778,7 +2841,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
                         onUpdate={p=>updateTask(dk,task.id,p)}
                         onBlurSync={()=>syncTaskToCalendar(dk,task.id)}
                         onDelete={()=>deleteTask(dk,task.id)}
-                        onDeleteFuture={task.repeatId ? ()=>deleteTaskAndFuture(dk,task.id) : null}
+                        onDeleteFuture={(task.repeatId || task.repeat?.days?.length) ? ()=>deleteTaskAndFuture(dk,task.id) : null}
                         onEnterKey={()=>addTask(dk,task.id)}
                         titleRef={el=>taskTitleRefs.current[task.id]=el}
                         deleteIfEmpty={()=>{if(!task.title.trim())deleteTask(dk,task.id);}}
@@ -2874,7 +2937,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
                     onUpdate={p=>updateTask(mobileDayKey,task.id,p)}
                     onBlurSync={()=>syncTaskToCalendar(mobileDayKey,task.id)}
                     onDelete={()=>deleteTask(mobileDayKey,task.id)}
-                    onDeleteFuture={task.repeatId ? ()=>deleteTaskAndFuture(mobileDayKey,task.id) : null}
+                    onDeleteFuture={(task.repeatId || task.repeat?.days?.length) ? ()=>deleteTaskAndFuture(mobileDayKey,task.id) : null}
                     onEnterKey={()=>addTask(mobileDayKey,task.id)}
                     titleRef={el=>taskTitleRefsMobile.current[task.id]=el}
                     deleteIfEmpty={()=>{if(!task.title.trim())deleteTask(mobileDayKey,task.id);}}
@@ -2971,6 +3034,102 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
         />
       )}
 
+      {showRepeatCleanup && (
+        <RepeatCleanupModal
+          groups={getRepeatGroups()}
+          onDeleteGroup={(g)=>deleteRepeatGroup(g.key, g.repeatId, g.title, g.days)}
+          onClose={()=>setShowRepeatCleanup(false)}
+        />
+      )}
+
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// REPEAT CLEANUP MODAL
+// Lists all repeat task groups across all weeks; lets user delete entire groups at once.
+// ─────────────────────────────────────────────
+const DAY_LABELS = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+function RepeatCleanupModal({ groups, onDeleteGroup, onClose }) {
+  const [deletedKeys, setDeletedKeys] = useState(new Set());
+  const [confirmKey, setConfirmKey] = useState(null);
+  const visible = groups.filter(g => !deletedKeys.has(g.key));
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-box" style={{maxWidth:460,maxHeight:'80vh',display:'flex',flexDirection:'column'}}
+        onClick={e=>e.stopPropagation()}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
+          <div style={{fontFamily:"'Playfair Display',serif",fontSize:17,fontWeight:700,color:'var(--ink)'}}>
+            🔁 Repeat Task Groups
+          </div>
+          <button onClick={onClose}
+            style={{background:'none',border:'none',cursor:'pointer',fontSize:18,color:'var(--ink-faint)',lineHeight:1}}>✕</button>
+        </div>
+        <div style={{fontSize:12,color:'var(--ink-light)',marginBottom:14}}>
+          Each row is a group of repeat task instances across all weeks.
+          Deleting a group removes every instance — past and future.
+        </div>
+        <div style={{flex:1,overflowY:'auto'}}>
+          {visible.length === 0 && (
+            <div style={{textAlign:'center',color:'var(--ink-faint)',fontSize:13,padding:'24px 0'}}>
+              No repeat tasks found.
+            </div>
+          )}
+          {visible.map(g => {
+            const isConfirming = confirmKey === g.key;
+            const dayStr = DAY_LABELS.filter((_,i)=>g.days.includes(i)).join(' ');
+            return (
+              <div key={g.key}
+                style={{display:'flex',alignItems:'center',gap:8,padding:'8px 10px',
+                        borderRadius:'var(--radius-sm)',marginBottom:6,
+                        background:'var(--paper)',border:'1px solid var(--border)'}}>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:13,fontWeight:600,color:'var(--ink)',
+                               overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                    {g.title||'(untitled)'}
+                  </div>
+                  <div style={{fontSize:10,color:'var(--ink-light)',marginTop:2}}>
+                    {dayStr || 'unknown days'}{g.endDate ? ` · until ${g.endDate}` : ''}
+                    {' · '}<span style={{color:'var(--ink-faint)'}}>{g.instances.length} instance{g.instances.length!==1?'s':''}</span>
+                  </div>
+                </div>
+                {isConfirming ? (
+                  <div style={{display:'flex',gap:4,flexShrink:0}}>
+                    <button onClick={()=>{
+                      onDeleteGroup(g);
+                      setDeletedKeys(s=>new Set([...s,g.key]));
+                      setConfirmKey(null);
+                    }} style={{padding:'3px 8px',borderRadius:5,border:'none',cursor:'pointer',
+                               background:'var(--red)',color:'white',fontSize:11,fontWeight:600}}>
+                      Delete all
+                    </button>
+                    <button onClick={()=>setConfirmKey(null)}
+                      style={{padding:'3px 6px',borderRadius:5,border:'1px solid var(--border)',
+                              cursor:'pointer',background:'none',fontSize:11,color:'var(--ink-light)'}}>
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <button onClick={()=>setConfirmKey(g.key)}
+                    style={{padding:'3px 8px',borderRadius:5,border:'1px solid var(--border)',
+                            cursor:'pointer',background:'none',fontSize:11,color:'var(--ink-light)',
+                            flexShrink:0}}>
+                    Delete…
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        <div style={{marginTop:12,textAlign:'right'}}>
+          <button onClick={onClose}
+            style={{padding:'6px 16px',borderRadius:'var(--radius-sm)',border:'1px solid var(--border)',
+                    background:'none',cursor:'pointer',fontSize:13,color:'var(--ink-light)'}}>
+            Done
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -6207,7 +6366,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.8.3</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.8.4</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
