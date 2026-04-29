@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v3.8.4 -->
+<!-- LP Planner v3.8.5 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -1177,7 +1177,8 @@
     .app { height: auto; min-height: 100vh; overflow: visible; }
     .main-content { flex-direction: column; overflow: visible; padding-bottom: 64px; }
     .main-panel { overflow: visible; }
-    .habit-main { overflow-x: hidden; overflow-y: auto; height: auto; }
+    .habit-main { overflow-x: hidden; overflow-y: auto; height: auto; padding-bottom: 148px; }
+    /* 148px = nav (56px) + FAB top-from-nav (80px - 56px = 24px offset) + FAB height (48px) + breathing room (20px) */
     /* Hide weekly desktop panel on mobile — replaced by mobile-day-view */
     .weekly-main-panel { display: none !important; }
     /* Bigger tap targets for task radio and accordion caret on mobile */
@@ -4474,6 +4475,11 @@ function HabitChecklist({ date, goals, completions, onToggle, onAdd, onDelete, o
     if (editingId && editRef.current) {
       editRef.current.focus();
       editRef.current.select();
+      // Scroll the input into view after a short delay so the mobile keyboard has time
+      // to appear and resize the viewport before we ask the browser to scroll.
+      setTimeout(() => {
+        editRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 150);
     }
   }, [editingId]);
 
@@ -4627,7 +4633,7 @@ function HabitChecklist({ date, goals, completions, onToggle, onAdd, onDelete, o
                 )}
                 {/* Expand toggle */}
                 <button
-                  style={{background:'none',border:'none',cursor:'pointer',fontSize:11,color:'var(--ink-faint)',padding:'0 2px',flexShrink:0}}
+                  style={{background:'none',border:'none',cursor:'pointer',fontSize:16,color:'var(--ink-faint)',padding:'4px 6px',flexShrink:0,lineHeight:1}}
                   onClick={e=>{e.stopPropagation();setExpandedGoals(ex=>({...ex,[g.id]:!ex[g.id]}));}}
                   title="Qty & notes">
                   {isExpanded ? '▲' : '▼'}
@@ -6366,7 +6372,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.8.4</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.8.5</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
