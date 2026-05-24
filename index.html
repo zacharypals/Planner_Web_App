@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v3.8.5 -->
+<!-- LP Planner v3.8.6 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -312,7 +312,7 @@
     display: flex; align-items: center; gap: 4px;
     font-size: 9px; font-family: 'DM Mono', monospace; letter-spacing: 0.06em;
     text-transform: uppercase; color: var(--accent);
-    padding: 4px 6px; cursor: pointer; user-select: none;
+    padding: 7px 8px; cursor: pointer; user-select: none;
     background: var(--accent-light); border-radius: var(--radius-sm) var(--radius-sm) 0 0;
     font-weight: 600; transition: background 0.1s;
   }
@@ -324,11 +324,12 @@
   }
   .habit-task-row:last-child { border-bottom: none; border-radius: 0 0 var(--radius-sm) var(--radius-sm); }
   .habit-task-check {
-    width: 13px; height: 13px; border-radius: 50%; border: 1.5px solid;
+    width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid;
     display: flex; align-items: center; justify-content: center;
     cursor: pointer; flex-shrink: 0; transition: all 0.12s;
   }
   .habit-task-check:active { transform: scale(0.9); }
+  .habit-selected-date-mobile { display: none; }
   /* ── SCHEDULE SELECTOR (habit checklist) ── */
   .habit-schedule-selector {
     display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
@@ -482,6 +483,17 @@
     .fitness-main { padding: 10px 12px 80px; }
     .fitness-view-tabs { width: 100%; }
     .fitness-view-tab { padding: 5px 8px; font-size: 11px; }
+  }
+  /* Mobile habit accordion — larger tap targets */
+  @media (max-width: 767px) {
+    .habit-task-label { padding: 9px 10px; font-size: 10px; }
+    .habit-task-check { width: 18px; height: 18px; }
+    .habit-selected-date-mobile {
+      display: block; text-align: center;
+      font-family: 'Playfair Display', serif; font-size: 16px; font-weight: 600;
+      color: var(--ink); padding: 10px 0 6px;
+      border-top: 1px solid var(--border); margin-bottom: 4px;
+    }
   }
   /* ── FITNESS PHASE 2 ── */
   .fitness-view-tabs {
@@ -1677,13 +1689,13 @@ const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
 // ── HELPERS ──
-function useSwipe(onSwipeLeft, onSwipeRight) {
+function useSwipe(onSwipeLeft, onSwipeRight, threshold=50) {
   const touchStartX = React.useRef(null);
   function onTouchStart(e) { touchStartX.current = e.touches[0].clientX; }
   function onTouchEnd(e) {
     if (touchStartX.current === null) return;
     const dx = e.changedTouches[0].clientX - touchStartX.current;
-    if (Math.abs(dx) > 50) { dx < 0 ? onSwipeLeft() : onSwipeRight(); }
+    if (Math.abs(dx) > threshold) { dx < 0 ? onSwipeLeft() : onSwipeRight(); }
     touchStartX.current = null;
   }
   return { onTouchStart, onTouchEnd };
@@ -3478,19 +3490,19 @@ function DailyHabitsSection({ dayKey, habitGoals, habitCompletions, setHabitComp
         const isExpanded = !!expandedIds[g.id];
         return (
           <div key={g.id} className="habit-task-row" style={{borderLeft:`3px solid ${g.color}`}}>
-            <div style={{display:'flex', alignItems:'center', gap:5, padding:'4px 6px'}}>
+            <div style={{display:'flex', alignItems:'center', gap:5, padding:'6px 8px'}}>
               <div className="habit-task-check"
                 style={{background: done ? g.color : 'transparent', borderColor: g.color}}
                 onClick={e => { e.stopPropagation(); toggleHabit(g.id); }}>
                 {done && <span style={{color:'white', fontSize:9, lineHeight:1}}>✓</span>}
               </div>
-              <span style={{flex:1, fontSize:11.5, fontFamily:"'DM Sans',sans-serif", fontWeight:500,
+              <span style={{flex:1, fontSize:12, fontFamily:"'DM Sans',sans-serif", fontWeight:500,
                 color: done ? g.color : 'var(--ink)', textDecoration: done ? 'line-through' : 'none',
                 opacity: done ? 0.7 : 1}}>
                 {g.name}
               </span>
               <button
-                style={{background:'none',border:'none',cursor:'pointer',fontSize:9,color:'var(--ink-faint)',padding:'0 2px',flexShrink:0,lineHeight:1}}
+                style={{background:'none',border:'none',cursor:'pointer',fontSize:11,color:'var(--ink-faint)',padding:'2px 4px',flexShrink:0,lineHeight:1}}
                 onClick={e => { e.stopPropagation(); setExpandedIds(ex => ({...ex, [g.id]: !ex[g.id]})); }}>
                 {isExpanded ? '▲' : '▼'}
               </button>
@@ -4357,7 +4369,8 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
       {(() => {
         const habitSwipe = useSwipe(
           () => setSelectedDate(d => addDays(d, view==='daily'?1:view==='weekly'?7:view==='monthly'?31:365)),
-          () => setSelectedDate(d => addDays(d, view==='daily'?-1:view==='weekly'?-7:view==='monthly'?-31:-365))
+          () => setSelectedDate(d => addDays(d, view==='daily'?-1:view==='weekly'?-7:view==='monthly'?-31:-365)),
+          100
         );
         return (
       <div className="habit-main" {...habitSwipe}>
@@ -4397,6 +4410,9 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
           <MonthlyView date={selectedDate} selected={selectedDate} goals={displayGoals} completions={completions}
             qty={qty} notes={notes}
             onDayClick={setSelectedDate} today={today} />
+          <div className="habit-selected-date-mobile">
+            {DAYS[selectedDate.getDay()]}, {MONTHS[selectedDate.getMonth()]} {selectedDate.getDate()}
+          </div>
           <HabitChecklist date={selectedDate} goals={goals} completions={completions}
             onToggle={toggleCompletion} onAdd={addGoal} onDelete={deleteGoal} onRename={updateGoal}
             onReorder={reorderGoals}
@@ -4409,6 +4425,9 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
         </>}
         {view==='weekly' && <>
           <WeeklyHabitView date={selectedDate} selected={selectedDate} goals={displayGoals} completions={completions} today={today} qty={qty} notes={notes} onDayClick={setSelectedDate} />
+          <div className="habit-selected-date-mobile">
+            {DAYS[selectedDate.getDay()]}, {MONTHS[selectedDate.getMonth()]} {selectedDate.getDate()}
+          </div>
           <HabitChecklist date={selectedDate} goals={goals} completions={completions}
             onToggle={toggleCompletion} onAdd={addGoal} onDelete={deleteGoal} onRename={updateGoal}
             onReorder={reorderGoals}
@@ -4421,6 +4440,9 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
         </>}
         {view==='yearly' && <>
           <YearlyView date={selectedDate} selected={selectedDate} goals={displayGoals} completions={completions} today={today} onDayClick={setSelectedDate} />
+          <div className="habit-selected-date-mobile">
+            {DAYS[selectedDate.getDay()]}, {MONTHS[selectedDate.getMonth()]} {selectedDate.getDate()}
+          </div>
           <HabitChecklist date={selectedDate} goals={goals} completions={completions}
             onToggle={toggleCompletion} onAdd={addGoal} onDelete={deleteGoal} onRename={updateGoal}
             onReorder={reorderGoals}
@@ -6372,7 +6394,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.8.5</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.8.6</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
