@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v3.8.9 -->
+<!-- LP Planner v3.9.0 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -3676,7 +3676,7 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onDeleteFuture, onEnte
             placeholder={task.isEvent ? 'Event…' : 'Task…'}
             autoCapitalize="sentences"
             value={task.title}
-            onChange={e=>onUpdate({title:e.target.value})}
+            onChange={e=>{let v=e.target.value; if(task.title===''&&v.length===1) v=v.toUpperCase(); onUpdate({title:v});}}
             onBlur={()=>{
               if(onBlurSync && task.isEvent) onBlurSync();
               if(deleteIfEmpty) deleteIfEmpty();
@@ -6395,7 +6395,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.8.9</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.9.0</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
