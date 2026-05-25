@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v3.8.8 -->
+<!-- LP Planner v3.8.9 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -3674,6 +3674,7 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onDeleteFuture, onEnte
             ref={el=>{if(titleRef)titleRef(el);}}
             className="task-title-input"
             placeholder={task.isEvent ? 'Event…' : 'Task…'}
+            autoCapitalize="sentences"
             value={task.title}
             onChange={e=>onUpdate({title:e.target.value})}
             onBlur={()=>{
@@ -6394,7 +6395,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.8.8</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.8.9</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -6910,7 +6911,9 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
           <div style={{display:'flex',alignItems:'center',gap:6,padding:'2px 0 4px',borderBottom:'1px solid var(--border)',marginBottom:2}}>
             <span className="set-num"></span>
             {isCardio?(<><span className="set-label" style={{width:60,textAlign:'center'}}>Dist (mi)</span>
-              <span className="set-label" style={{width:60,textAlign:'center',marginLeft:6}}>Time (M:SS)</span>
+              <span className="set-label" style={{width:32,textAlign:'center',marginLeft:6}}>Min</span>
+              <span style={{width:10,flexShrink:0}}/>
+              <span className="set-label" style={{width:32,textAlign:'center'}}>Sec</span>
               <span className="set-label" style={{width:56,textAlign:'center',marginLeft:6}}>min/mi</span></>)
             :(<><span className="set-label" style={{width:52,textAlign:'center'}}>Reps</span>
               <span className="set-label" style={{width:52,textAlign:'center',marginLeft:18}}>Weight</span></>)}
@@ -6925,8 +6928,21 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
                 {isCardio?(<>
                   <input type="number" min="0" step="0.01" className="set-input" placeholder="—" value={set.dist||''}
                     onChange={e=>updateSet(dk,ex.id,set.id,{dist:e.target.value})} style={{width:60,opacity:set.done?0.6:1}}/>
-                  <input type="text" inputMode="numeric" className="set-input" placeholder="M:SS" value={set.time||''}
-                    onChange={e=>updateSet(dk,ex.id,set.id,{time:e.target.value})} style={{width:60,marginLeft:6,opacity:set.done?0.6:1}}/>
+                  {(()=>{
+                    const tp=(set.time||'').split(':');
+                    const tMins=tp[0]||''; const tSecs=tp.length>1?tp[1]:'';
+                    return (<>
+                      <input type="number" min="0" inputMode="numeric" className="set-input" placeholder="0"
+                        value={tMins}
+                        onChange={e=>{const s=tSecs!==''?':'+tSecs:''; updateSet(dk,ex.id,set.id,{time:e.target.value+s});}}
+                        style={{width:32,marginLeft:6,textAlign:'center',opacity:set.done?0.6:1}}/>
+                      <span style={{fontFamily:"'DM Mono',monospace",fontSize:13,color:'var(--ink-faint)',flexShrink:0}}>:</span>
+                      <input type="number" min="0" max="59" inputMode="numeric" className="set-input" placeholder="00"
+                        value={tSecs}
+                        onChange={e=>{const m=tMins||'0'; updateSet(dk,ex.id,set.id,{time:m+':'+e.target.value});}}
+                        style={{width:32,textAlign:'center',opacity:set.done?0.6:1}}/>
+                    </>);
+                  })()}
                   <span className="set-label" style={{width:56,textAlign:'center',fontWeight:pace?700:400,color:pace?'var(--gold)':'var(--ink-faint)',fontSize:pace?11:9}}>{pace||'—'}</span>
                 </>):(<>
                   <input type="number" min="0" className="set-input" placeholder="—" value={set.reps||''}
