@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v3.9.5 -->
+<!-- LP Planner v3.9.6 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -6510,7 +6510,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.9.5</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.9.6</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -6909,8 +6909,9 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
   function exStats(ex) {
     const doneSets=ex.sets.filter(s=>s.done);
     const hasWeight=doneSets.some(s=>parseFloat(s.weight)>0);
+    const totalReps=doneSets.reduce((acc,s)=>acc+(parseFloat(s.reps)||0),0);
     const volume=doneSets.reduce((acc,s)=>{const r=parseFloat(s.reps)||0,w=parseFloat(s.weight)||0;return acc+(w>0?r*w:r);},0);
-    return {done:doneSets.length,total:ex.sets.length,volume:Math.round(volume),hasWeight};
+    return {done:doneSets.length,total:ex.sets.length,volume:Math.round(volume),hasWeight,totalReps:Math.round(totalReps)};
   }
   function exName(exerciseId) { return fitnessExercises.find(e=>e.id===exerciseId)?.name||'Unknown'; }
 
@@ -7018,7 +7019,7 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
             </span>
           )}
           <span style={{fontFamily:"'DM Sans',sans-serif",fontSize:13,fontWeight:700,color:'var(--accent)',flex:1}}>{exName(ex.exerciseId)}</span>
-          {stats.done>0&&<span className="fitness-stat-pill">{stats.done}/{stats.total} sets{stats.volume>0&&` · ${stats.volume.toLocaleString()} ${stats.hasWeight?'lbs':'reps'}`}</span>}
+          {stats.done>0&&<span className="fitness-stat-pill">{stats.done}/{stats.total} sets{stats.totalReps>0&&` · ${stats.totalReps} reps`}{stats.hasWeight&&stats.volume>0&&` · ${stats.volume.toLocaleString()} lbs`}</span>}
           <button onClick={()=>deleteExercise(dk,ex.id)}
             style={{background:'none',border:'none',cursor:'pointer',fontSize:13,color:'var(--ink-faint)',padding:'0 2px',lineHeight:1,opacity:0.5}}>✕</button>
         </div>
