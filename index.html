@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v3.9.4 -->
+<!-- LP Planner v3.9.5 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -488,6 +488,8 @@
   @media (max-width: 767px) {
     .habit-task-label { padding: 8px 9px; font-size: 18px; }
     .habit-task-check { width: 36px; height: 36px; }
+    .goal-check { width: 28px; height: 28px; border-radius: 8px; border-width: 2px; }
+    .goal-check.checked::after { font-size: 16px; }
     .habit-selected-date-mobile {
       display: block; text-align: center;
       font-family: 'Playfair Display', serif; font-size: 20px; font-weight: 700;
@@ -6508,7 +6510,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.9.4</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.9.5</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
