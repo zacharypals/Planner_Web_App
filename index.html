@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v3.9.7 -->
+<!-- LP Planner v3.9.8 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -4157,6 +4157,29 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
     return dates.filter(dk=>isCompleted(goalId,dk)).length;
   }
 
+  // Sum qty for a goal across all dates in the current view window
+  function qtyRollup(goalId) {
+    let dates = [];
+    if (view==='daily') { dates=[fmt(selectedDate)]; }
+    else if (view==='weekly') {
+      const ws=getWeekStart(selectedDate);
+      dates=Array.from({length:7},(_,i)=>fmt(addDays(ws,i)));
+    }
+    else if (view==='monthly') {
+      const d=new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+      const m=d.getMonth();
+      while(d.getMonth()===m) { dates.push(fmt(d)); d.setDate(d.getDate()+1); }
+    }
+    else { // yearly
+      const d=new Date(selectedDate.getFullYear(),0,1);
+      while(d.getFullYear()===selectedDate.getFullYear()) { dates.push(fmt(d)); d.setDate(d.getDate()+1); }
+    }
+    return dates.reduce((sum, dk) => {
+      const v = parseFloat((qty[dk]||{})[goalId] || 0);
+      return sum + (isNaN(v) ? 0 : v);
+    }, 0);
+  }
+
   function calcStreak(goalId) {
     const todayDate = new Date(); todayDate.setHours(0,0,0,0);
     const todayKey = fmt(todayDate);
@@ -4330,14 +4353,25 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
                   </div>
                 )}
                 <div style={{display:'flex',alignItems:'center',gap:6}}>
-                  <span style={{fontSize:10,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace",flexShrink:0}}>Qty:</span>
-                  <input type="number" min="0" step="1"
+                  <button
+                    onClick={e=>{e.stopPropagation();updateGoal(goal.id,{qtyMode:(goal.qtyMode||'qty')==='qty'?'$':'qty'});}}
+                    style={{
+                      fontSize:10,fontFamily:"'DM Mono',monospace",fontWeight:700,
+                      padding:'1px 6px',borderRadius:10,border:'1px solid var(--border)',
+                      background:(goal.qtyMode||'qty')==='$'?'var(--gold)':'var(--cream)',
+                      color:(goal.qtyMode||'qty')==='$'?'white':'var(--ink-light)',
+                      cursor:'pointer',flexShrink:0,lineHeight:1.6,
+                    }}
+                    title="Toggle between Qty and $ mode">
+                    {(goal.qtyMode||'qty')==='$' ? '$' : 'Qty'}
+                  </button>
+                  <input type="number" min="0" step="any" inputMode="decimal"
                     className="habit-qty-input"
                     placeholder="—"
                     value={getQty(goal.id)}
                     onChange={e=>setGoalQty(goal.id, e.target.value)}
                     onClick={e=>e.stopPropagation()}
-                    style={{width:60}}
+                    style={{width:70}}
                   />
                 </div>
                 <div style={{display:'flex',flexDirection:'column',gap:2}}>
@@ -4409,6 +4443,34 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
         <div style={{display:'flex',justifyContent:'center',alignItems:'center',padding:'4px 0 8px',borderBottom:'1px solid var(--border)',marginBottom:'8px'}}>
           <HabitNavArrows view={view} date={selectedDate} onChange={setSelectedDate}/>
         </div>
+
+        {/* Qty rollup banner — shown when a single habit is filtered and it has a qty mode */}
+        {filterGoal && (() => {
+          const fg = goals.find(g => g.id === filterGoal);
+          if (!fg || view === 'daily') return null;
+          const total = qtyRollup(filterGoal);
+          if (total === 0) return null;
+          const isDollar = (fg.qtyMode || 'qty') === '$';
+          const displayVal = isDollar
+            ? '$' + (Number.isInteger(total) ? total.toLocaleString() : total.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}))
+            : (Number.isInteger(total) ? total.toLocaleString() : parseFloat(total.toFixed(4)).toString());
+          const viewLabel = view === 'weekly' ? 'This Week' : view === 'monthly' ? 'This Month' : 'This Year';
+          return (
+            <div style={{
+              display:'flex',alignItems:'baseline',justifyContent:'center',gap:8,
+              padding:'8px 16px',marginBottom:10,
+              background: fg.color + '12',
+              borderRadius:10,border:`1px solid ${fg.color}30`,
+            }}>
+              <span style={{fontFamily:"'DM Mono',monospace",fontSize:26,fontWeight:700,color:fg.color,lineHeight:1}}>
+                {displayVal}
+              </span>
+              <span style={{fontFamily:"'DM Sans',sans-serif",fontSize:12,color:'var(--ink-faint)',letterSpacing:'0.03em'}}>
+                total · {viewLabel}
+              </span>
+            </div>
+          );
+        })()}
 
         {view==='monthly' && <>
           <MonthlyView date={selectedDate} selected={selectedDate} goals={displayGoals} completions={completions}
@@ -4723,8 +4785,19 @@ function HabitChecklist({ date, goals, completions, onToggle, onAdd, onDelete, o
                   )}
                   {getQty && (
                     <div style={{display:'flex',alignItems:'center',gap:8}}>
-                      <span style={{fontSize:10,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace",flexShrink:0}}>Qty:</span>
-                      <input type="number" min="0" step="1" inputMode="numeric"
+                      <button
+                        onClick={e=>{e.stopPropagation();onRename(g.id,{qtyMode:(g.qtyMode||'qty')==='qty'?'$':'qty'});}}
+                        style={{
+                          fontSize:10,fontFamily:"'DM Mono',monospace",fontWeight:700,
+                          padding:'1px 6px',borderRadius:10,border:'1px solid var(--border)',
+                          background:(g.qtyMode||'qty')==='$'?'var(--gold)':'var(--cream)',
+                          color:(g.qtyMode||'qty')==='$'?'white':'var(--ink-light)',
+                          cursor:'pointer',flexShrink:0,lineHeight:1.6,
+                        }}
+                        title="Toggle between Qty and $ mode">
+                        {(g.qtyMode||'qty')==='$' ? '$' : 'Qty'}
+                      </button>
+                      <input type="number" min="0" step="any" inputMode="decimal"
                         className="habit-qty-input"
                         placeholder="—"
                         value={getQty(g.id)}
@@ -4840,7 +4913,7 @@ function MonthlyView({date, selected, goals, completions, onDayClick, today, qty
                 if (!done && !qtyVal && !noteLines.length) return null;
                 return (
                   <div style={{marginTop:2,padding:'1px 3px'}}>
-                    {qtyVal && <div style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:g.color,fontWeight:700,lineHeight:1.3}}>{qtyVal}</div>}
+                    {qtyVal && <div style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:g.color,fontWeight:700,lineHeight:1.3}}>{(g.qtyMode||'qty')==='$'?'$':''}{qtyVal}</div>}
                     {noteLines.map((l,i)=>(
                       <div key={i} style={{fontSize:8,fontFamily:"'DM Sans',sans-serif",color:'var(--ink-light)',lineHeight:1.3,overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis'}}>{l}</div>
                     ))}
@@ -4895,7 +4968,7 @@ function WeeklyHabitView({date, selected, goals, completions, today, onDayClick,
                       overflow:'hidden',
                     }}>
                       {isSingle && qtyVal && (
-                        <div style={{fontSize:10,fontFamily:"'DM Mono',monospace",fontWeight:700,color:done?'white':g.color,lineHeight:1.3}}>{qtyVal}</div>
+                        <div style={{fontSize:10,fontFamily:"'DM Mono',monospace",fontWeight:700,color:done?'white':g.color,lineHeight:1.3}}>{(g.qtyMode||'qty')==='$'?'$':''}{qtyVal}</div>
                       )}
                       {isSingle && noteLines.map((l,li)=>(
                         <div key={li} style={{fontSize:9,fontFamily:"'DM Sans',sans-serif",color:done?'rgba(255,255,255,0.85)':'var(--ink-light)',lineHeight:1.3,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{l}</div>
@@ -6510,7 +6583,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.9.7</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.9.8</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
