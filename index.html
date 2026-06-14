@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v3.10.3 -->
+<!-- LP Planner v3.10.4 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -4451,14 +4451,7 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
       </div>{/* end sidebar-wrap */}
 
       {/* MAIN */}
-      {(() => {
-        const habitSwipe = useSwipe(
-          () => setSelectedDate(d => addDays(d, view==='daily'?1:view==='weekly'?7:view==='monthly'?31:365)),
-          () => setSelectedDate(d => addDays(d, view==='daily'?-1:view==='weekly'?-7:view==='monthly'?-31:-365)),
-          100
-        );
-        return (
-      <div className="habit-main" {...habitSwipe}>
+      <div className="habit-main">
         <div className="habit-header-row">
           <div className="view-tabs">
             {['daily','weekly','monthly','yearly'].map(v=>(
@@ -4569,7 +4562,6 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
         {view==='daily' && <DailyView date={selectedDate} goals={displayGoals} completions={completions}
           onToggle={(gid)=>toggleCompletion(gid,fmt(selectedDate))} />}
       </div>
-      );})()}
 
       {/* Mobile FAB + sheet for countdowns */}
       <div className={`mobile-sheet-overlay ${sheetOpen?'open':''}`} onClick={()=>setSheetOpen(false)} />
@@ -6765,7 +6757,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.10.3</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.10.4</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
