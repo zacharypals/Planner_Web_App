@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v3.9.8 -->
+<!-- LP Planner v3.10.2 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -1722,6 +1722,22 @@ function fmtDisplay(d) {
   return `${MONTHS[d.getMonth()].slice(0,3)} ${d.getDate()}`;
 }
 function isSameDay(a,b) { return fmt(a)===fmt(b); }
+
+// ── QTY LINE ITEM HELPERS ──
+// Normalizes legacy flat number/string into LineItem[]. Safe to call on any stored value.
+function normalizeQty(val) {
+  if (Array.isArray(val)) return val;
+  const n = parseFloat(val);
+  if (!isNaN(n) && n !== 0) return [{id:'li'+Date.now()+Math.random().toString(36).slice(2,6), amount:n, note:'', ts:0}];
+  return [];
+}
+// Sums a LineItem[] (or legacy value) to a number for display/rollup
+function qtyTotal(val) {
+  if (Array.isArray(val)) return val.reduce((s,li) => s + (parseFloat(li.amount)||0), 0);
+  const n = parseFloat(val);
+  return isNaN(n) ? 0 : n;
+}
+function genLiId() { return 'li'+Date.now()+Math.random().toString(36).slice(2,7); }
 
 // ─────────────────────────────────────────────
 // GOOGLE AUTH + DRIVE + CALENDAR ENGINE
@@ -3468,9 +3484,18 @@ function DailyHabitsSection({ dayKey, habitGoals, habitCompletions, setHabitComp
       return { ...c, [dayKey]: has ? arr.filter(x => x !== goalId) : [...arr, goalId] };
     });
   }
-  function getQty(goalId) { return (habitQty[dayKey] || {})[goalId] || ''; }
+  function getQty(goalId) {
+    const raw = (habitQty[dayKey] || {})[goalId];
+    const total = qtyTotal(raw);
+    return total === 0 ? '' : String(total);
+  }
   function setQtyVal(goalId, val) {
-    setHabitQty(q => ({ ...q, [dayKey]: { ...(q[dayKey] || {}), [goalId]: val } }));
+    const raw = (habitQty[dayKey] || {})[goalId];
+    const existing = normalizeQty(raw);
+    const note = existing.length > 0 ? existing[0].note : '';
+    const n = parseFloat(val);
+    const items = (val === '' || isNaN(n)) ? [] : [{id: existing.length > 0 ? existing[0].id : genLiId(), amount:n, note, ts: existing.length > 0 ? existing[0].ts : Date.now()}];
+    setHabitQty(q => ({ ...q, [dayKey]: { ...(q[dayKey] || {}), [goalId]: items } }));
   }
   function getNoteVal(goalId) { return (habitNotes[dayKey] || {})[goalId] || ''; }
   function setNoteVal(goalId, val) {
@@ -4109,10 +4134,35 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
     setMetrics(m => ({...m, [selectedDayKey]: {...(m[selectedDayKey]||{}), [field]: val}}));
   }
 
-  // Qty helpers (amount per goal per day)
-  function getQty(goalId) { return (qty[selectedDayKey] || {})[goalId] || ''; }
+  // Qty helpers (amount per goal per day) — line-item aware
+  function getRawQty(goalId) { return (qty[selectedDayKey] || {})[goalId]; }
+  function getQtyItems(goalId) { return normalizeQty(getRawQty(goalId)); }
+  function getQty(goalId) {
+    const total = qtyTotal(getRawQty(goalId));
+    return total === 0 ? '' : String(total);
+  }
   function setGoalQty(goalId, val) {
-    setQty(q => ({...q, [selectedDayKey]: {...(q[selectedDayKey]||{}), [goalId]: val}}));
+    // For single-entry habits: write as LineItem[] with one item preserving any existing note
+    const existing = getQtyItems(goalId);
+    const note = existing.length > 0 ? existing[0].note : '';
+    const n = parseFloat(val);
+    const items = (val === '' || isNaN(n)) ? [] : [{id: existing.length > 0 ? existing[0].id : genLiId(), amount:n, note, ts: existing.length > 0 ? existing[0].ts : Date.now()}];
+    setQty(q => ({...q, [selectedDayKey]: {...(q[selectedDayKey]||{}), [goalId]: items}}));
+  }
+  function addQtyEntry(goalId, amount, note) {
+    const n = parseFloat(amount);
+    if (isNaN(n) || n === 0) return;
+    const existing = getQtyItems(goalId);
+    const newItem = {id: genLiId(), amount: n, note: note||'', ts: Date.now()};
+    setQty(q => ({...q, [selectedDayKey]: {...(q[selectedDayKey]||{}), [goalId]: [...existing, newItem]}}));
+  }
+  function removeQtyEntry(goalId, liId) {
+    const updated = getQtyItems(goalId).filter(li => li.id !== liId);
+    setQty(q => ({...q, [selectedDayKey]: {...(q[selectedDayKey]||{}), [goalId]: updated}}));
+  }
+  function updateQtyEntry(goalId, liId, patch) {
+    const updated = getQtyItems(goalId).map(li => li.id === liId ? {...li, ...patch} : li);
+    setQty(q => ({...q, [selectedDayKey]: {...(q[selectedDayKey]||{}), [goalId]: updated}}));
   }
   function getNote(goalId) { return (notes[selectedDayKey] || {})[goalId] || ''; }
   function setGoalNote(goalId, val) {
@@ -4175,8 +4225,8 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
       while(d.getFullYear()===selectedDate.getFullYear()) { dates.push(fmt(d)); d.setDate(d.getDate()+1); }
     }
     return dates.reduce((sum, dk) => {
-      const v = parseFloat((qty[dk]||{})[goalId] || 0);
-      return sum + (isNaN(v) ? 0 : v);
+      const v = qtyTotal((qty[dk]||{})[goalId]);
+      return sum + v;
     }, 0);
   }
 
@@ -4352,28 +4402,25 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
                     </div>
                   </div>
                 )}
+                {/* Multi-entry toggle */}
                 <div style={{display:'flex',alignItems:'center',gap:6}}>
+                  <span style={{fontSize:10,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace",flexShrink:0}}>Multi-entry:</span>
+                  <button
+                    onClick={e=>{e.stopPropagation();updateGoal(goal.id,{multiEntry:!goal.multiEntry});}}
+                    style={{fontSize:10,fontFamily:"'DM Mono',monospace",fontWeight:700,padding:'1px 8px',borderRadius:10,border:'1px solid var(--border)',background:goal.multiEntry?'var(--accent)':'var(--cream)',color:goal.multiEntry?'white':'var(--ink-light)',cursor:'pointer',lineHeight:1.6}}
+                    title="Allow multiple line-item entries per day">
+                    {goal.multiEntry ? 'On' : 'Off'}
+                  </button>
                   <button
                     onClick={e=>{e.stopPropagation();updateGoal(goal.id,{qtyMode:(goal.qtyMode||'qty')==='qty'?'$':'qty'});}}
-                    style={{
-                      fontSize:10,fontFamily:"'DM Mono',monospace",fontWeight:700,
-                      padding:'1px 6px',borderRadius:10,border:'1px solid var(--border)',
-                      background:(goal.qtyMode||'qty')==='$'?'var(--gold)':'var(--cream)',
-                      color:(goal.qtyMode||'qty')==='$'?'white':'var(--ink-light)',
-                      cursor:'pointer',flexShrink:0,lineHeight:1.6,
-                    }}
+                    style={{fontSize:10,fontFamily:"'DM Mono',monospace",fontWeight:700,padding:'1px 6px',borderRadius:10,border:'1px solid var(--border)',background:(goal.qtyMode||'qty')==='$'?'var(--gold)':'var(--cream)',color:(goal.qtyMode||'qty')==='$'?'white':'var(--ink-light)',cursor:'pointer',flexShrink:0,lineHeight:1.6}}
                     title="Toggle between Qty and $ mode">
                     {(goal.qtyMode||'qty')==='$' ? '$' : 'Qty'}
                   </button>
-                  <input type="number" min="0" step="any" inputMode="decimal"
-                    className="habit-qty-input"
-                    placeholder="—"
-                    value={getQty(goal.id)}
-                    onChange={e=>setGoalQty(goal.id, e.target.value)}
-                    onClick={e=>e.stopPropagation()}
-                    style={{width:70}}
-                  />
                 </div>
+                <QtySection goal={goal} items={getQtyItems(goal.id)} getQty={getQty}
+                  setGoalQty={setGoalQty} addQtyEntry={addQtyEntry}
+                  removeQtyEntry={removeQtyEntry} updateQtyEntry={updateQtyEntry} />
                 <div style={{display:'flex',flexDirection:'column',gap:2}}>
                   <span style={{fontSize:10,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace"}}>Notes:</span>
                   <textarea
@@ -4484,7 +4531,7 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
             onReorder={reorderGoals}
             onGoToMetrics={onGoToMetrics}
             getMetric={getMetric} setMetric={setMetric}
-            getQty={getQty} setGoalQty={setGoalQty}
+            getQty={getQty} setGoalQty={setGoalQty} getQtyItems={getQtyItems} addQtyEntry={addQtyEntry} removeQtyEntry={removeQtyEntry} updateQtyEntry={updateQtyEntry}
             getNote={getNote} setGoalNote={setGoalNote}
             countInView={countInView} calcStreak={calcStreak}
             fitnessExercises={fitnessExercises} />
@@ -4499,7 +4546,7 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
             onReorder={reorderGoals}
             onGoToMetrics={onGoToMetrics}
             getMetric={getMetric} setMetric={setMetric}
-            getQty={getQty} setGoalQty={setGoalQty}
+            getQty={getQty} setGoalQty={setGoalQty} getQtyItems={getQtyItems} addQtyEntry={addQtyEntry} removeQtyEntry={removeQtyEntry} updateQtyEntry={updateQtyEntry}
             getNote={getNote} setGoalNote={setGoalNote}
             countInView={countInView} calcStreak={calcStreak}
             fitnessExercises={fitnessExercises} />
@@ -4514,7 +4561,7 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
             onReorder={reorderGoals}
             onGoToMetrics={onGoToMetrics}
             getMetric={getMetric} setMetric={setMetric}
-            getQty={getQty} setGoalQty={setGoalQty}
+            getQty={getQty} setGoalQty={setGoalQty} getQtyItems={getQtyItems} addQtyEntry={addQtyEntry} removeQtyEntry={removeQtyEntry} updateQtyEntry={updateQtyEntry}
             getNote={getNote} setGoalNote={setGoalNote}
             countInView={countInView} calcStreak={calcStreak}
             fitnessExercises={fitnessExercises} />
@@ -4542,7 +4589,129 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
   );
 }
 
-function HabitChecklist({ date, goals, completions, onToggle, onAdd, onDelete, onRename, onReorder, onGoToMetrics, getMetric, setMetric, getQty, setGoalQty, getNote, setGoalNote, countInView, calcStreak, fitnessExercises }) {
+// ── QtySection — reusable qty entry UI (single or multi-entry) ──
+function QtySection({ goal, items, getQty, setGoalQty, addQtyEntry, removeQtyEntry, updateQtyEntry }) {
+  const [showItems, setShowItems] = useState(false);
+  const [addAmount, setAddAmount] = useState('');
+  const [addNote, setAddNote] = useState('');
+  const [editingId, setEditingId] = useState(null);
+  const [editAmount, setEditAmount] = useState('');
+  const [editNote, setEditNote] = useState('');
+  const isDollar = (goal.qtyMode || 'qty') === '$';
+  const prefix = isDollar ? '$' : '';
+  const totalVal = qtyTotal(items);
+  const displayTotal = totalVal === 0 ? '' : (isDollar
+    ? '$' + (Number.isInteger(totalVal) ? totalVal.toLocaleString() : totalVal.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}))
+    : String(parseFloat(totalVal.toFixed(4))));
+
+  function commitAdd() {
+    const n = parseFloat(addAmount);
+    if (isNaN(n) || n === 0) return;
+    addQtyEntry(goal.id, n, addNote.trim());
+    setAddAmount(''); setAddNote('');
+  }
+  function startEdit(li) {
+    setEditingId(li.id); setEditAmount(String(li.amount)); setEditNote(li.note||'');
+  }
+  function commitEdit() {
+    const n = parseFloat(editAmount);
+    if (!isNaN(n)) updateQtyEntry(goal.id, editingId, {amount:n, note:editNote.trim()});
+    setEditingId(null);
+  }
+
+  if (!goal.multiEntry) {
+    // Single-entry: plain editable field with mode indicator
+    return (
+      <div style={{display:'flex',alignItems:'center',gap:6}}>
+        <span style={{fontSize:10,fontFamily:"'DM Mono',monospace",fontWeight:700,padding:'1px 6px',borderRadius:10,border:'1px solid var(--border)',background:isDollar?'var(--gold)':'var(--cream)',color:isDollar?'white':'var(--ink-light)',flexShrink:0,lineHeight:1.6}}>
+          {isDollar ? '$' : 'Qty'}
+        </span>
+        <input type="number" min="0" step="any" inputMode="decimal"
+          className="habit-qty-input"
+          placeholder="—"
+          value={getQty(goal.id)}
+          onChange={e=>setGoalQty(goal.id, e.target.value)}
+          onClick={e=>e.stopPropagation()}
+          style={{width:70}}
+        />
+      </div>
+    );
+  }
+
+  // Multi-entry mode
+  return (
+    <div style={{display:'flex',flexDirection:'column',gap:4}} onClick={e=>e.stopPropagation()}>
+      {/* Header row: mode toggle, total, expand toggle */}
+      <div style={{display:'flex',alignItems:'center',gap:6}}>
+        <button
+          onClick={e=>{e.stopPropagation();}}
+          style={{fontSize:10,fontFamily:"'DM Mono',monospace",fontWeight:700,padding:'1px 6px',borderRadius:10,border:'1px solid var(--border)',background:isDollar?'var(--gold)':'var(--cream)',color:isDollar?'white':'var(--ink-light)',cursor:'default',flexShrink:0,lineHeight:1.6}}
+          title="Mode indicator">
+          {isDollar ? '$' : 'Qty'}
+        </button>
+        <span style={{fontFamily:"'DM Mono',monospace",fontSize:13,fontWeight:700,color:'var(--ink)',minWidth:40}}>
+          {displayTotal || '—'}
+        </span>
+        {items.length > 0 && (
+          <button onClick={e=>{e.stopPropagation();setShowItems(s=>!s);}}
+            style={{fontSize:10,color:'var(--ink-faint)',background:'none',border:'none',cursor:'pointer',padding:'0 2px',lineHeight:1}}>
+            {showItems ? '▲' : `▾ ${items.length} item${items.length>1?'s':''}`}
+          </button>
+        )}
+      </div>
+      {/* Line items list */}
+      {showItems && items.length > 0 && (
+        <div style={{display:'flex',flexDirection:'column',gap:3,paddingLeft:4,borderLeft:'2px solid var(--border)'}}>
+          {items.map(li => (
+            <div key={li.id} style={{display:'flex',alignItems:'center',gap:4,fontSize:11}}>
+              {editingId===li.id ? (
+                <>
+                  <input type="number" min="0" step="any" inputMode="decimal" value={editAmount}
+                    onChange={e=>setEditAmount(e.target.value)}
+                    style={{width:54,fontSize:11,fontFamily:"'DM Mono',monospace",border:'1px solid var(--border)',borderRadius:3,padding:'1px 4px',background:'white',color:'var(--ink)',outline:'none'}}
+                    autoFocus />
+                  <input type="text" value={editNote} onChange={e=>setEditNote(e.target.value)}
+                    placeholder="note…"
+                    style={{flex:1,fontSize:11,fontFamily:"'DM Sans',sans-serif",border:'1px solid var(--border)',borderRadius:3,padding:'1px 4px',background:'white',color:'var(--ink)',outline:'none',minWidth:0}}
+                    onKeyDown={e=>{if(e.key==='Enter')commitEdit();if(e.key==='Escape')setEditingId(null);}} />
+                  <button onClick={commitEdit} style={{fontSize:10,background:'var(--accent)',color:'white',border:'none',borderRadius:3,padding:'1px 5px',cursor:'pointer',fontFamily:"'DM Mono',monospace",flexShrink:0}}>✓</button>
+                </>
+              ) : (
+                <>
+                  <span style={{fontFamily:"'DM Mono',monospace",fontWeight:700,color:'var(--ink)',flexShrink:0}}>{prefix}{li.amount}</span>
+                  {li.note && <span style={{fontFamily:"'DM Sans',sans-serif",color:'var(--ink-light)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',flex:1}}>{li.note}</span>}
+                  {!li.note && <span style={{flex:1}}/>}
+                  <button onClick={()=>startEdit(li)} style={{fontSize:10,background:'none',border:'none',cursor:'pointer',color:'var(--ink-faint)',padding:'0 2px',flexShrink:0}} title="Edit">✎</button>
+                  <button onClick={()=>removeQtyEntry(goal.id,li.id)} style={{fontSize:11,background:'none',border:'none',cursor:'pointer',color:'var(--ink-faint)',padding:'0 2px',flexShrink:0}} title="Remove">✕</button>
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      {/* Add new entry row */}
+      <div style={{display:'flex',alignItems:'center',gap:4}}>
+        <input type="number" min="0" step="any" inputMode="decimal"
+          value={addAmount}
+          onChange={e=>setAddAmount(e.target.value)}
+          placeholder={prefix+'0'}
+          onKeyDown={e=>{if(e.key==='Enter')commitAdd();}}
+          style={{width:60,fontSize:11,fontFamily:"'DM Mono',monospace",border:'1px solid var(--border)',borderRadius:3,padding:'2px 4px',background:'white',color:'var(--ink)',outline:'none'}}
+        />
+        <input type="text" value={addNote} onChange={e=>setAddNote(e.target.value)}
+          placeholder="note (optional)"
+          onKeyDown={e=>{if(e.key==='Enter')commitAdd();}}
+          style={{flex:1,fontSize:11,fontFamily:"'DM Sans',sans-serif",border:'1px solid var(--border)',borderRadius:3,padding:'2px 4px',background:'white',color:'var(--ink)',outline:'none',minWidth:0}}
+        />
+        <button onClick={e=>{e.stopPropagation();commitAdd();}}
+          style={{fontSize:13,background:'var(--accent)',color:'white',border:'none',borderRadius:4,padding:'2px 8px',cursor:'pointer',fontWeight:700,flexShrink:0,lineHeight:1.5}}
+          title="Add entry">+</button>
+      </div>
+    </div>
+  );
+}
+
+function HabitChecklist({ date, goals, completions, onToggle, onAdd, onDelete, onRename, onReorder, onGoToMetrics, getMetric, setMetric, getQty, setGoalQty, getQtyItems, addQtyEntry, removeQtyEntry, updateQtyEntry, getNote, setGoalNote, countInView, calcStreak, fitnessExercises }) {
   const dk = fmt(date);
   const [confirmId, setConfirmId] = useState(null);
   const [editingId, setEditingId] = useState(null);
@@ -4784,27 +4953,28 @@ function HabitChecklist({ date, goals, completions, onToggle, onAdd, onDelete, o
                     </div>
                   )}
                   {getQty && (
-                    <div style={{display:'flex',alignItems:'center',gap:8}}>
-                      <button
-                        onClick={e=>{e.stopPropagation();onRename(g.id,{qtyMode:(g.qtyMode||'qty')==='qty'?'$':'qty'});}}
-                        style={{
-                          fontSize:10,fontFamily:"'DM Mono',monospace",fontWeight:700,
-                          padding:'1px 6px',borderRadius:10,border:'1px solid var(--border)',
-                          background:(g.qtyMode||'qty')==='$'?'var(--gold)':'var(--cream)',
-                          color:(g.qtyMode||'qty')==='$'?'white':'var(--ink-light)',
-                          cursor:'pointer',flexShrink:0,lineHeight:1.6,
-                        }}
-                        title="Toggle between Qty and $ mode">
-                        {(g.qtyMode||'qty')==='$' ? '$' : 'Qty'}
-                      </button>
-                      <input type="number" min="0" step="any" inputMode="decimal"
-                        className="habit-qty-input"
-                        placeholder="—"
-                        value={getQty(g.id)}
-                        onChange={e=>setGoalQty(g.id, e.target.value)}
-                        style={{width:70}}
-                      />
-                    </div>
+                    <>
+                      {onRename && (
+                        <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                          <span style={{fontSize:10,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace",flexShrink:0}}>Multi-entry:</span>
+                          <button
+                            onClick={e=>{e.stopPropagation();onRename(g.id,{multiEntry:!g.multiEntry});}}
+                            style={{fontSize:10,fontFamily:"'DM Mono',monospace",fontWeight:700,padding:'1px 8px',borderRadius:10,border:'1px solid var(--border)',background:g.multiEntry?'var(--accent)':'var(--cream)',color:g.multiEntry?'white':'var(--ink-light)',cursor:'pointer',lineHeight:1.6}}
+                            title="Allow multiple line-item entries per day">
+                            {g.multiEntry ? 'On' : 'Off'}
+                          </button>
+                          <button
+                            onClick={e=>{e.stopPropagation();onRename(g.id,{qtyMode:(g.qtyMode||'qty')==='qty'?'$':'qty'});}}
+                            style={{fontSize:10,fontFamily:"'DM Mono',monospace",fontWeight:700,padding:'1px 6px',borderRadius:10,border:'1px solid var(--border)',background:(g.qtyMode||'qty')==='$'?'var(--gold)':'var(--cream)',color:(g.qtyMode||'qty')==='$'?'white':'var(--ink-light)',cursor:'pointer',flexShrink:0,lineHeight:1.6}}
+                            title="Toggle between Qty and $ mode">
+                            {(g.qtyMode||'qty')==='$' ? '$' : 'Qty'}
+                          </button>
+                        </div>
+                      )}
+                      <QtySection goal={g} items={getQtyItems ? getQtyItems(g.id) : normalizeQty(getQty(g.id))}
+                        getQty={getQty} setGoalQty={setGoalQty}
+                        addQtyEntry={addQtyEntry} removeQtyEntry={removeQtyEntry} updateQtyEntry={updateQtyEntry} />
+                    </>
                   )}
                   {getNote && (
                     <div style={{display:'flex',flexDirection:'column',gap:2}}>
@@ -4907,15 +5077,21 @@ function MonthlyView({date, selected, goals, completions, onDayClick, today, qty
               {goals.length === 1 && (() => {
                 const g = goals[0];
                 const done = (completions[dk]||[]).includes(g.id);
-                const qtyVal = qty ? (qty[dk]||{})[g.id] || '' : '';
+                const qtyRaw = qty ? (qty[dk]||{})[g.id] : null;
+                const qtyVal = qtyRaw != null ? qtyTotal(qtyRaw) : 0;
+                const liNotes = qtyRaw ? normalizeQty(qtyRaw).map(li=>li.note).filter(Boolean) : [];
                 const notesVal = notes ? (notes[dk]||{})[g.id] || '' : '';
                 const noteLines = notesVal.split('\n').slice(0,4).filter(l=>l.trim());
                 if (!done && !qtyVal && !noteLines.length) return null;
+                const qtyDisplay = qtyVal ? ((g.qtyMode||'qty')==='$' ? '$'+qtyVal : String(qtyVal)) : '';
                 return (
                   <div style={{marginTop:2,padding:'1px 3px'}}>
-                    {qtyVal && <div style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:g.color,fontWeight:700,lineHeight:1.3}}>{(g.qtyMode||'qty')==='$'?'$':''}{qtyVal}</div>}
+                    {qtyDisplay && <div style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:g.color,fontWeight:700,lineHeight:1.3}}>{qtyDisplay}</div>}
+                    {liNotes.map((n,i)=>(
+                      <div key={i} style={{fontSize:8,fontFamily:"'DM Sans',sans-serif",color:'var(--ink-light)',lineHeight:1.3,overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis'}}>{n}</div>
+                    ))}
                     {noteLines.map((l,i)=>(
-                      <div key={i} style={{fontSize:8,fontFamily:"'DM Sans',sans-serif",color:'var(--ink-light)',lineHeight:1.3,overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis'}}>{l}</div>
+                      <div key={'n'+i} style={{fontSize:8,fontFamily:"'DM Sans',sans-serif",color:'var(--ink-light)',lineHeight:1.3,overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis'}}>{l}</div>
                     ))}
                   </div>
                 );
@@ -4951,7 +5127,9 @@ function WeeklyHabitView({date, selected, goals, completions, today, onDayClick,
                 {goals.map(g=>{
                   const done=(completions[dk]||[]).includes(g.id);
                   const isSingle = goals.length === 1;
-                  const qtyVal = (isSingle && qty) ? (qty[dk]||{})[g.id] || '' : '';
+                  const qtyRaw = (isSingle && qty) ? (qty[dk]||{})[g.id] : null;
+                  const qtyVal = qtyRaw != null ? qtyTotal(qtyRaw) : 0;
+                  const liNotes = qtyRaw ? normalizeQty(qtyRaw).map(li=>li.note).filter(Boolean) : [];
                   const notesVal = (isSingle && notes) ? (notes[dk]||{})[g.id] || '' : '';
                   const noteLines = notesVal.split('\n').slice(0,4).filter(l=>l.trim());
                   return (
@@ -4967,11 +5145,14 @@ function WeeklyHabitView({date, selected, goals, completions, today, onDayClick,
                       flexDirection:'column', justifyContent:'flex-start', gap:1,
                       overflow:'hidden',
                     }}>
-                      {isSingle && qtyVal && (
+                      {isSingle && !!qtyVal && (
                         <div style={{fontSize:10,fontFamily:"'DM Mono',monospace",fontWeight:700,color:done?'white':g.color,lineHeight:1.3}}>{(g.qtyMode||'qty')==='$'?'$':''}{qtyVal}</div>
                       )}
+                      {isSingle && liNotes.map((n,i)=>(
+                        <div key={i} style={{fontSize:9,fontFamily:"'DM Sans',sans-serif",color:done?'rgba(255,255,255,0.85)':'var(--ink-light)',lineHeight:1.3,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{n}</div>
+                      ))}
                       {isSingle && noteLines.map((l,li)=>(
-                        <div key={li} style={{fontSize:9,fontFamily:"'DM Sans',sans-serif",color:done?'rgba(255,255,255,0.85)':'var(--ink-light)',lineHeight:1.3,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{l}</div>
+                        <div key={'n'+li} style={{fontSize:9,fontFamily:"'DM Sans',sans-serif",color:done?'rgba(255,255,255,0.85)':'var(--ink-light)',lineHeight:1.3,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{l}</div>
                       ))}
                     </div>
                   );
@@ -6184,9 +6365,10 @@ function App() {
 
           if (!newQty) newQty = {...habitQty};
           const dayQty = {...(newQty[dk] || {})};
-          const existing = parseFloat(dayQty[habit.id]) || 0;
-          if (Math.abs(total - existing) > 0.001) {
-            dayQty[habit.id] = String(Math.round(total * 100) / 100);
+          const existingTotal = qtyTotal(dayQty[habit.id]);
+          if (Math.abs(total - existingTotal) > 0.001) {
+            const rounded = Math.round(total * 100) / 100;
+            dayQty[habit.id] = [{id: genLiId(), amount: rounded, note: 'fitness sync', ts: Date.now()}];
             newQty[dk] = dayQty;
           }
         }
@@ -6583,7 +6765,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.9.8</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.10.2</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
