@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v3.10.5 -->
+<!-- LP Planner v3.10.6 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -418,11 +418,20 @@
   }
   /* Set rows */
   .set-row {
-    display: flex; align-items: center; gap: 6px;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
     padding: 4px 0; border-bottom: 1px solid rgba(0,0,0,0.04);
   }
   .set-row:last-child { border-bottom: none; }
   .set-row.done { opacity: 0.55; }
+  .set-row-main { display: flex; align-items: center; gap: 6px; width: 100%; }
+  .set-note-input {
+    width: 100%; font-family: 'DM Sans', sans-serif; font-size: 11px;
+    border: none; border-top: 1px solid rgba(0,0,0,0.05); border-radius: 0;
+    padding: 2px 4px 3px 26px; background: transparent; color: var(--ink-light);
+    outline: none; margin-top: 0;
+  }
+  .set-note-input::placeholder { color: var(--ink-faint); font-style: italic; }
+  .set-note-input:focus { background: rgba(45,107,74,0.04); }
   .set-num {
     font-family: 'DM Mono', monospace; font-size: 10px; color: var(--ink-faint);
     width: 18px; flex-shrink: 0; text-align: right;
@@ -6757,7 +6766,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.10.5</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.10.6</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -6892,6 +6901,9 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
   const [showLibManager, setShowLibManager] = useState(false);
   const [showGoalManager, setShowGoalManager] = useState(false);
   const [goalsCollapsed, setGoalsCollapsed] = useState(false);
+
+  const pendingSetFocus = useRef(null); // key: `${dk}-${exId}-${setId}`
+  const setFirstInputRefs = useRef({}); // key -> DOM input element
 
   const dateKey = fmt(selectedDate);
   const weekStart = getWeekStart(selectedDate);
@@ -7083,9 +7095,17 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
   function updateSet(dk, exId, setId, patch) {
     setDayExs(dk, exs=>exs.map(e=>e.id!==exId?e:{...e,sets:e.sets.map(s=>s.id!==setId?s:{...s,...patch})}));
   }
-  function addSet(dk, exId) {
-    setDayExs(dk, exs=>exs.map(e=>e.id!==exId?e:{...e,sets:[...e.sets,{id:'s'+Date.now(),reps:'',weight:'',dist:'',time:'',done:false}]}));
+  function addSet(dk, exId, focusAfter) {
+    const newId = 's'+Date.now();
+    setDayExs(dk, exs=>exs.map(e=>e.id!==exId?e:{...e,sets:[...e.sets,{id:newId,reps:'',weight:'',dist:'',time:'',note:'',done:false}]}));
+    if (focusAfter) pendingSetFocus.current = `${dk}-${exId}-${newId}`;
   }
+  useEffect(() => {
+    if (pendingSetFocus.current) {
+      const el = setFirstInputRefs.current[pendingSetFocus.current];
+      if (el) { el.focus(); pendingSetFocus.current = null; }
+    }
+  });
   function deleteSet(dk, exId, setId) {
     setDayExs(dk, exs=>exs.map(e=>e.id!==exId?e:{...e,sets:e.sets.filter(s=>s.id!==setId)}));
   }
@@ -7285,12 +7305,18 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
           {ex.sets.map((set,si)=>{
             const dist=parseFloat(set.dist)||0,timeDec=parseTimeInput(set.time);
             const pace=(dist>0&&timeDec>0)?formatPace(timeDec/dist):null;
+            const focusKey=`${dk}-${ex.id}-${set.id}`;
+            function handleEnter(e) {
+              if (e.key==='Enter') { e.preventDefault(); addSet(dk, ex.id, true); }
+            }
             return (
               <div key={set.id} className={`set-row ${set.done?'done':''}`}>
+                <div className="set-row-main">
                 <span className="set-num">{si+1}</span>
                 {isCardio?(<>
                   <input type="number" min="0" step="0.01" className="set-input" placeholder="—" value={set.dist||''}
-                    onChange={e=>updateSet(dk,ex.id,set.id,{dist:e.target.value})} style={{width:60,opacity:set.done?0.6:1}}/>
+                    ref={el=>setFirstInputRefs.current[focusKey]=el}
+                    onChange={e=>updateSet(dk,ex.id,set.id,{dist:e.target.value})} onKeyDown={handleEnter} style={{width:60,opacity:set.done?0.6:1}}/>
                   {(()=>{
                     const tp=(set.time||'').split(':');
                     const tMins=tp[0]||''; const tSecs=tp.length>1?tp[1]:'';
@@ -7298,31 +7324,37 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
                       <input type="number" min="0" inputMode="numeric" className="set-input" placeholder="0"
                         value={tMins}
                         onChange={e=>{const s=tSecs!==''?':'+tSecs:''; updateSet(dk,ex.id,set.id,{time:e.target.value+s});}}
+                        onKeyDown={handleEnter}
                         style={{width:32,marginLeft:6,textAlign:'center',opacity:set.done?0.6:1}}/>
                       <span style={{fontFamily:"'DM Mono',monospace",fontSize:13,color:'var(--ink-faint)',flexShrink:0}}>:</span>
                       <input type="number" min="0" max="59" inputMode="numeric" className="set-input" placeholder="00"
                         value={tSecs}
                         onChange={e=>{const m=tMins||'0'; updateSet(dk,ex.id,set.id,{time:m+':'+e.target.value});}}
+                        onKeyDown={handleEnter}
                         style={{width:32,textAlign:'center',opacity:set.done?0.6:1}}/>
                     </>);
                   })()}
                   <span className="set-label" style={{width:56,textAlign:'center',fontWeight:pace?700:400,color:pace?'var(--gold)':'var(--ink-faint)',fontSize:pace?11:9}}>{pace||'—'}</span>
                 </>):(<>
                   <input type="number" min="0" className="set-input" placeholder="—" value={set.reps||''}
-                    onChange={e=>updateSet(dk,ex.id,set.id,{reps:e.target.value})} style={{opacity:set.done?0.6:1}}/>
+                    ref={el=>setFirstInputRefs.current[focusKey]=el}
+                    onChange={e=>updateSet(dk,ex.id,set.id,{reps:e.target.value})} onKeyDown={handleEnter} style={{opacity:set.done?0.6:1}}/>
                   <span className="set-label">×</span>
                   <input type="number" min="0" className="set-input" placeholder="—" value={set.weight||''}
-                    onChange={e=>updateSet(dk,ex.id,set.id,{weight:e.target.value})} style={{opacity:set.done?0.6:1}}/>
+                    onChange={e=>updateSet(dk,ex.id,set.id,{weight:e.target.value})} onKeyDown={handleEnter} style={{opacity:set.done?0.6:1}}/>
                   <span className="set-label">lbs</span>
                 </>)}
                 <div className={`set-check ${set.done?'done':''}`} onClick={()=>updateSet(dk,ex.id,set.id,{done:!set.done})}/>
                 <button onClick={()=>deleteSet(dk,ex.id,set.id)}
                   style={{background:'none',border:'none',cursor:'pointer',fontSize:11,color:'var(--ink-faint)',padding:'0 2px',opacity:0.35,marginLeft:2,lineHeight:1}}>✕</button>
+                </div>
+                <input type="text" className="set-note-input" placeholder="note…" value={set.note||''}
+                  onChange={e=>updateSet(dk,ex.id,set.id,{note:e.target.value})}/>
               </div>
             );
           })}
           <div style={{paddingTop:6}}>
-            <button onClick={()=>addSet(dk,ex.id)}
+            <button onClick={()=>addSet(dk,ex.id,true)}
               style={{background:'none',border:'1px solid var(--border)',borderRadius:4,cursor:'pointer',fontSize:10,color:'var(--ink-light)',padding:'2px 8px',fontFamily:"'DM Sans',sans-serif"}}>
               + Set
             </button>
