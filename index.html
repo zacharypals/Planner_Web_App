@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v3.10.7 -->
+<!-- LP Planner v3.10.9 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -6509,9 +6509,20 @@ function App() {
     }
     window.addEventListener('beforeunload', handleBeforeUnload);
     document.addEventListener('visibilitychange', handleVisibilityChange);
+    // Periodic freshness check even while the tab stays continuously focused.
+    // Without this, a device left open and active (never backgrounded, so
+    // visibilitychange never fires) will never learn that another device saved
+    // newer data to Drive — and its next own save would blindly overwrite Drive
+    // with its stale in-memory snapshot, silently discarding the other device's
+    // changes. checkAndRefreshFromDrive already no-ops if a local save is
+    // pending/in-flight, so this is safe to run on a fixed interval.
+    const driveCheckInterval = setInterval(() => {
+      if (document.visibilityState === 'visible') checkAndRefreshFromDrive();
+    }, 30000);
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      clearInterval(driveCheckInterval);
     };
   }, [flushSave, driveFileId, authUser]);
 
@@ -6781,7 +6792,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.10.7</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.10.9</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -6873,17 +6884,17 @@ function App() {
 
       {/* Mobile bottom nav — only visible on phones via CSS */}
       <div className="mobile-bottom-nav">
-        <button className={`mobile-bottom-nav-btn ${page==='planner'?'active':''}`} onClick={()=>setPage('planner')}>
-          <span className="icon">📅</span>Week
-        </button>
         <button className={`mobile-bottom-nav-btn ${page==='monthly'?'active':''}`} onClick={()=>setPage('monthly')}>
           <span className="icon">🗓</span>Month
+        </button>
+        <button className={`mobile-bottom-nav-btn ${page==='pages'?'active':''}`} onClick={()=>setPage('pages')}>
+          <span className="icon">📝</span>Pages
         </button>
         <button className={`mobile-bottom-nav-btn ${page==='habit'?'active':''}`} onClick={()=>setPage('habit')}>
           <span className="icon">✓</span>Habits
         </button>
-        <button className={`mobile-bottom-nav-btn ${page==='pages'?'active':''}`} onClick={()=>setPage('pages')}>
-          <span className="icon">📝</span>Pages
+        <button className={`mobile-bottom-nav-btn ${page==='planner'?'active':''}`} onClick={()=>setPage('planner')}>
+          <span className="icon">📅</span>Week
         </button>
         <button className={`mobile-bottom-nav-btn ${page==='fitness'?'active':''}`} onClick={()=>setPage('fitness')}>
           <span className="icon">💪</span>Fitness
