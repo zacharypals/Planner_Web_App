@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v3.10.9 -->
+<!-- LP Planner v3.10.10 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -2960,20 +2960,20 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
             if(i===0){setWeekStart(ws=>addDays(ws,-7));return 6;}
             return i-1;
           })}>‹</button>
-          <div style={{textAlign:'center'}}>
-            <div className="mobile-day-label">{DAYS[mobileDayDate.getDay()]}</div>
-            <div className="mobile-day-date">{MONTHS[mobileDayDate.getMonth()].slice(0,3)} {mobileDayDate.getDate()}</div>
-          </div>
-          <div style={{display:'flex',alignItems:'center',gap:6}}>
+          <div style={{display:'flex',alignItems:'center',gap:10}}>
+            <div style={{textAlign:'center'}}>
+              <div className="mobile-day-label">{DAYS[mobileDayDate.getDay()]}</div>
+              <div className="mobile-day-date">{MONTHS[mobileDayDate.getMonth()].slice(0,3)} {mobileDayDate.getDate()}</div>
+            </div>
             <button onClick={toggleSwipeNav} title={swipeNav ? 'Swipe navigation on — tap to disable' : 'Swipe navigation off — tap to enable'}
               style={{background:'none',border:'none',cursor:'pointer',fontSize:16,opacity:swipeNav?1:0.35,padding:'2px 4px',lineHeight:1}}>
               👆
             </button>
-            <button className="nav-arrow" onClick={()=>setMobileDayIndex(i=>{
-              if(i===6){setWeekStart(ws=>addDays(ws,7));return 0;}
-              return i+1;
-            })}>›</button>
           </div>
+          <button className="nav-arrow" onClick={()=>setMobileDayIndex(i=>{
+            if(i===6){setWeekStart(ws=>addDays(ws,7));return 0;}
+            return i+1;
+          })}>›</button>
         </div>
         <div className="mobile-day-tasks" ref={mobileTasksContainerRef}>
           <DailyHabitsSection dayKey={mobileDayKey}
@@ -3025,6 +3025,17 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
         </div>
         {/* Week dot row */}
         <div className="mobile-week-dots">
+          <button
+            onClick={()=>{setWeekStart(getWeekStart(today));setMobileDayIndex(today.getDay());}}
+            title="Jump to today"
+            style={{
+              height:28,padding:'0 10px',borderRadius:14,border:'1.5px solid var(--border)',
+              background:'none',fontSize:11,fontFamily:"'DM Mono',monospace",fontWeight:500,
+              color:'var(--ink-light)',cursor:'pointer',display:'flex',alignItems:'center',
+              marginRight:4,
+            }}>
+            Today
+          </button>
           {weekDays.map((d,i)=>(
             <button key={i}
               className={`mobile-week-dot ${i===mobileDayIndex?'active':''} ${isSameDay(d,today)?'today':''}`}
@@ -6792,7 +6803,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.10.9</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.10.10</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
