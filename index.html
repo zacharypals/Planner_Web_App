@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v3.10.10 -->
+<!-- LP Planner v3.10.11 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -6460,8 +6460,18 @@ function App() {
       if (now - lastDriveCheckRef.current < 30000) return; // max once per 30s
       lastDriveCheckRef.current = now;
       try {
-        const token = getToken();
-        if (!token) return;
+        let token = getToken();
+        if (!token) {
+          // Access token silently expires (~55min) on a tab left open and idle.
+          // getToken() just returns null in that case — without refreshing here,
+          // this background check would go permanently silent on a long-lived idle
+          // tab and would never notice another device's changes. Refresh once and
+          // retry; if refresh fails, bail quietly and let the normal save-path 401
+          // handling surface a "sign in again" prompt on the user's next action.
+          await new Promise(resolve => requestTokenSilent(() => resolve(), () => resolve()));
+          token = getToken();
+          if (!token) return;
+        }
         // Fetch just the modifiedTime — tiny request, no full file download
         const metaRes = await fetch(
           `https://www.googleapis.com/drive/v3/files/${driveFileId}?fields=modifiedTime`,
@@ -6803,7 +6813,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.10.10</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.10.11</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
