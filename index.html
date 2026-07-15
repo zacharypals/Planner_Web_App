@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v3.10.11 -->
+<!-- LP Planner v3.11.00 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -6813,7 +6813,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.10.11</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.11.0</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -6948,6 +6948,14 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
   const [showLibManager, setShowLibManager] = useState(false);
   const [showGoalManager, setShowGoalManager] = useState(false);
   const [goalsCollapsed, setGoalsCollapsed] = useState(false);
+  const [collapsedExIds, setCollapsedExIds] = useState(()=>new Set());
+  function toggleExCollapsed(exId) {
+    setCollapsedExIds(prev=>{
+      const next=new Set(prev);
+      if(next.has(exId)) next.delete(exId); else next.add(exId);
+      return next;
+    });
+  }
 
   const pendingSetFocus = useRef(null); // key: `${dk}-${exId}-${setId}`
   const setFirstInputRefs = useRef({}); // key -> DOM input element
@@ -7301,6 +7309,7 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
     const libEx=fitnessExercises.find(e=>e.id===ex.exerciseId);
     const isCardio=libEx?.category==='Cardio';
     const isDropTarget = isDayView && dragOverExId===ex.id && dragEx?.exId!==ex.id;
+    const isCollapsed = isDayView && collapsedExIds.has(ex.id);
     return (
       <div key={ex.id}
         style={{position:'relative'}}
@@ -7318,12 +7327,15 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
             boxShadow:'0 0 0 2px var(--accent-light)'}}/>
         )}
         <div className="workout-card">
-        <div className="workout-card-header">
+        <div className="workout-card-header"
+          onClick={isDayView ? ()=>toggleExCollapsed(ex.id) : undefined}
+          style={isDayView ? {cursor:'pointer'} : undefined}>
           {isDayView && (
             <span
               draggable={true}
               onDragStart={e=>{e.stopPropagation();setDragEx({exId:ex.id,fromDk:dk,exerciseId:ex.exerciseId});}}
               onDragEnd={()=>{setDragEx(null);setDragOverExId(null);}}
+              onClick={e=>e.stopPropagation()}
               title="Drag to reorder"
               style={{cursor:'grab',color:'var(--ink-faint)',fontSize:14,padding:'0 4px 0 0',
                 lineHeight:1,flexShrink:0,opacity:0.4,userSelect:'none'}}
@@ -7332,12 +7344,19 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
               ⣿
             </span>
           )}
+          {isDayView && (
+            <span title={isCollapsed?'Expand':'Collapse'}
+              style={{fontSize:10,color:'var(--ink-faint)',flexShrink:0,transition:'transform 0.15s ease',
+                transform:isCollapsed?'rotate(-90deg)':'rotate(0deg)',display:'inline-block',userSelect:'none'}}>
+              ▾
+            </span>
+          )}
           <span style={{fontFamily:"'DM Sans',sans-serif",fontSize:13,fontWeight:700,color:'var(--accent)',flex:1}}>{exName(ex.exerciseId)}</span>
           {stats.done>0&&<span className="fitness-stat-pill">{stats.done}/{stats.total} sets{stats.totalReps>0&&` · ${stats.totalReps} reps`}{stats.hasWeight&&stats.volume>0&&` · ${stats.volume.toLocaleString()} lbs`}</span>}
-          <button onClick={()=>deleteExercise(dk,ex.id)}
+          <button onClick={e=>{e.stopPropagation();deleteExercise(dk,ex.id);}}
             style={{background:'none',border:'none',cursor:'pointer',fontSize:13,color:'var(--ink-faint)',padding:'0 2px',lineHeight:1,opacity:0.5}}>✕</button>
         </div>
-        <div className="exercise-block">
+        {!isCollapsed && <div className="exercise-block">
           <div style={{display:'flex',alignItems:'center',gap:6,padding:'2px 0 4px',borderBottom:'1px solid var(--border)',marginBottom:2}}>
             <span className="set-num"></span>
             {isCardio?(<><span className="set-label" style={{width:60,textAlign:'center'}}>Dist (mi)</span>
@@ -7406,7 +7425,7 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
               + Set
             </button>
           </div>
-        </div>
+        </div>}
       </div>
       </div>
     );
