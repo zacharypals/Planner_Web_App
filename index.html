@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v3.11.00 -->
+<!-- LP Planner v3.11.1 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -6813,7 +6813,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.11.0</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.11.1</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -6959,6 +6959,7 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
 
   const pendingSetFocus = useRef(null); // key: `${dk}-${exId}-${setId}`
   const setFirstInputRefs = useRef({}); // key -> DOM input element
+  const touchDragActiveRef = useRef(false); // true while a touch-based exercise drag (mobile) is in progress
 
   const dateKey = fmt(selectedDate);
   const weekStart = getWeekStart(selectedDate);
@@ -7312,7 +7313,8 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
     const isCollapsed = isDayView && collapsedExIds.has(ex.id);
     return (
       <div key={ex.id}
-        style={{position:'relative'}}
+        data-ex-id={ex.id}
+        style={{position:'relative',opacity:(isDayView&&dragEx?.exId===ex.id)?0.45:1}}
         onDragOver={isDayView ? e=>{e.preventDefault();setDragOverExId(ex.id);} : undefined}
         onDragLeave={isDayView ? ()=>setDragOverExId(null) : undefined}
         onDrop={isDayView ? e=>{
@@ -7336,9 +7338,38 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
               onDragStart={e=>{e.stopPropagation();setDragEx({exId:ex.id,fromDk:dk,exerciseId:ex.exerciseId});}}
               onDragEnd={()=>{setDragEx(null);setDragOverExId(null);}}
               onClick={e=>e.stopPropagation()}
+              onPointerDown={e=>{
+                if(e.pointerType!=='touch') return;
+                e.stopPropagation();
+                e.preventDefault();
+                touchDragActiveRef.current=true;
+                try{ e.currentTarget.setPointerCapture(e.pointerId); }catch(err){}
+                setDragEx({exId:ex.id,fromDk:dk,exerciseId:ex.exerciseId});
+              }}
+              onPointerMove={e=>{
+                if(e.pointerType!=='touch'||!touchDragActiveRef.current) return;
+                e.preventDefault();
+                const el=document.elementFromPoint(e.clientX,e.clientY);
+                const tile=el&&el.closest('[data-ex-id]');
+                setDragOverExId(tile?tile.getAttribute('data-ex-id'):null);
+              }}
+              onPointerUp={e=>{
+                if(e.pointerType!=='touch'||!touchDragActiveRef.current) return;
+                e.preventDefault();
+                touchDragActiveRef.current=false;
+                if(dragEx?.exId && dragOverExId && dragOverExId!==dragEx.exId){
+                  reorderExercises(dk, dragEx.exId, dragOverExId);
+                }
+                setDragEx(null); setDragOverExId(null);
+              }}
+              onPointerCancel={()=>{
+                touchDragActiveRef.current=false;
+                setDragEx(null); setDragOverExId(null);
+              }}
               title="Drag to reorder"
               style={{cursor:'grab',color:'var(--ink-faint)',fontSize:14,padding:'0 4px 0 0',
-                lineHeight:1,flexShrink:0,opacity:0.4,userSelect:'none'}}
+                lineHeight:1,flexShrink:0,opacity:0.4,userSelect:'none',WebkitUserSelect:'none',
+                WebkitTouchCallout:'none',touchAction:'none'}}
               onMouseEnter={e=>e.currentTarget.style.opacity='0.9'}
               onMouseLeave={e=>e.currentTarget.style.opacity='0.4'}>
               ⣿
