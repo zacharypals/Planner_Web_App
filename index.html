@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v3.11.1 -->
+<!-- LP Planner v3.11.2 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -3639,6 +3639,7 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onDeleteFuture, onEnte
   const [mobileConfirming, setMobileConfirming] = useState(false);
   const [showColors, setShowColors] = useState(false);
   const [repeatOpen, setRepeatOpen] = useState(false);
+  const [rescheduleWeekOffset, setRescheduleWeekOffset] = useState(0);
   const longPressTimer = useRef(null);
 
   // Auto-grow textarea
@@ -3648,6 +3649,11 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onDeleteFuture, onEnte
       textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
     }
   }, [task.details, task.expanded]);
+
+  // Reset reschedule week preview whenever the card collapses
+  useEffect(() => {
+    if (!task.expanded) setRescheduleWeekOffset(0);
+  }, [task.expanded]);
 
   // Cancel confirm if mouse leaves card
   function handleMouseLeave() { setConfirming(false); }
@@ -3891,33 +3897,75 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onDeleteFuture, onEnte
             </div>
           )}
           {/* ── Reschedule (mobile only) ── */}
-          {onReschedule && weekDays && (
-            <div style={{paddingTop:6,borderTop:'1px solid rgba(0,0,0,0.07)',marginTop:6}} onClick={e=>e.stopPropagation()}>
-              <div style={{fontSize:10,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace",marginBottom:5}}>📅 Reschedule:</div>
-              <div style={{display:'flex',gap:4}}>
-                {weekDays.map((d,i)=>{
-                  const dk = fmt(d);
-                  const isCurrentDay = dk === currentDayKey;
-                  return (
-                    <button key={i}
-                      onClick={e=>{ e.stopPropagation(); if(!isCurrentDay) onReschedule(dk); }}
-                      style={{
-                        width:30, height:30, borderRadius:'50%', border:'1.5px solid',
-                        borderColor: isCurrentDay ? 'var(--accent)' : 'var(--border)',
-                        background: isCurrentDay ? 'var(--accent)' : 'white',
-                        color: isCurrentDay ? 'white' : 'var(--ink-light)',
-                        fontFamily:"'DM Mono',monospace", fontSize:10, fontWeight:600,
-                        cursor: isCurrentDay ? 'default' : 'pointer',
-                        display:'flex', alignItems:'center', justifyContent:'center',
-                        transition:'all 0.12s', flexShrink:0,
-                      }}>
-                      {DAYS[d.getDay()].slice(0,1)}
-                    </button>
-                  );
-                })}
+          {onReschedule && weekDays && (() => {
+            const previewDays = rescheduleWeekOffset === 0
+              ? weekDays
+              : weekDays.map(d => addDays(d, rescheduleWeekOffset * 7));
+            const rangeStart = previewDays[0], rangeEnd = previewDays[6];
+            const sameMonth = rangeStart.getMonth() === rangeEnd.getMonth();
+            const weekLabel = sameMonth
+              ? `${MONTHS[rangeStart.getMonth()].slice(0,3)} ${rangeStart.getDate()}–${rangeEnd.getDate()}`
+              : `${MONTHS[rangeStart.getMonth()].slice(0,3)} ${rangeStart.getDate()} – ${MONTHS[rangeEnd.getMonth()].slice(0,3)} ${rangeEnd.getDate()}`;
+            const today = new Date(); today.setHours(0,0,0,0);
+            return (
+              <div style={{paddingTop:6,borderTop:'1px solid rgba(0,0,0,0.07)',marginTop:6}} onClick={e=>e.stopPropagation()}>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:5}}>
+                  <div style={{fontSize:10,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace"}}>📅 Reschedule:</div>
+                  <div style={{display:'flex',alignItems:'center',gap:6}}>
+                    {rescheduleWeekOffset !== 0 && (
+                      <button onClick={e=>{e.stopPropagation();setRescheduleWeekOffset(0);}}
+                        style={{background:'none',border:'none',cursor:'pointer',fontSize:9,
+                                color:'var(--accent)',fontFamily:"'DM Mono',monospace",
+                                textDecoration:'underline',padding:'0 2px'}}>
+                        This week
+                      </button>
+                    )}
+                    <button onClick={e=>{e.stopPropagation();setRescheduleWeekOffset(o=>o-1);}}
+                      style={{background:'none',border:'1px solid var(--border)',borderRadius:4,
+                              cursor:'pointer',fontSize:11,color:'var(--ink-light)',
+                              width:20,height:20,lineHeight:1,padding:0}}>‹</button>
+                    <span style={{fontSize:10,color:'var(--ink)',fontFamily:"'DM Mono',monospace",
+                                  fontWeight:600,minWidth:64,textAlign:'center'}}>
+                      {weekLabel}
+                    </span>
+                    <button onClick={e=>{e.stopPropagation();setRescheduleWeekOffset(o=>o+1);}}
+                      style={{background:'none',border:'1px solid var(--border)',borderRadius:4,
+                              cursor:'pointer',fontSize:11,color:'var(--ink-light)',
+                              width:20,height:20,lineHeight:1,padding:0}}>›</button>
+                  </div>
+                </div>
+                <div style={{display:'flex',gap:4}}>
+                  {previewDays.map((d,i)=>{
+                    const dk = fmt(d);
+                    const isCurrentDay = rescheduleWeekOffset === 0 && dk === currentDayKey;
+                    const isToday = d.getTime() === today.getTime();
+                    return (
+                      <button key={i}
+                        onClick={e=>{
+                          e.stopPropagation();
+                          if (isCurrentDay) return;
+                          onReschedule(dk);
+                          setRescheduleWeekOffset(0);
+                        }}
+                        style={{
+                          width:30, height:36, borderRadius:8, border:'1.5px solid',
+                          borderColor: isCurrentDay ? 'var(--accent)' : (isToday ? 'var(--gold)' : 'var(--border)'),
+                          background: isCurrentDay ? 'var(--accent)' : 'white',
+                          color: isCurrentDay ? 'white' : 'var(--ink-light)',
+                          fontFamily:"'DM Mono',monospace", fontSize:9, fontWeight:600,
+                          cursor: isCurrentDay ? 'default' : 'pointer',
+                          display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
+                          gap:1, transition:'all 0.12s', flexShrink:0,
+                        }}>
+                        <span>{DAYS[d.getDay()].slice(0,1)}</span>
+                        <span style={{fontSize:9,opacity:isCurrentDay?0.9:0.7}}>{d.getDate()}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* ── Repeat ── */}
           {!task.isProjectTask && (
@@ -6813,7 +6861,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.11.1</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.11.2</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
