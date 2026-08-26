@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v3.11.2 -->
+<!-- LP Planner v3.11.3 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -595,7 +595,8 @@
   .task-title-input {
     flex: 1; background: transparent; border: none; outline: none;
     font-size: 11px; font-weight: 500; font-family: 'DM Sans', sans-serif;
-    cursor: text;
+    cursor: text; resize: none; overflow: hidden; white-space: pre-wrap;
+    word-break: break-word; line-height: 1.3; display: block; padding: 0;
   }
   .task-expand-btn {
     background: none; border: none; cursor: pointer; font-size: 10px;
@@ -3635,6 +3636,7 @@ const EVENT_COLORS = [
 ];
 function TaskCard({ task, onUpdate, onBlurSync, onDelete, onDeleteFuture, onEnterKey, titleRef, deleteIfEmpty, onCopy, hasCopied, onPasteBelow, onShowCtxMenu, onDragStart, onDragOver, onDragEnd, onDrop, isDragOver, onApplyRepeat, onReschedule, weekDays, currentDayKey }) {
   const textareaRef = useRef();
+  const titleTextareaRef = useRef();
   const [confirming, setConfirming] = useState(false);
   const [mobileConfirming, setMobileConfirming] = useState(false);
   const [showColors, setShowColors] = useState(false);
@@ -3649,6 +3651,14 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onDeleteFuture, onEnte
       textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
     }
   }, [task.details, task.expanded]);
+
+  // Auto-grow title textarea so wrapped titles are fully visible
+  useEffect(() => {
+    if (titleTextareaRef.current) {
+      titleTextareaRef.current.style.height = 'auto';
+      titleTextareaRef.current.style.height = titleTextareaRef.current.scrollHeight + 'px';
+    }
+  }, [task.title]);
 
   // Reset reschedule week preview whenever the card collapses
   useEffect(() => {
@@ -3739,21 +3749,22 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onDeleteFuture, onEnte
           style={{borderColor: task.done ? '#2d5a3d' : undefined, color: task.done ? '#2d5a3d' : undefined, background: task.done ? '#e8f0eb' : undefined}}
           onClick={()=>onUpdate({done:!task.done})} />
         <div style={{flex:1,minWidth:0}}>
-          <input
-            ref={el=>{if(titleRef)titleRef(el);}}
+          <textarea
+            ref={el=>{titleTextareaRef.current=el; if(titleRef)titleRef(el);}}
             className="task-title-input"
             placeholder={task.isEvent ? 'Event…' : 'Task…'}
             autoCapitalize="sentences"
+            rows={1}
             value={task.title}
-            onChange={e=>{let v=e.target.value; if(task.title===''&&v.length===1) v=v.toUpperCase(); onUpdate({title:v});}}
+            onChange={e=>{let v=e.target.value.replace(/\n/g,''); if(task.title===''&&v.length===1) v=v.toUpperCase(); onUpdate({title:v});}}
             onBlur={()=>{
               if(onBlurSync && task.isEvent) onBlurSync();
               if(deleteIfEmpty) deleteIfEmpty();
             }}
             onKeyDown={e=>{
-              if(e.key==='Enter' && !task.isEvent && !task.isProjectTask){
+              if(e.key==='Enter'){
                 e.preventDefault();
-                if(onEnterKey) onEnterKey();
+                if(!task.isEvent && !task.isProjectTask && onEnterKey) onEnterKey();
               }
             }}
             onClick={e=>e.stopPropagation()}
@@ -6861,7 +6872,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.11.2</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.11.3</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
