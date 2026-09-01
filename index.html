@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v3.11.3 -->
+<!-- LP Planner v3.12.0 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -2522,11 +2522,11 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
       setTasks(dayKey, t => {
         const idx = t.findIndex(x=>x.id===afterId);
         const next = [...t];
-        next.splice(idx+1, 0, {id, title:'', details:'', done:false, expanded:false, colorIndex: idx+1});
+        next.splice(idx+1, 0, {id, title:'', details:'', done:false, expanded:false, colorIndex: pickTaskColorIndex(t)});
         return next;
       });
     } else {
-      setTasks(dayKey, t => [...t, {id, title:'', details:'', done:false, expanded:false, colorIndex: t.length}]);
+      setTasks(dayKey, t => [...t, {id, title:'', details:'', done:false, expanded:false, colorIndex: pickTaskColorIndex(t)}]);
     }
   }
   function updateTask(dayKey, id, patch) {
@@ -2694,20 +2694,34 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
   function moveTaskBetweenDays(fromDayKey, toDayKey, taskId, targetId) {
     // Capture task reference for calendar sync (needs to happen outside updater)
     const taskForSync = getTasks(fromDayKey).find(t => t.id === taskId);
-    setWD(w => {
-      const allTasks = w.tasks || {};
-      const srcList = allTasks[fromDayKey] || [];
+    // NOTE: weekData is keyed by week-start date, then by day within that week.
+    // fromDayKey and toDayKey can belong to DIFFERENT weeks (e.g. reschedule
+    // across a week boundary), so each day must be resolved to its own week key
+    // and both written. Writing everything under the currently-displayed week
+    // (the old bug) silently stranded the task under a day-string that the
+    // destination week never looks up, making it appear to vanish.
+    const emptyWeek = () => ({ proverb:'', toCreate:[], people:[], beWord:'', proud:'', story:'', tasks:{} });
+    const fromWk = fmt(getWeekStart(parseLocal(fromDayKey) || new Date(fromDayKey)));
+    const toWk = fmt(getWeekStart(parseLocal(toDayKey) || new Date(toDayKey)));
+    setWeekData(allWD => {
+      const fromWD = allWD[fromWk] || emptyWeek();
+      const srcList = (fromWD.tasks || {})[fromDayKey] || [];
       // Find task from FRESH state — if already moved (double-fire guard), bail out
       const task = srcList.find(t => t.id === taskId);
-      if (!task) return w;
+      if (!task) return allWD;
       const srcTasks = srcList.filter(t => t.id !== taskId);
-      const dstList = allTasks[toDayKey] || [];
+      const nextFromWD = { ...fromWD, tasks: { ...fromWD.tasks, [fromDayKey]: srcTasks } };
+      // If destination is the same week, chain off nextFromWD so the removal isn't lost
+      const toWD = toWk === fromWk ? nextFromWD : (allWD[toWk] || emptyWeek());
+      const dstList = (toWD.tasks || {})[toDayKey] || [];
       // If task somehow already in destination, bail out (idempotency guard)
-      if (dstList.some(t => t.id === taskId)) return w;
+      if (dstList.some(t => t.id === taskId)) return allWD;
       const dstTasks = [...dstList];
       const insertAt = targetId ? dstTasks.findIndex(t => t.id === targetId) : dstTasks.length;
       dstTasks.splice(insertAt === -1 ? dstTasks.length : insertAt, 0, task);
-      return { ...w, tasks: { ...allTasks, [fromDayKey]: srcTasks, [toDayKey]: dstTasks } };
+      const nextToWD = { ...toWD, tasks: { ...toWD.tasks, [toDayKey]: dstTasks } };
+      if (toWk === fromWk) return { ...allWD, [fromWk]: nextToWD };
+      return { ...allWD, [fromWk]: nextFromWD, [toWk]: nextToWD };
     });
     // Sync date change to Google Calendar
     if (taskForSync?.isEvent && taskForSync?.gcalId && getToken()) {
@@ -2921,7 +2935,19 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
                             else moveTaskBetweenDays(dragging.dayKey, dk, dragging.id, task.id);
                           }
                           setDragging(null); setDragOver(null);
-                        }} />
+                        }}
+                        onReschedule={(toDayKey)=>{
+                          moveTaskBetweenDays(dk,toDayKey,task.id,null);
+                          if(task.expanded) updateTask(toDayKey,task.id,{expanded:false});
+                          // If it's a project task, also update scheduledDate in pagesData
+                          if(task.isProjectTask && task.projectDocId && setPagesData) {
+                            setPagesData(p => p.map(doc => doc.id !== task.projectDocId ? doc : {
+                              ...doc, tasks: (doc.tasks||[]).map(t => t.id===task.id ? {...t, scheduledDate:toDayKey} : t)
+                            }));
+                          }
+                        }}
+                        weekDays={weekDays}
+                        currentDayKey={dk} />
                     ))}
                     <button className="add-task-btn" onClick={()=>addTask(dk)}>+</button>
                     <DayNote dayKey={dk} note={getDayNote(dk)} onChange={note=>setDayNote(dk,note)} />
@@ -3612,13 +3638,19 @@ const TASK_COLORS = [
   '#fff3cd', // warm yellow
   '#cce5ff', // sky blue
   '#e2d9f3', // soft lavender
-  '#fde8d0', // peach
-  '#c9f0f7', // mint
-  '#fce4ec', // rose
-  '#dbeafe', // periwinkle
-  '#fef9c3', // lemon
-  '#ffe4cc', // apricot
-  '#e0f2fe', // powder blue
+  '#ffdab3', // apricot orange
+  '#b2f2e5', // seafoam teal
+  '#f3d9fa', // orchid lilac
+  '#c8e6c9', // leaf green
+  '#ffccbc', // coral
+  '#b3e5fc', // cyan sky
+  '#f0e68c', // pastel olive
+  '#e1bee7', // soft plum
+  '#ffe0b2', // marigold
+  '#b2dfdb', // teal mist
+  '#d7ccc8', // warm taupe
+  '#c5cae9', // periwinkle indigo
+  '#ffcdd2', // watermelon
 ];
 const EVENT_COLORS = [
   '#fce7f3', // soft pink
@@ -3627,13 +3659,27 @@ const EVENT_COLORS = [
   '#d1fae5', // seafoam
   '#fef3c7', // champagne
   '#ffedd5', // cantaloupe
-  '#f0fdf4', // pale mint
-  '#fdf4ff', // whisper purple
-  '#e0f2fe', // ice blue
-  '#fefce8', // cream yellow
-  '#ffe4e6', // blush
-  '#ecfdf5', // aqua mist
+  '#e0f7fa', // ice cyan
+  '#f3e5f5', // orchid mist
+  '#dcedc8', // spring green
+  '#ffe0e0', // watermelon pink
+  '#e8eaf6', // periwinkle indigo
+  '#fff9c4', // butter yellow
+  '#d7ccc8', // warm taupe
+  '#b2ebf2', // aqua
+  '#f8bbd0', // rose
+  '#c8e6c9', // mint leaf
 ];
+// Picks a color index not already used by other tasks the same day, so
+// colors don't visibly repeat until every palette slot is taken; falls
+// back to random once the day genuinely has more tasks than colors.
+function pickTaskColorIndex(existingTasks) {
+  const used = new Set((existingTasks||[]).map(t => t.colorIndex ?? 0));
+  for (let i = 0; i < TASK_COLORS.length; i++) {
+    if (!used.has(i)) return i;
+  }
+  return Math.floor(Math.random() * TASK_COLORS.length);
+}
 function TaskCard({ task, onUpdate, onBlurSync, onDelete, onDeleteFuture, onEnterKey, titleRef, deleteIfEmpty, onCopy, hasCopied, onPasteBelow, onShowCtxMenu, onDragStart, onDragOver, onDragEnd, onDrop, isDragOver, onApplyRepeat, onReschedule, weekDays, currentDayKey }) {
   const textareaRef = useRef();
   const titleTextareaRef = useRef();
@@ -3907,7 +3953,7 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onDeleteFuture, onEnte
               </div>
             </div>
           )}
-          {/* ── Reschedule (mobile only) ── */}
+          {/* ── Reschedule (pick a day, incl. other weeks) ── */}
           {onReschedule && weekDays && (() => {
             const previewDays = rescheduleWeekOffset === 0
               ? weekDays
@@ -6872,7 +6918,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.11.3</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.12.0</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
