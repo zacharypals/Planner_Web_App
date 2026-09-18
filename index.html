@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v3.12.1 -->
+<!-- LP Planner v3.12.2 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -1743,7 +1743,12 @@ function normalizeQty(val) {
 }
 // Sums a LineItem[] (or legacy value) to a number for display/rollup
 function qtyTotal(val) {
-  if (Array.isArray(val)) return val.reduce((s,li) => s + (parseFloat(li.amount)||0), 0);
+  if (Array.isArray(val)) {
+    const sum = val.reduce((s,li) => s + (parseFloat(li.amount)||0), 0);
+    // Round away binary floating-point drift (e.g. 0.1+0.2=0.30000000000000004)
+    // while preserving legitimate precision beyond 2 decimals.
+    return Math.round((sum + Number.EPSILON) * 1e6) / 1e6;
+  }
   const n = parseFloat(val);
   return isNaN(n) ? 0 : n;
 }
@@ -6919,7 +6924,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.12.1</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.12.2</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
