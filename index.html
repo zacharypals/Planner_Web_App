@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v3.12.2 -->
+<!-- LP Planner v3.13.0 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -1687,6 +1687,149 @@
   @media (min-width: 768px) {
     .mobile-day-view, .mobile-sheet, .mobile-sheet-overlay,
     .mobile-fab, .mobile-bottom-nav { display: none !important; }
+  }
+
+  /* ═══════════════════════════════════════════════════════════════
+     v3.13.0 LOOK REFRESH — layout & component styling borrowed from
+     Finance Pal. Colors and fonts are unchanged. Everything for the
+     refresh lives in this block so it can be tuned or removed in one place.
+     ═══════════════════════════════════════════════════════════════ */
+  :root {
+    --card-border: 1px solid var(--border);
+    --card-shadow: 0 1px 3px rgba(44,36,24,0.07);
+  }
+
+  /* ── Top bar: soft translucent tabs, ghost buttons ── */
+  .nav-tab {
+    text-transform: none; letter-spacing: 0.01em; font-size: 14px;
+    padding: 8px 14px; color: rgba(255,255,255,0.75);
+  }
+  .nav-tab:hover { background: rgba(255,255,255,0.10); color: #fff; }
+  .nav-tab.active { background: rgba(255,255,255,0.18); color: #fff; font-weight: 600; }
+  .auth-btn, .auth-btn.sync {
+    border: none; background: rgba(255,255,255,0.14); color: #fff;
+    padding: 6px 12px; font-size: 13px;
+  }
+  .auth-btn:hover, .auth-btn.sync:hover { background: rgba(255,255,255,0.24); color: #fff; border: none; }
+  .auth-btn.danger:hover { background: rgba(255,255,255,0.24); }
+
+  /* ── Desktop: content floats as cards on the cream page ── */
+  @media (min-width: 768px) {
+    .nav-bar { height: 56px; padding: 0 20px; }
+    .main-content, .fitness-layout { padding: 16px; gap: 16px; }
+
+    /* Sidebars become cards (toggle strip lives inside the card) */
+    .sidebar-wrap, .pages-sidebar-wrap, .fitness-sidebar {
+      background: var(--paper); border: var(--card-border);
+      border-radius: var(--radius-lg); box-shadow: var(--card-shadow); overflow: hidden;
+    }
+    .sidebar-wrap > .sidebar, .pages-sidebar-wrap > .pages-sidebar { box-shadow: none; }
+    .sidebar-toggle-strip, .pages-toggle-strip {
+      border-right: none; border-left: 1px solid var(--border); background: var(--paper);
+    }
+    .pages-sidebar-wrap > .pages-sidebar { border-right: none; }
+    .fitness-sidebar { border-right: var(--card-border); }
+
+    /* Weekly planner: calendar + review as two stacked cards */
+    .weekly-main-panel { gap: 16px; }
+    .weekly-calendar {
+      height: calc(100vh - 56px - 32px - 112px);
+      background: var(--paper); border: var(--card-border);
+      border-radius: var(--radius-lg); box-shadow: var(--card-shadow);
+    }
+    .cal-grid { column-gap: 0; }
+    .cal-header-cell { border-radius: 0; border-right: 1px solid rgba(255,255,255,0.12); }
+    .cal-grid > .cal-header-cell:nth-child(7) { border-right: none; }
+    .cal-day { border-right: 1px solid var(--border); }
+    .cal-day:last-child { border-right: none; }
+    .week-review {
+      margin: 0; border: var(--card-border); border-radius: var(--radius-lg);
+      box-shadow: var(--card-shadow);
+    }
+
+    /* Habit tracker & Pages main areas are cards */
+    .habit-main, .pages-main {
+      background: var(--paper); border: var(--card-border);
+      border-radius: var(--radius-lg); box-shadow: var(--card-shadow);
+    }
+    .pages-doc-header { box-shadow: none; border-bottom: 1px solid var(--border); background: transparent; }
+
+    /* Monthly calendar card */
+    .monthly-cal-wrap {
+      background: var(--paper); border: var(--card-border);
+      border-radius: var(--radius-lg); box-shadow: var(--card-shadow);
+      padding: 16px 20px 20px; margin: 0;
+    }
+  }
+
+  /* ── Monthly calendar: clean table grid instead of floating tiles ── */
+  .monthly-cal-header { column-gap: 0; }
+  .monthly-cal-grid {
+    gap: 1px; background: var(--border); border: 1px solid var(--border);
+    border-radius: var(--radius-md); overflow: hidden;
+  }
+  .monthly-cell { border-radius: 0; box-shadow: none; }
+  .monthly-cell:hover { box-shadow: none; }
+  .monthly-cell.empty { background: var(--cream); }
+
+  /* ── Segmented control (Habit view switcher) ── */
+  .view-tabs {
+    display: inline-flex; gap: 2px; padding: 3px;
+    background: var(--cream); border-radius: var(--radius-sm);
+  }
+  .view-tab {
+    border: none; background: transparent; border-radius: 6px;
+    padding: 5px 12px; color: var(--ink-light);
+  }
+  .view-tab:hover:not(.active) { background: transparent; color: var(--ink); }
+  .view-tab.active {
+    background: var(--paper); color: var(--ink); font-weight: 600;
+    box-shadow: 0 1px 3px rgba(44,36,24,0.12);
+  }
+
+  /* ── Chips ── */
+  .goal-filter-chip {
+    border-radius: 999px; border-width: 1px; font-size: 12px; padding: 4px 12px;
+    background: var(--paper);
+  }
+
+  /* ── Buttons, inputs, text areas ── */
+  .btn, .modal-btn { border-radius: var(--radius-md); font-weight: 600; padding: 9px 16px; }
+  .btn-secondary, .modal-btn.secondary { background: var(--cream); border: 1px solid transparent; color: var(--ink); }
+  .btn-secondary:hover, .modal-btn.secondary:hover { background: var(--cream); border-color: var(--border); }
+  .sidebar-textarea, .modal-input, .modal-textarea, .review-textarea, .pages-body {
+    background: var(--paper); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  }
+  .pages-body { border-radius: var(--radius-md); }
+  .sidebar-textarea:focus, .modal-input:focus, .modal-textarea:focus,
+  .review-textarea:focus, .pages-body:focus {
+    border-color: var(--accent); box-shadow: 0 0 0 3px rgba(45,107,74,0.12);
+  }
+
+  /* ── Modals & popovers: same card language ── */
+  .modal, .modal-box, .people-picker-modal, .task-ctx-menu {
+    border: var(--card-border); border-radius: var(--radius-lg);
+  }
+
+  /* ── Mobile ── */
+  @media (max-width: 767px) {
+    .mobile-bottom-nav { box-shadow: none; border-top: 1px solid var(--border); }
+    .mobile-bottom-nav-btn { font-size: 11px; color: var(--ink-light); }
+    .mobile-bottom-nav-btn.active { color: var(--accent); font-weight: 600; }
+    .mobile-day-nav { box-shadow: none; border-bottom: 1px solid var(--border); }
+    .mobile-week-dots { box-shadow: none; border-top: 1px solid var(--border); margin-top: auto; }
+    .mobile-day-tasks {
+      flex: 0 1 auto; margin: 12px; padding: 12px;
+      background: var(--paper); border: var(--card-border);
+      border-radius: var(--radius-lg); box-shadow: var(--card-shadow);
+    }
+    .monthly-cal-wrap {
+      background: var(--paper); border: var(--card-border); border-radius: var(--radius-lg);
+      box-shadow: var(--card-shadow); margin: 10px; padding: 10px 8px 12px;
+      min-width: 0; /* let all 7 days fit inside the card on phones */
+    }
+    .monthly-cal-grid { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+    .monthly-event-chip .chip-time { display: none; } /* narrow cells: show the title, not the time */
   }
 </style>
 </head>
@@ -6924,7 +7067,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.12.2</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.13.0</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
