@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v3.13.0 -->
+<!-- LP Planner v3.13.1 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -7067,7 +7067,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.13.0</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.13.1</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -7202,13 +7202,11 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
   const [showLibManager, setShowLibManager] = useState(false);
   const [showGoalManager, setShowGoalManager] = useState(false);
   const [goalsCollapsed, setGoalsCollapsed] = useState(false);
-  const [collapsedExIds, setCollapsedExIds] = useState(()=>new Set());
-  function toggleExCollapsed(exId) {
-    setCollapsedExIds(prev=>{
-      const next=new Set(prev);
-      if(next.has(exId)) next.delete(exId); else next.add(exId);
-      return next;
-    });
+  // Collapsed/expanded state for Day-view exercise tiles is stored on the exercise
+  // itself (ex.collapsed in fitnessLog) so it survives tab switches, reloads, and
+  // syncs across devices with the rest of the log via Drive.
+  function toggleExCollapsed(dk, exId) {
+    setDayExs(dk, exs=>exs.map(e=>e.id!==exId?e:{...e, collapsed:!e.collapsed}));
   }
 
   const pendingSetFocus = useRef(null); // key: `${dk}-${exId}-${setId}`
@@ -7564,7 +7562,7 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
     const libEx=fitnessExercises.find(e=>e.id===ex.exerciseId);
     const isCardio=libEx?.category==='Cardio';
     const isDropTarget = isDayView && dragOverExId===ex.id && dragEx?.exId!==ex.id;
-    const isCollapsed = isDayView && collapsedExIds.has(ex.id);
+    const isCollapsed = isDayView && !!ex.collapsed;
     return (
       <div key={ex.id}
         data-ex-id={ex.id}
@@ -7584,7 +7582,7 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
         )}
         <div className="workout-card">
         <div className="workout-card-header"
-          onClick={isDayView ? ()=>toggleExCollapsed(ex.id) : undefined}
+          onClick={isDayView ? ()=>toggleExCollapsed(dk, ex.id) : undefined}
           style={isDayView ? {cursor:'pointer'} : undefined}>
           {isDayView && (
             <span
