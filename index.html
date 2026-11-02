@@ -1,5 +1,10 @@
 <!DOCTYPE html>
-<!-- LP Planner v4.5.5 -->
+<!-- LP Planner v4.9.0 -->
+<!-- v4.9.0 — Offline mode: a service worker (sw.js) keeps the app itself available with no connection; edits are saved on the device and upload when you reconnect; calm "Offline" notice instead of an error. -->
+<!-- v4.8.0 — Goals can link Weight and Calories (roll-up with trend line; weight uses a 7-day average); a milestone can complete itself when your weight reaches a number (needs 3+ weigh-ins in 7 days since the goal began); target defaults to the chart's weight target. -->
+<!-- v4.7.1 — Weekly Review can review any week (arrows in its header; defaults to last week on Sun/Mon); drag date tip readable in dark mode; Drop in the review now works on a week other than the one displayed. -->
+<!-- v4.7.0 — Weekly Review (4-step guided close-out of the week); goals link to habits & exercises with a weekly roll-up; Goals timeline bars drag to move and resize, with undo. -->
+<!-- v4.6.0 — Undo toast for deletes; habits on certain days or N× a week (streaks by week); richer repeat rules (every N, monthly nth/last, end after N/date, scope dialog, rolling top-up). -->
 <!-- v4.5.5 — Fitness "+ Exercise" picker lists exercises A→Z within each group (display only; library order unchanged). -->
 <!-- v4.5.4 — Fitness cardio rows: Sec, min/mi and Done headers line up over their columns (Done centered over the check, same as strength rows). -->
 <!-- v4.5.3 — Fitness set rows: column headers (Weight, Done) now line up exactly over their inputs and the check circle. -->
@@ -18,7 +23,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <link rel="manifest" href="manifest.json">
-<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="icon" type="image/png" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-512.png">
 <meta name="theme-color" content="#3a2960">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -1211,8 +1216,158 @@
     .week-review { grid-template-columns: 1fr; }
   }
 
+  /* ── REPEAT PANEL (v4.6.0) ── */
+  .rp-panel { display: flex; flex-direction: column; gap: 8px; padding-top: 8px; }
+  .rp-seg { display: flex; gap: 4px; flex-wrap: wrap; }
+  .rp-seg button {
+    flex: 1 1 auto; min-height: 30px; padding: 0 8px; border-radius: 8px; cursor: pointer;
+    border: 1.5px solid var(--border); background: var(--surface); color: var(--ink-light);
+    font: 600 11px 'DM Sans', sans-serif;
+  }
+  .rp-seg button:hover { border-color: var(--accent); color: var(--accent); }
+  .rp-seg button.active { background: var(--accent-light); border-color: var(--accent); color: var(--accent); }
+  .rp-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font: 12px 'DM Sans', sans-serif; color: var(--ink); }
+  .rp-num {
+    width: 48px; min-height: 30px; box-sizing: border-box; text-align: center;
+    border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--ink);
+    font: 12px 'DM Mono', monospace;
+  }
+  .rp-num:focus, .rp-date:focus { outline: none; border-color: var(--accent); }
+  .rp-date {
+    min-height: 30px; box-sizing: border-box; border: 1px solid var(--border); border-radius: 8px;
+    background: var(--surface); color: var(--ink); font: 11px 'DM Mono', monospace; padding: 0 6px;
+  }
+  .rp-days { display: flex; gap: 4px; flex-wrap: wrap; }
+  .rp-days .task-repeat-day-btn { width: 30px; height: 30px; font-size: 11px; }
+  .rp-radio { display: flex; align-items: center; gap: 8px; min-height: 30px; font: 12px 'DM Sans', sans-serif; color: var(--ink); cursor: pointer; flex-wrap: wrap; }
+  .rp-radio input[type="radio"] { width: 16px; height: 16px; accent-color: var(--accent); margin: 0; flex-shrink: 0; }
+  .rp-label { font: 600 10px 'DM Mono', monospace; color: var(--ink-light); letter-spacing: 0.04em; text-transform: uppercase; }
+  .rp-summary { background: var(--accent-light); color: var(--accent); border-radius: 8px; padding: 6px 8px; font: 600 11px 'DM Sans', sans-serif; line-height: 1.4; }
+  .rp-next { font: 11px 'DM Sans', sans-serif; color: var(--ink-light); line-height: 1.5; }
+  .rp-actions { display: flex; gap: 6px; align-items: center; }
+  .rp-apply { min-height: 32px; padding: 0 14px; border-radius: 8px; border: none; cursor: pointer; background: var(--accent); color: #fff; font: 700 12px 'DM Sans', sans-serif; }
+  .rp-apply:disabled { opacity: 0.45; cursor: default; }
+  .rp-scope-opt { display: flex; align-items: flex-start; gap: 10px; border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; cursor: pointer; background: var(--paper); }
+  .rp-scope-opt.on { border-color: var(--accent); background: var(--accent-light); }
+  .rp-scope-opt input { width: 18px; height: 18px; accent-color: var(--accent); margin: 2px 0 0; flex-shrink: 0; }
+
+  /* ── WEEKLY REVIEW (v4.7.0) ── */
+  .wr-overlay {
+    position: fixed; inset: 0; z-index: 9995; background: rgba(28,22,40,0.55);
+    display: flex; align-items: center; justify-content: center; padding: 20px;
+  }
+  .wr-box {
+    background: var(--paper); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
+    width: min(680px, 100%); max-height: min(860px, 94vh); display: flex; flex-direction: column; overflow: hidden;
+  }
+  .wr-head { padding: 16px 22px 12px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+  /* v4.7.1 — which week is being reviewed, and arrows to change it */
+  .wr-weeknav { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+  .wr-weeknav button {
+    min-width: 26px; min-height: 26px; border: none; background: none; cursor: pointer;
+    color: var(--ink-light); font-size: 15px; border-radius: 6px; line-height: 1;
+  }
+  .wr-weeknav button:hover { background: var(--cream); color: var(--accent); }
+  .wr-weeknav .wk {
+    font: 600 11px 'DM Mono', monospace; color: var(--ink); white-space: nowrap; padding: 0 4px;
+  }
+  .wr-open-wk {
+    border: none; background: none; cursor: pointer; padding: 0; margin-top: 4px;
+    font: 11.5px 'DM Sans', sans-serif; color: var(--accent); text-decoration: underline;
+  }
+  @media (max-width: 767px) { .wr-weeknav button { min-width: 40px; min-height: 40px; } }
+  .wr-step { font: 600 10px 'DM Mono', monospace; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); }
+  .wr-title { font-family: 'Playfair Display', serif; font-size: 23px; font-weight: 600; color: var(--ink); margin-top: 2px; }
+  .wr-sub { font-size: 12.5px; color: var(--ink-light); margin-top: 3px; }
+  .wr-body { padding: 18px 22px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 16px; }
+  .wr-foot {
+    padding: 12px 22px; border-top: 1px solid var(--border); flex-shrink: 0;
+    display: flex; align-items: center; gap: 10px; justify-content: space-between; background: var(--paper);
+  }
+  .wr-dots { display: flex; gap: 5px; }
+  .wr-dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--border); display: block; }
+  .wr-dots i.on { background: var(--accent); }
+  .wr-btn {
+    font-family: 'DM Sans', sans-serif; font-size: 14px; min-height: 42px; padding: 0 18px; border-radius: 10px;
+    border: 1px solid var(--border); background: var(--surface); color: var(--ink); cursor: pointer;
+  }
+  .wr-btn:hover { background: var(--cream); }
+  .wr-btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; }
+  .wr-btn.primary:hover { filter: brightness(1.08); }
+  .wr-btn.ghost { border-color: transparent; background: transparent; color: var(--ink-light); }
+  .wr-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+  .wr-stat { background: var(--cream); border-radius: var(--radius-md); padding: 12px 10px; text-align: center; }
+  .wr-stat b { display: block; font-family: 'Playfair Display', serif; font-size: 26px; font-weight: 600; color: var(--ink); line-height: 1.1; }
+  .wr-stat span { display: block; font-size: 11px; color: var(--ink-light); margin-top: 3px; line-height: 1.3; }
+  .wr-stat em { font-style: normal; font-family: 'DM Mono', monospace; font-size: 11px; color: var(--ink-faint); }
+  .wr-sec-label { font: 600 10px 'DM Mono', monospace; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-faint); }
+  .wr-item {
+    border: 1px solid var(--border); border-radius: var(--radius-md); padding: 10px 12px;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: var(--surface);
+  }
+  .wr-item .t { flex: 1 1 180px; min-width: 0; font-size: 14px; color: var(--ink); }
+  .wr-item .from { font-size: 11px; color: var(--ink-faint); font-family: 'DM Mono', monospace; }
+  .wr-mini {
+    font-family: 'DM Sans', sans-serif; font-size: 12px; min-height: 32px; padding: 0 10px; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--surface); color: var(--ink); cursor: pointer; flex-shrink: 0;
+  }
+  .wr-mini:hover { border-color: var(--accent); color: var(--accent); }
+  .wr-mini.drop:hover { border-color: var(--red); color: var(--red); }
+  .wr-mini.on { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  .wr-ta {
+    width: 100%; box-sizing: border-box; min-height: 68px; resize: vertical; padding: 9px 11px;
+    border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface);
+    color: var(--ink); font: 14px 'DM Sans', sans-serif; line-height: 1.5;
+  }
+  .wr-ta:focus, .wr-in:focus { outline: none; border-color: var(--accent); }
+  .wr-in {
+    width: 100%; box-sizing: border-box; min-height: 40px; padding: 0 11px;
+    border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface);
+    color: var(--ink); font: 14px 'DM Sans', sans-serif;
+  }
+  .wr-goal { border: 1px solid var(--border); border-radius: var(--radius-md); padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+  .wr-done { text-align: center; padding: 22px 10px; color: var(--ink-light); font-size: 14px; }
+  .wr-review-btn {
+    display: flex; align-items: center; justify-content: center; gap: 7px; width: 100%; min-height: 38px;
+    margin: 8px 0 2px; border-radius: var(--radius-md); cursor: pointer; font: 600 13px 'DM Sans', sans-serif;
+    border: 1px solid var(--border); background: var(--surface); color: var(--ink-light);
+  }
+  .wr-review-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .wr-review-btn.due { background: var(--gold-light); border-color: var(--gold); color: #8a6a05; }
+  @media (max-width: 767px) {
+    .wr-overlay { padding: 0; align-items: stretch; }
+    .wr-box { width: 100%; max-height: 100%; border-radius: 0; }
+    .wr-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .wr-btn { min-height: 44px; }
+    .wr-mini { min-height: 38px; }
+  }
+
+  /* ── UNDO TOAST (v4.6.0) ── */
+  .undo-toast {
+    /* v4.7.1 — 9998 sits ABOVE the Weekly Review overlay (9995), which otherwise swallowed the
+       click, and below the save-error toast (10000) and sign-in wall (20000). The review leans on
+       Undo for Drop and Move, so the toast has to stay reachable while it's open. */
+    position: fixed; left: 50%; transform: translateX(-50%); bottom: 24px; z-index: 9998;
+    background: #2a2538; color: #fff; border-radius: 12px; padding: 6px 8px 6px 16px;
+    display: flex; align-items: center; gap: 12px; max-width: min(92vw, 460px);
+    box-shadow: 0 6px 24px rgba(0,0,0,0.35); font-family: 'DM Sans', sans-serif; font-size: 13px;
+  }
+  .undo-toast.lift { bottom: 96px; }
+  .undo-toast-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .undo-toast-btn {
+    background: none; border: none; color: #d4c4ff; font-weight: 700; font-size: 14px; cursor: pointer;
+    min-height: 44px; padding: 0 14px; border-radius: 8px; font-family: inherit; flex-shrink: 0;
+  }
+  .undo-toast-btn:hover { background: rgba(255,255,255,0.12); }
+  .undo-toast-more { font-size: 11px; opacity: 0.7; flex-shrink: 0; }
+
   /* ── MOBILE (< 768px) ── */
   @media (max-width: 767px) {
+    .undo-toast { bottom: 68px; }
+    .undo-toast.lift { bottom: 140px; }
+    .rp-seg button, .rp-num, .rp-date, .rp-radio { min-height: 40px; }
+    .rp-days .task-repeat-day-btn { width: 38px; height: 38px; font-size: 12px; }
+    .rp-apply { min-height: 44px; }
     /* Nav bar */
     .nav-bar { flex-wrap: nowrap; gap: 4px; padding: 6px 10px; position: sticky; top: 0; z-index: 200; }
     .nav-tabs { display: none; } /* hidden — use bottom nav */
@@ -1935,6 +2090,20 @@
   .gl-tl-lab { display: flex; align-items: center; gap: 8px; padding: 0 10px; font-size: 13px; overflow: hidden; }
   .gl-tl-lab span.t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .gl-tl-bar { position: absolute; border-radius: 9px; cursor: pointer; overflow: hidden; box-sizing: border-box; }
+  /* v4.7.0 — drag to reschedule */
+  .gl-tl-bar.grab { cursor: grab; touch-action: none; }
+  .gl-tl-bar.dragging { cursor: grabbing; overflow: visible; box-shadow: 0 2px 10px rgba(35,30,51,0.28); z-index: 4; }
+  .gl-tl-grip { position: absolute; top: 0; bottom: 0; width: 9px; cursor: ew-resize; touch-action: none; }
+  .gl-tl-grip.l { left: 0; } .gl-tl-grip.r { right: 0; }
+  .gl-tl-bar.grab:hover .gl-tl-grip { background: rgba(255,255,255,0.45); box-shadow: inset 0 0 0 1px rgba(35,30,51,0.22); }
+  .gl-tl-drag-tip {
+    /* Fixed dark chip, like .undo-toast — var(--ink) flips to near-white in dark mode,
+       which left white text on a light pill. Do not swap this back to --ink. */
+    position: absolute; top: -4px; z-index: 6; pointer-events: none;
+    background: #2a2538; color: #fff; border-radius: 6px; padding: 2px 7px; white-space: nowrap;
+    font-family: 'DM Mono', monospace; font-size: 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  }
   .gl-tl-dia { position: absolute; width: 11px; height: 11px; transform: rotate(45deg); box-sizing: border-box; pointer-events: none; }
   .gl-tl-today { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--gold); pointer-events: none; z-index: 2; }
   .gl-tl-todaytag { position: absolute; top: 3px; font-family: 'DM Mono', monospace; font-size: 9px; line-height: 12px; background: var(--gold); color: var(--ink); padding: 2px 7px; border-radius: 999px; z-index: 3; pointer-events: none; }
@@ -2105,6 +2274,394 @@ function qtyTotal(val) {
 }
 function genLiId() { return 'li'+Date.now()+Math.random().toString(36).slice(2,7); }
 
+// ── HABIT FREQUENCY (v4.6.0) ──
+// goal.freq: undefined = every day | {type:'days', days:[0-6]} | {type:'perWeek', n:1-7}
+// goal.restDates: ['YYYY-MM-DD'] — days that neither count toward nor break a streak.
+// Days off the schedule are neutral too; a completion on any day still counts.
+// perWeek streaks count consecutive weeks (Sun–Sat) with at least n completions; the current
+// week counts once it is met and is "pending" (never a break) until then.
+function habitStreak(goal, completions, todayDate) {
+  const done = dk => ((completions || {})[dk] || []).includes(goal.id);
+  const type = goal.freq && goal.freq.type;
+  const t0 = new Date(todayDate); t0.setHours(0,0,0,0);
+  if (type === 'perWeek') {
+    const n = Math.max(1, parseInt(goal.freq.n, 10) || 1);
+    const count = w => { let c = 0; for (let i = 0; i < 7; i++) if (done(fmt(addDays(w, i)))) c++; return c; };
+    let ws = getWeekStart(t0);
+    let streak = count(ws) >= n ? 1 : 0;
+    for (let i = 0; i < 520; i++) {
+      ws = addDays(ws, -7);
+      if (count(ws) >= n) streak++; else break;
+    }
+    return streak;
+  }
+  const rest = new Set(goal.restDates || []);
+  const sched = type === 'days' ? new Set(goal.freq.days || []) : null;
+  // If today is done start from today; otherwise today is still pending, so start from yesterday
+  let cursor = done(fmt(t0)) ? new Date(t0) : addDays(t0, -1);
+  let streak = 0;
+  for (let i = 0; i < 4000; i++) {
+    const dk = fmt(cursor);
+    if (done(dk)) streak++;
+    else if (rest.has(dk) || (sched && !sched.has(cursor.getDay()))) { /* neutral day */ }
+    else break;
+    cursor = addDays(cursor, -1);
+  }
+  return streak;
+}
+// "2/3" style progress for × per week habits (null for other kinds)
+function habitWeekProgress(goal, completions, todayDate) {
+  if (!goal.freq || goal.freq.type !== 'perWeek') return null;
+  const ws = getWeekStart(todayDate);
+  let c = 0;
+  for (let i = 0; i < 7; i++) if (((completions || {})[fmt(addDays(ws, i))] || []).includes(goal.id)) c++;
+  return { done: c, n: Math.max(1, parseInt(goal.freq.n, 10) || 1) };
+}
+function habitFreqSummary(goal) {
+  const f = goal.freq;
+  if (!f) return 'Every day';
+  if (f.type === 'perWeek') return `${f.n || 1}× a week`;
+  if (f.type === 'days') return (f.days || []).map(i => ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][i]).join(', ') || 'No days chosen';
+  return 'Every day';
+}
+
+// ── REPEAT RULES (v4.6.0) ──
+// task.repeat = { freq:'daily'|'weekly'|'monthly'|'yearly', interval:1+, days:[0-6] (weekly),
+//   monthMode:'date'|'nth'|'last' (monthly), endType:'never'|'date'|'count', endDate, count,
+//   anchor:'YYYY-MM-DD' (series start), genThrough:'YYYY-MM-DD' (how far copies were written) }
+// Tasks saved before v4.6.0 only have {days, endDate}; normalizeRepeat reads those as
+// "weekly, every week, until endDate". Copies are still written into weekData (so checking off,
+// colours, dragging etc. all work as before); "never ends" series are topped up as time passes.
+const REPEAT_HORIZON_DAYS = { daily: 60, weekly: 182, monthly: 400, yearly: 800 };
+const REPEAT_DAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+function normalizeRepeat(r) {
+  if (!r) return null;
+  return {
+    freq: r.freq || 'weekly',
+    interval: Math.max(1, parseInt(r.interval, 10) || 1),
+    days: Array.isArray(r.days) ? r.days : [],
+    monthMode: r.monthMode || 'date',
+    endType: r.endType || 'date',
+    endDate: r.endDate || '',
+    count: Math.max(2, parseInt(r.count, 10) || 10),
+    anchor: r.anchor || '',
+    genThrough: r.genThrough || '',
+  };
+}
+// Is there enough information to generate copies?
+function repeatIsComplete(r) {
+  const n = normalizeRepeat(r);
+  if (!n) return false;
+  if (n.freq === 'weekly' && !n.days.length) return false;
+  if (n.endType === 'date' && !n.endDate) return false;
+  return true;
+}
+function repeatDaysInMonth(y, m) { return new Date(y, m + 1, 0).getDate(); }
+// Does day d (a local Date) fall on the rule, counting from anchor date a? (a itself is never a match)
+function repeatMatches(n, a, d) {
+  if (Math.round((d - a) / 86400000) <= 0) return false;
+  if (n.freq === 'daily') return Math.round((d - a) / 86400000) % n.interval === 0;
+  if (n.freq === 'weekly') {
+    if (!n.days.includes(d.getDay())) return false;
+    const w = Math.round((getWeekStart(d) - getWeekStart(a)) / (7 * 86400000));
+    return w % n.interval === 0;
+  }
+  if (n.freq === 'monthly') {
+    const mo = (d.getFullYear() - a.getFullYear()) * 12 + d.getMonth() - a.getMonth();
+    if (mo < 0 || mo % n.interval !== 0) return false;
+    const dim = repeatDaysInMonth(d.getFullYear(), d.getMonth());
+    if (n.monthMode === 'last') return d.getDate() === dim;
+    if (n.monthMode === 'nth') {
+      if (d.getDay() !== a.getDay()) return false;
+      const k = Math.ceil(a.getDate() / 7);                       // 1st, 2nd, … Monday of the month
+      return k >= 5 ? d.getDate() + 7 > dim : Math.ceil(d.getDate() / 7) === k;   // 5th = the last one
+    }
+    return d.getDate() === Math.min(a.getDate(), dim);             // "day 31" falls back to month end
+  }
+  if (n.freq === 'yearly') {
+    const y = d.getFullYear() - a.getFullYear();
+    return y > 0 && y % n.interval === 0 && d.getMonth() === a.getMonth() && d.getDate() === a.getDate();
+  }
+  return false;
+}
+// Dates (YYYY-MM-DD) strictly after afterKey, up to throughKey, that fall on the rule.
+// "After N times" counts the anchor task as time #1.
+function repeatDates(rule, anchorKey, afterKey, throughKey, max) {
+  const n = normalizeRepeat(rule);
+  const a = parseLocal(anchorKey);
+  const out = [];
+  if (!n || !a) return out;
+  const through = parseLocal(throughKey);
+  const end = n.endType === 'date' && n.endDate ? parseLocal(n.endDate) : null;
+  const cap = n.endType === 'count' ? n.count - 1 : (max || 800);
+  let cursor = addDays(parseLocal(afterKey) || a, 1);
+  for (let i = 0; i < 6000 && out.length < cap; i++) {
+    if (through && cursor > through) break;
+    if (end && cursor > end) break;
+    if (repeatMatches(n, a, cursor)) out.push(fmtLocal(cursor));
+    cursor = addDays(cursor, 1);
+  }
+  return out;
+}
+function repeatOrdinal(k) { return ['', 'first', 'second', 'third', 'fourth', 'last'][Math.min(k, 5)]; }
+// Plain-English summary, e.g. "Every 2 weeks on Mon, Wed · never ends"
+function repeatSummary(rule, fallbackAnchorKey) {
+  const n = normalizeRepeat(rule);
+  if (!n) return '';
+  const a = parseLocal(n.anchor || fallbackAnchorKey || '');
+  let s;
+  if (n.freq === 'daily') s = n.interval === 1 ? 'Every day' : `Every ${n.interval} days`;
+  else if (n.freq === 'weekly') {
+    const names = n.days.map(i => REPEAT_DAY_NAMES[i]).join(', ') || 'no days chosen';
+    s = (n.interval === 1 ? 'Every week' : `Every ${n.interval} weeks`) + ` on ${names}`;
+  } else if (n.freq === 'monthly') {
+    const every = n.interval === 1 ? 'Monthly' : `Every ${n.interval} months`;
+    if (n.monthMode === 'last') s = `${every} on the last day`;
+    else if (n.monthMode === 'nth' && a) s = `${every} on the ${repeatOrdinal(Math.ceil(a.getDate() / 7))} ${DAYS[a.getDay()]}`;
+    else s = `${every} on day ${a ? a.getDate() : '?'}`;
+  } else {
+    s = (n.interval === 1 ? 'Every year' : `Every ${n.interval} years`) + (a ? ` on ${MONTHS[a.getMonth()].slice(0,3)} ${a.getDate()}` : '');
+  }
+  const end = n.endType === 'never' ? 'never ends' : n.endType === 'count' ? `${n.count} times` : (n.endDate ? `until ${n.endDate}` : 'pick an end date');
+  return `${s} · ${end}`;
+}
+// Copy-on-write edit of one day's task list inside a weekData object being built (`out`)
+function wdEditDay(out, dk, fn) {
+  const wk = fmtLocal(getWeekStart(parseLocal(dk)));
+  const week = out[wk] || { proverb:'', toCreate:[], people:[], beWord:'', proud:'', story:'', tasks:{} };
+  const tasks = week.tasks || {};
+  out[wk] = { ...week, tasks: { ...tasks, [dk]: fn(tasks[dk] || []) } };
+}
+// Is this task part of a repeat series (new rules, or the old weekday-copy style)?
+function taskIsRepeating(t) {
+  return !!(t && (t.repeatId || (t.repeat && ((t.repeat.days || []).length || (t.repeat.freq && t.repeat.freq !== 'weekly')))));
+}
+function defaultRepeat(dayKey) {
+  const d = parseLocal(dayKey);
+  return { freq: 'weekly', interval: 1, days: [d ? d.getDay() : 1], monthMode: 'date', endType: 'never', endDate: '', count: 10 };
+}
+function repeatCopy(tpl, repeatId, dk, stored) {
+  return { ...tpl, id: `${repeatId}_${dk}`, repeatId, repeat: stored, done: false, expanded: false, gcalId: null };
+}
+// Apply a rule to the task `src` sitting on srcDk.
+//  • Unfinished copies of the old series after srcDk are dropped and rewritten from the rule.
+//  • split=true gives this task and the following ones a NEW series id (earlier ones keep their old rule).
+// Returns { wd, repeatId, count } — wd is a new object; untouched weeks are shared, not copied.
+function repeatApply(wd, src, srcDk, rule, split, todayKey) {
+  const n = normalizeRepeat(rule);
+  const oldId = src.repeatId || null;
+  const newId = !oldId ? src.id : (split ? 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5) : oldId);
+  let horizon = '';
+  if (n.endType === 'never') {
+    const base = parseLocal(todayKey) > parseLocal(srcDk) ? parseLocal(todayKey) : parseLocal(srcDk);
+    horizon = fmtLocal(addDays(base, REPEAT_HORIZON_DAYS[n.freq] || 182));
+  }
+  const stored = { ...n, anchor: srcDk, genThrough: horizon };
+  const out = { ...wd };
+  if (oldId) {
+    Object.keys(wd).forEach(wk => {
+      Object.keys((wd[wk] && wd[wk].tasks) || {}).forEach(dk => {
+        if (dk <= srcDk) return;
+        if ((wd[wk].tasks[dk] || []).some(t => t.repeatId === oldId && !t.done)) {
+          wdEditDay(out, dk, ts => ts.filter(t => !(t.repeatId === oldId && !t.done)));
+        }
+      });
+    });
+  }
+  wdEditDay(out, srcDk, ts => ts.map(t => t.id === src.id ? { ...t, repeatId: newId, repeat: stored } : t));
+  const dates = repeatDates(stored, srcDk, srcDk, horizon, 800);
+  dates.forEach(dk => wdEditDay(out, dk, ts => ts.some(t => t.repeatId === newId) ? ts : [...ts, repeatCopy(src, newId, dk, stored)]));
+  return { wd: out, repeatId: newId, count: dates.length };
+}
+// Top up "never ends" series so copies always run well ahead of today. Returns the SAME object when
+// nothing needed adding (so React doesn't re-render).
+function repeatExtend(wd, todayKey) {
+  const series = {};
+  Object.keys(wd).forEach(wk => {
+    const tasks = (wd[wk] && wd[wk].tasks) || {};
+    Object.keys(tasks).forEach(dk => (tasks[dk] || []).forEach(t => {
+      if (!t.repeatId || !t.repeat || t.repeat.endType !== 'never') return;
+      const s = series[t.repeatId] || (series[t.repeatId] = { latestDk: '', latest: null, gen: '' });
+      if (dk >= s.latestDk) { s.latestDk = dk; s.latest = t; }
+      if ((t.repeat.genThrough || '') > s.gen) s.gen = t.repeat.genThrough;
+    }));
+  });
+  const today = parseLocal(todayKey);
+  let out = null;
+  Object.keys(series).forEach(id => {
+    const s = series[id];
+    const rule = normalizeRepeat(s.latest.repeat);
+    const H = REPEAT_HORIZON_DAYS[rule.freq] || 182;
+    const horizon = fmtLocal(addDays(today, H));
+    if (s.gen && s.gen >= fmtLocal(addDays(today, Math.floor(H * 0.6)))) return;   // still plenty ahead
+    const after = s.gen && s.gen > s.latestDk ? s.gen : s.latestDk;               // never re-add skipped days
+    const dates = repeatDates(rule, rule.anchor || s.latestDk, after, horizon, 800);
+    if (!dates.length) return;
+    if (!out) out = { ...wd };
+    const stored = { ...rule, genThrough: horizon };
+    dates.forEach(dk => wdEditDay(out, dk, ts => ts.some(t => t.repeatId === id) ? ts : [...ts, repeatCopy(s.latest, id, dk, stored)]));
+  });
+  return out || wd;
+}
+
+// ── GOAL ↔ HABIT / FITNESS LINKS (v4.7.0) ──
+// A goal may point at habits and at fitness exercises it is built on:
+//   goal.linkedHabitIds: [habitId]      — habits from the Habit Tracker
+//   goal.linkedExerciseIds: [exerciseId] — exercises from the Fitness library
+// These are read-only roll-ups: they never change glProgress or glHealth, which stay driven by
+// milestones. They answer "is the underlying practice actually happening?" alongside "is the
+// checklist moving?". Date keys here use fmt (UTC-ISO), matching habitCompletions and fitnessLog.
+//
+// How a habit did in the 7 days from weekStart: {done, target, pct}
+function habitWeekStats(goal, completions, weekStart) {
+  let done = 0;
+  for (let i = 0; i < 7; i++) if (((completions || {})[fmt(addDays(weekStart, i))] || []).includes(goal.id)) done++;
+  const f = goal.freq;
+  const target = !f ? 7
+    : f.type === 'perWeek' ? Math.max(1, parseInt(f.n, 10) || 1)
+    : f.type === 'days' ? ((f.days || []).length || 7)
+    : 7;
+  return { done, target, pct: target ? Math.min(1, done / target) : 0 };
+}
+// Sessions and completed sets for one exercise in the 7 days from weekStart
+function fitWeekStats(exerciseId, fitnessLog, weekStart) {
+  let sessions = 0, sets = 0;
+  for (let i = 0; i < 7; i++) {
+    let hit = false;
+    ((fitnessLog || {})[fmt(addDays(weekStart, i))] || []).forEach(w =>
+      (w.exercises || []).forEach(ex => {
+        if (ex.exerciseId !== exerciseId) return;
+        hit = true;
+        sets += (ex.sets || []).filter(s => s.done).length;
+      }));
+    if (hit) sessions++;
+  }
+  return { sessions, sets };
+}
+// Everything a goal links to, resolved against the current habit and exercise lists.
+// Links to things that have since been deleted are skipped rather than shown as blanks.
+function glLinks(goal, habitGoals, fitnessExercises, completions, fitnessLog, weekStart, mctx) {
+  const out = [];
+  (goal.linkedHabitIds || []).forEach(id => {
+    const h = (habitGoals || []).find(x => x.id === id);
+    if (!h) return;
+    const w = habitWeekStats(h, completions, weekStart);
+    out.push({ kind: 'habit', id, name: h.name || 'Habit', color: h.color,
+      detail: `${w.done}/${w.target} this week`, pct: w.pct,
+      streak: habitStreak(h, completions, new Date()), perWeek: !!(h.freq && h.freq.type === 'perWeek') });
+  });
+  (goal.linkedExerciseIds || []).forEach(id => {
+    const ex = (fitnessExercises || []).find(x => x.id === id);
+    if (!ex) return;
+    const w = fitWeekStats(id, fitnessLog, weekStart);
+    out.push({ kind: 'exercise', id, name: ex.name || 'Exercise', color: null,
+      detail: w.sessions ? `${w.sessions} session${w.sessions === 1 ? '' : 's'} · ${w.sets} set${w.sets === 1 ? '' : 's'}` : 'Not trained this week',
+      pct: w.sessions ? Math.min(1, w.sessions / 3) : 0, sessions: w.sessions });
+  });
+  if (mctx) (goal.linkedMetrics || []).forEach(id => { const l = glMetricLink(id, goal, mctx, weekStart); if (l) out.push(l); });
+  return out;
+}
+function glHasLinks(goal) { return !!((goal.linkedHabitIds || []).length || (goal.linkedExerciseIds || []).length || (goal.linkedMetrics || []).length); }
+
+// ── MEASUREMENTS (v4.8.0) ──
+// Weight and calories live in `habitMetrics` ({dateKey: {weight, cals}}, values stored as strings)
+// with a single global weightTarget / calsTarget that also draw the chart reference lines. A goal
+// can link either one (goal.linkedMetrics: ['weight','cals']) for a roll-up, and a milestone can
+// complete itself from weight (m.metric = {id:'weight', op:'<='|'>=', value}).
+// Everything takes `mctx = {metrics, weightTarget, calsTarget}` so it is one prop to carry around.
+// Weight bounces day to day, so anything that decides "have I reached it" uses a 7-day average and
+// needs at least GL_MIN_READINGS readings in that window — one low weigh-in never counts.
+const GL_METRICS = { weight: { label: 'Weight', icon: '⚖' }, cals: { label: 'Calories', icon: '🍽' } };
+const GL_MIN_READINGS = 3;
+function mNum(v) { const n = parseFloat(v); return Number.isFinite(n) ? n : null; }
+function mRound(x) { return String(Math.round(x * 10) / 10); }
+// Readings of one series between two local dates (inclusive), oldest first
+function metricSeries(metrics, id, from, to) {
+  const key = id === 'weight' ? 'weight' : 'cals';
+  const out = [];
+  for (let d = new Date(from), i = 0; d <= to && i < 800; d = addDays(d, 1), i++) {
+    const v = mNum(((metrics || {})[fmt(d)] || {})[key]);
+    if (v !== null && (id !== 'weight' || v > 0)) out.push({ dk: fmt(d), v });
+  }
+  return out;
+}
+// 7-day average of weight ending asOf. sinceKey (local 'YYYY-MM-DD') ignores readings from before a goal began.
+function smoothWeight(metrics, asOf, sinceKey) {
+  let from = addDays(asOf, -6);
+  const since = sinceKey ? parseLocal(sinceKey) : null;
+  if (since && since > from) from = since;
+  const r = from <= asOf ? metricSeries(metrics, 'weight', from, asOf) : [];
+  return { n: r.length, avg: r.length >= GL_MIN_READINGS ? r.reduce((s, x) => s + x.v, 0) / r.length : null };
+}
+// Where the goal started: the average of the first week of readings on or after its start date
+function weightBaseline(metrics, startKey, asOf) {
+  const start = (startKey && parseLocal(startKey)) || addDays(asOf, -365);
+  const first = metricSeries(metrics, 'weight', start, asOf)[0];
+  if (!first) return null;
+  const r0 = parseLocal(first.dk);
+  const wk = metricSeries(metrics, 'weight', r0, addDays(r0, 6));
+  return { value: wk.reduce((s, x) => s + x.v, 0) / wk.length, dk: first.dk };
+}
+// One roll-up row for a linked measurement, for the week starting weekStart
+function glMetricLink(id, goal, mctx, weekStart) {
+  const meta = GL_METRICS[id];
+  if (!meta) return null;
+  const now = new Date(); now.setHours(0, 0, 0, 0);
+  const weekEnd = addDays(weekStart, 6);
+  const asOf = weekEnd < now ? weekEnd : now;
+  const base = { kind: 'metric', id, name: meta.label, icon: meta.icon, color: null, spark: [] };
+  if (id === 'weight') {
+    const tgt = mNum(mctx.weightTarget);
+    const cur = smoothWeight(mctx.metrics, asOf);
+    const spark = metricSeries(mctx.metrics, 'weight', addDays(asOf, -20), asOf).map(r => r.v);
+    if (cur.avg === null) return { ...base, spark, pct: null, detail: cur.n ? `${cur.n} of ${GL_MIN_READINGS} readings` : 'No recent readings' };
+    const b = weightBaseline(mctx.metrics, goal.startDate, asOf);
+    const change = b ? cur.avg - b.value : null;
+    let detail = mRound(cur.avg) + (tgt !== null ? ` → ${mRound(tgt)}` : '');
+    if (change !== null && Math.abs(change) >= 0.05) detail += ` · ${change > 0 ? '+' : '−'}${mRound(Math.abs(change))}`;
+    const span = b && tgt !== null ? b.value - tgt : 0;
+    const pct = Math.abs(span) > 0.05 ? Math.max(0, Math.min(1, (b.value - cur.avg) / span)) : null;
+    return { ...base, spark, pct, detail };
+  }
+  const series = metricSeries(mctx.metrics, 'cals', weekStart, asOf);
+  if (!series.length) return { ...base, pct: null, detail: 'No entries this week' };
+  const tgt = mNum(mctx.calsTarget);
+  if (tgt === null) return { ...base, pct: null, detail: `avg ${Math.round(series.reduce((s, x) => s + x.v, 0) / series.length)} kcal` };
+  const under = series.filter(x => x.v <= tgt).length;
+  return { ...base, pct: under / series.length, detail: `${under}/${series.length} days under ${tgt}` };
+}
+// Has a milestone's weight condition been met right now?
+function glMetricMet(m, goal, mctx, asOf) {
+  const c = m.metric;
+  if (!c || c.id !== 'weight') return false;
+  const v = mNum(c.value);
+  if (v === null) return false;
+  const cur = smoothWeight(mctx.metrics, asOf, goal.startDate);
+  if (cur.avg === null) return false;
+  return c.op === '>=' ? cur.avg >= v : cur.avg <= v;
+}
+// Complete any open weight milestones whose condition is met. Returns the SAME goals array when
+// nothing changed (so React does no work) plus what was reached, for the Undo toast.
+// Only active goals; a milestone you reopened by hand (metricHold) is left alone.
+function glAutoComplete(goals, mctx, asOf) {
+  const reached = [];
+  let changed = false;
+  const out = (goals || []).map(g => {
+    if (g.status === 'done' || g.status === 'parked') return g;
+    let touched = false;
+    const ms = (g.milestones || []).map(m => {
+      if (m.done || m.metricHold || !m.metric || !glMetricMet(m, g, mctx, asOf)) return m;
+      touched = true;
+      reached.push({ gid: g.id, mid: m.id, title: m.title, goal: g.title });
+      return { ...m, done: true, completedAt: Date.now(), autoDone: true };
+    });
+    if (!touched) return g;
+    changed = true;
+    return { ...g, milestones: ms };
+  });
+  return { goals: changed ? out : goals, reached };
+}
+
 // ─────────────────────────────────────────────
 // CONFIG — the only values that differ between the TEST app and the live app
 // ─────────────────────────────────────────────
@@ -2123,6 +2680,40 @@ let _lastCalSyncMs = 0; // timestamp of last auto calendar sync — throttles to
 // Pages body flush: PagesView registers a synchronous flush fn here so pending editor text
 // is written to local storage before a sync (tab hidden, page closing, sign-out).
 const _bodyFlushRef = { fn: null };
+// ── UNDO (v4.6.0) ──
+// Deleting something calls Undo.push(label, restoreFn). restoreFn must re-insert ONLY what was
+// removed, using functional state updates, so it never overwrites edits made since the delete.
+// Entries expire after 10s; the toast always offers the most recent one.
+const Undo = {
+  items: [], subs: new Set(),
+  push(label, restore) {
+    const item = { id: Date.now() + Math.random(), label, restore };
+    this.items = [...this.items, item].slice(-5);
+    setTimeout(() => { this.items = this.items.filter(x => x.id !== item.id); this.emit(); }, 10000);
+    this.emit();
+  },
+  run() {
+    const item = this.items[this.items.length - 1];
+    if (!item) return;
+    this.items = this.items.slice(0, -1);
+    this.emit();
+    try { item.restore(); } catch (e) { console.error('Undo failed', e); }
+  },
+  emit() { this.subs.forEach(f => f(this.items)); },
+};
+function UndoToast({ lift }) {
+  const [items, setItems] = useState(Undo.items);
+  useEffect(() => { Undo.subs.add(setItems); return () => { Undo.subs.delete(setItems); }; }, []);
+  if (!items.length) return null;
+  const top = items[items.length - 1];
+  return (
+    <div className={`undo-toast${lift ? ' lift' : ''}`} role="status" aria-live="polite">
+      <span className="undo-toast-label">{top.label}</span>
+      {items.length > 1 && <span className="undo-toast-more">+{items.length - 1} earlier</span>}
+      <button type="button" className="undo-toast-btn" onClick={() => Undo.run()}>Undo</button>
+    </div>
+  );
+}
 // Debounce timers for calendar sync — keyed by task id
 const _calSyncTimers = {};
 function debouncedCalSync(id, fn, delay = 2500) {
@@ -3200,7 +3791,273 @@ function SortableChecklist({ items, onUpdate, onAdd, onDelete, onReorder, placeh
   );
 }
 
-function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToHabit, calHeaderColor, setCalHeaderColor, habitGoals, habitCompletions, setHabitCompletions, habitQty, setHabitQty, habitNotes, setHabitNotes, peopleDirectory, setPeopleDirectory, goals, setGoals, onOpenGoal }) {
+// ─────────────────────────────────────────────
+// WEEKLY REVIEW (v4.7.0)
+// A four-step guided close-out of the displayed week: how it went → where unfinished tasks go →
+// a goals check-in → reflect and set next week's top 3. Reads the week it is given, so reviewing
+// an older week works the same way. Writes go through the Weekly Planner's own task helpers, so
+// cross-week moves, calendar sync and Undo all behave exactly as they do elsewhere.
+// ─────────────────────────────────────────────
+function WeekReview({ weekStart, wd, goals, setGoals, habitGoals, habitCompletions, fitnessLog,
+                      fitnessExercises, mctx, onMoveTask, onDeleteTask, onAddTask, onSetWD, onNavWeek,
+                      onGoToWeek, onOpenGoal, onClose }) {
+  const [step, setStep] = useState(1);
+  const [custom, setCustom] = useState(null);     // id of the row whose date picker is open
+  const [top3, setTop3] = useState(['', '', '']);
+  const [goalDraft, setGoalDraft] = useState({}); // goalId -> text of the task being added
+  // Switching weeks: the drafts belong to the week you were on, so clear them. Keep the step.
+  const wkId = fmt(weekStart);
+  useEffect(() => { setTop3(['', '', '']); setGoalDraft({}); setCustom(null); }, [wkId]);
+  const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+  const nextMon = addDays(weekStart, 8);          // weekStart is Sunday, so +8 is next Monday
+  const nextMonKey = fmt(nextMon);
+  const label = `${fmtDisplay(days[0])} – ${fmtDisplay(days[6])}`;
+  // Goal task scheduledDate uses fmtLocal while weekData day keys use fmt; in a negative UTC
+  // offset these agree, but match on both so a goal task is never missed. (See KI-4.)
+  const dayKeys = days.map(d => fmt(d));
+  const inWeek = new Set([...dayKeys, ...days.map(d => fmtLocal(d))]);
+
+  // ── What happened this week ──
+  const rows = [];
+  dayKeys.forEach((dk, i) => ((wd.tasks || {})[dk] || []).forEach(t => {
+    if ((t.title || '').trim()) rows.push({ kind: 'task', id: t.id, dk, dayIdx: i, title: t.title, done: !!t.done, task: t });
+  }));
+  (goals || []).forEach(g => (g.milestones || []).forEach(m => (m.tasks || []).forEach(t => {
+    if (!t.scheduledDate || !inWeek.has(t.scheduledDate)) return;
+    const d = parseLocal(t.scheduledDate);
+    rows.push({ kind: 'goal', id: t.id, dk: t.scheduledDate, dayIdx: d ? d.getDay() : 0,
+      title: t.title || 'Untitled task', done: !!t.done, g, m });
+  })));
+  const taskRows = rows.filter(r => r.kind === 'task');
+  const goalRows = rows.filter(r => r.kind === 'goal');
+  const unfinished = rows.filter(r => !r.done);
+  const perDay = dayKeys.map((_, i) => rows.filter(r => r.dayIdx === i && r.done).length);
+  const busiest = perDay.indexOf(Math.max(...perDay));
+  const quietest = perDay.indexOf(Math.min(...perDay));
+
+  const habitStats = (habitGoals || []).map(h => ({ h, ...habitWeekStats(h, habitCompletions, weekStart) }));
+  const habitTotal = habitStats.reduce((s, x) => s + x.target, 0);
+  const habitHit = habitStats.reduce((s, x) => s + Math.min(x.done, x.target), 0);
+  const workouts = dayKeys.filter(dk => ((fitnessLog || {})[dk] || []).length > 0).length;
+  const activeGoals = (goals || []).filter(g => g.status === 'active');
+
+  // ── Moving an unfinished task ──
+  function place(r, toKey) {
+    if (r.kind === 'task') {
+      const from = r.dk;
+      onMoveTask(from, toKey, r.id);
+      Undo.push(`Moved "${r.title.trim().slice(0, 30)}" to ${glShort(toKey)}`, () => onMoveTask(toKey, from, r.id));
+    } else {
+      const from = r.dk;
+      setGoals(gs => glPatchTask(gs, r.g.id, r.m.id, r.id, { scheduledDate: toKey }));
+      Undo.push(`Moved "${r.title.trim().slice(0, 30)}" to ${glShort(toKey)}`,
+        () => setGoals(gs => glPatchTask(gs, r.g.id, r.m.id, r.id, { scheduledDate: from })));
+    }
+    setCustom(null);
+  }
+  function drop(r) {
+    if (r.kind === 'task') { onDeleteTask(r.dk, r.id); return; }
+    const from = r.dk;
+    setGoals(gs => glPatchTask(gs, r.g.id, r.m.id, r.id, { scheduledDate: '' }));
+    Undo.push(`Unscheduled "${r.title.trim().slice(0, 30)}"`,
+      () => setGoals(gs => glPatchTask(gs, r.g.id, r.m.id, r.id, { scheduledDate: from })));
+    setCustom(null);
+  }
+  function moveAll() {
+    const list = [...unfinished];
+    list.forEach(r => {
+      if (r.kind === 'task') onMoveTask(r.dk, nextMonKey, r.id);
+      else setGoals(gs => glPatchTask(gs, r.g.id, r.m.id, r.id, { scheduledDate: nextMonKey }));
+    });
+    Undo.push(`Moved ${list.length} task${list.length === 1 ? '' : 's'} to ${glShort(nextMonKey)}`, () => list.forEach(r => {
+      if (r.kind === 'task') onMoveTask(nextMonKey, r.dk, r.id);
+      else setGoals(gs => glPatchTask(gs, r.g.id, r.m.id, r.id, { scheduledDate: r.dk }));
+    }));
+  }
+  function addGoalTask(g) {
+    const title = (goalDraft[g.id] || '').trim();
+    if (!title) return;
+    const m = glNextMilestone(g) || (g.milestones || [])[0];
+    if (!m) return;
+    const t = { id: glId('t'), title, scheduledDate: fmtLocal(nextMon), done: false, completedAt: null };
+    setGoals(gs => glPatchGoal(gs, g.id, gg => glPatchMs(gg, m.id, mm => ({ ...mm, tasks: [...(mm.tasks || []), t] }))));
+    setGoalDraft(d => ({ ...d, [g.id]: '' }));
+  }
+  function finish() {
+    // Top 3 become starred tasks at the top of next Monday, in the order they were typed
+    top3.map(s => s.trim()).filter(Boolean).reverse().forEach(title => onAddTask(nextMonKey, title, true));
+    onSetWD(w => ({ ...w, reviewedAt: Date.now() }));
+    onClose();
+  }
+
+  // Say plainly which week this is, relative to now — the review can point anywhere (v4.7.1)
+  const curWkKey = fmt(getWeekStart(new Date()));
+  const weeksBack = Math.round((parseLocal(curWkKey) - parseLocal(wkId)) / 604800000);
+  const whichWeek = weeksBack === 0 ? 'This week — still in progress.'
+    : weeksBack === 1 ? 'Last week.'
+    : weeksBack > 1 ? `${weeksBack} weeks ago.`
+    : weeksBack === -1 ? 'Next week — it hasn’t happened yet.'
+    : `${-weeksBack} weeks ahead — it hasn’t happened yet.`;
+
+  const heads = [
+    ['How the week went', whichWeek],
+    ['Unfinished tasks', unfinished.length ? `${unfinished.length} task${unfinished.length === 1 ? '' : 's'} didn't get done. Decide where each goes.` : 'Nothing left over — the whole week is closed out.'],
+    ['Goals check-in', 'Work done versus time used, per goal.'],
+    ['Reflect and plan', "Saved into this week's notes and next week's top 3."],
+  ];
+  const nextLabel = ['Next: unfinished tasks', 'Next: goals', 'Next: reflect and plan', 'Finish review'][step - 1];
+
+  return (
+    <div className="wr-overlay" onClick={onClose}>
+      <div className="wr-box" role="dialog" aria-label="Weekly review" onClick={e => e.stopPropagation()}>
+        <div className="wr-head">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+            <div className="wr-step">Week review · Step {step} of 4</div>
+            {onNavWeek && (
+              <div className="wr-weeknav">
+                <button type="button" aria-label="Review the week before" onClick={() => onNavWeek(-1)}>‹</button>
+                <span className="wk">{label}</span>
+                <button type="button" aria-label="Review the week after" onClick={() => onNavWeek(1)}>›</button>
+              </div>
+            )}
+          </div>
+          <div className="wr-title">{heads[step - 1][0]}</div>
+          <div className="wr-sub">{heads[step - 1][1]}</div>
+          {onGoToWeek && weeksBack !== 0 && (
+            <button type="button" className="wr-open-wk" onClick={onGoToWeek}>Open this week in the planner</button>
+          )}
+        </div>
+        <div className="wr-body">
+
+          {step === 1 && (<>
+            <div className="wr-stats">
+              <div className="wr-stat"><b>{taskRows.filter(r => r.done).length}</b><em>of {taskRows.length}</em><span>Tasks done</span></div>
+              <div className="wr-stat"><b>{habitTotal ? Math.round(habitHit / habitTotal * 100) : 0}%</b><em>&nbsp;</em><span>Habits completed</span></div>
+              <div className="wr-stat"><b>{workouts}</b><em>of 7 days</em><span>Workouts logged</span></div>
+              <div className="wr-stat"><b>{goalRows.filter(r => r.done).length}</b><em>of {goalRows.length}</em><span>Goal tasks done</span></div>
+            </div>
+            {habitStats.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                <span className="wr-sec-label">Habits this week</span>
+                {habitStats.map(({ h, done, target, pct }) => (
+                  <div key={h.id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ width: 9, height: 9, borderRadius: '50%', background: h.color || 'var(--accent)', flexShrink: 0 }} />
+                    <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{h.name || 'Habit'}</span>
+                    <div className="gl-bar" style={{ width: 90, height: 6, flexShrink: 0 }}>
+                      <div style={{ width: Math.round(pct * 100) + '%', background: h.color || 'var(--accent)' }} />
+                    </div>
+                    <span className="gl-mono" style={{ fontSize: 12, color: 'var(--ink-light)', minWidth: 34, textAlign: 'right', flexShrink: 0 }}>{done}/{target}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {rows.some(r => r.done) && (
+              <div style={{ fontSize: 13, color: 'var(--ink-light)', lineHeight: 1.6 }}>
+                Busiest day: <b style={{ color: 'var(--ink)' }}>{DAYS[busiest]}</b>, with {perDay[busiest]} task{perDay[busiest] === 1 ? '' : 's'} done.
+                {busiest !== quietest && <> Quietest: <b style={{ color: 'var(--ink)' }}>{DAYS[quietest]}</b>, with {perDay[quietest]}.</>}
+              </div>
+            )}
+          </>)}
+
+          {step === 2 && (unfinished.length ? (<>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <button className="wr-btn primary" onClick={moveAll}>Move all {unfinished.length} to {DAYS[1]}, {fmtDisplay(nextMon)}</button>
+              <span style={{ fontSize: 12.5, color: 'var(--ink-light)' }}>or choose for each task</span>
+            </div>
+            {unfinished.map(r => {
+              const sameDay = fmt(addDays(nextMon, (r.dayIdx + 6) % 7));   // same weekday, next week
+              return (
+                <div key={r.kind + r.id} className="wr-item">
+                  <span className="t">{r.title.trim() || 'Untitled'}</span>
+                  <span className="from">{r.kind === 'goal' ? `${r.g.title || 'Goal'} · ` : ''}From {DAYS[r.dayIdx].slice(0, 3)}</span>
+                  <button className="wr-mini" onClick={() => place(r, nextMonKey)}>Mon</button>
+                  {sameDay !== nextMonKey && <button className="wr-mini" onClick={() => place(r, sameDay)}>{DAYS[r.dayIdx].slice(0, 3)}</button>}
+                  {custom === r.kind + r.id ? (
+                    <input type="date" className="wr-mini" autoFocus defaultValue={nextMonKey}
+                      onChange={e => e.target.value && place(r, e.target.value)} onBlur={() => setCustom(null)} />
+                  ) : (
+                    <button className="wr-mini" onClick={() => setCustom(r.kind + r.id)}>Pick day</button>
+                  )}
+                  <button className="wr-mini drop" onClick={() => drop(r)}>Drop</button>
+                </div>
+              );
+            })}
+          </>) : (
+            <div className="wr-done">Nothing left over. Everything you planned this week is done or already moved.</div>
+          ))}
+
+          {step === 3 && (activeGoals.length ? activeGoals.map(g => {
+            const h = glHealth(g, glToday());
+            const m = glNextMilestone(g);
+            return (
+              <div key={g.id} className="wr-goal">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                  <span className="gl-dot" style={{ background: g.color }} />
+                  <span style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 600, cursor: 'pointer', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                    onClick={() => { onClose(); onOpenGoal(g.id); }}>{g.title || 'Untitled goal'}</span>
+                  <GlHealthPill h={h} />
+                </div>
+                {[['Work done', h.p], ['Time used', h.used]].map(([lab, v]) => (
+                  <div key={lab} style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                    <span style={{ fontSize: 12, color: 'var(--ink-light)', width: 72, flexShrink: 0 }}>{lab}</span>
+                    <div className="gl-bar" style={{ flex: 1, height: 7, background: glTint(g.color, 0.15) }}>
+                      <div style={{ width: Math.round(v * 100) + '%', background: lab === 'Work done' ? g.color : glTint(g.color, 0.45) }} />
+                    </div>
+                    <span className="gl-mono" style={{ fontSize: 12, color: 'var(--ink-light)', minWidth: 34, textAlign: 'right', flexShrink: 0 }}>{Math.round(v * 100)}%</span>
+                  </div>
+                ))}
+                <GlLinksRow goal={g} habitGoals={habitGoals} fitnessExercises={fitnessExercises} mctx={mctx}
+                  habitCompletions={habitCompletions} fitnessLog={fitnessLog} weekStart={weekStart} />
+                {m && <div style={{ fontSize: 12.5, color: 'var(--ink-light)' }}>Next: {m.title || 'Untitled milestone'}{m.dueDate ? ` · due ${glShort(m.dueDate)}` : ''}</div>}
+                <div style={{ display: 'flex', gap: 7 }}>
+                  <input className="wr-in" style={{ flex: 1, minHeight: 34, fontSize: 13 }}
+                    placeholder={(g.milestones || []).length ? 'Add a task for next week…' : 'Add a milestone first'}
+                    disabled={!(g.milestones || []).length} value={goalDraft[g.id] || ''}
+                    onChange={e => setGoalDraft(d => ({ ...d, [g.id]: e.target.value }))}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addGoalTask(g); } }} />
+                  <button className="wr-mini" disabled={!(goalDraft[g.id] || '').trim()} onClick={() => addGoalTask(g)}>Add</button>
+                </div>
+              </div>
+            );
+          }) : (
+            <div className="wr-done">No active goals. Create one on the Goals tab and it shows up here.</div>
+          ))}
+
+          {step === 4 && (<>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+              <span className="wr-sec-label">This week, I was proud that I:</span>
+              <textarea className="wr-ta" placeholder="Write about your proudest moment…" value={wd.proud || ''}
+                onChange={e => { const v = e.target.value; onSetWD(w => ({ ...w, proud: v })); }} />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+              <span className="wr-sec-label">Best story this week</span>
+              <textarea className="wr-ta" placeholder="What's the best story from this week?" value={wd.story || ''}
+                onChange={e => { const v = e.target.value; onSetWD(w => ({ ...w, story: v })); }} />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <span className="wr-sec-label">Top 3 for next week</span>
+              {[0, 1, 2].map(i => (
+                <input key={i} className="wr-in" placeholder={`${i + 1}.`} value={top3[i]}
+                  onChange={e => setTop3(t => { const n = [...t]; n[i] = e.target.value; return n; })} />
+              ))}
+              <span style={{ fontSize: 11.5, color: 'var(--ink-faint)' }}>★ Added to the top of {DAYS[1]}, {fmtDisplay(nextMon)} when you finish.</span>
+            </div>
+          </>)}
+
+        </div>
+        <div className="wr-foot">
+          {step > 1
+            ? <button className="wr-btn ghost" onClick={() => setStep(s => s - 1)}>‹ Back</button>
+            : <button className="wr-btn ghost" onClick={onClose}>Close</button>}
+          <div className="wr-dots" aria-hidden="true">{[1, 2, 3, 4].map(i => <i key={i} className={i <= step ? 'on' : ''} />)}</div>
+          <button className="wr-btn primary" onClick={() => step < 4 ? setStep(s => s + 1) : finish()}>{nextLabel}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToHabit, calHeaderColor, setCalHeaderColor, habitGoals, habitCompletions, setHabitCompletions, habitQty, setHabitQty, habitNotes, setHabitNotes, peopleDirectory, setPeopleDirectory, goals, setGoals, onOpenGoal, fitnessLog, fitnessExercises, mctx, reviewOpen, setReviewOpen }) {
   const today = new Date(); today.setHours(0,0,0,0);
   const [weekStart, setWeekStartRaw] = useState(() => {
     const saved = parseLocal(sessionStorage.getItem('lp_weekStart'));
@@ -3261,6 +4118,8 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
   const [sheetOpen, setSheetOpen] = useState(false);
   const [showPeoplePicker, setShowPeoplePicker] = useState(false);
   const [showRepeatCleanup, setShowRepeatCleanup] = useState(false);
+  const [repeatScope, setRepeatScope] = useState(null); // {kind:'delete'|'apply', task, dayKey, rule?}
+  const [reviewWeek, setReviewWeek] = useState(null);   // week-start Date the review is looking at
   const pendingTaskFocus = useRef(null); // {id, dayKey} — task to focus after render
   const taskTitleRefs = useRef({}); // id -> input ref (desktop)
   const taskTitleRefsMobile = useRef({}); // id -> input ref (mobile)
@@ -3278,6 +4137,26 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
   }
 
   const wd = getWD();
+  // ── Weekly Review week targeting (v4.7.0) ──
+  // The review can look at ANY week, not just the displayed one, so `reviewWeek` is its own state.
+  // Default when opening: the week that just ended if you're sitting in a barely-started current
+  // week (Sunday or Monday); otherwise the week you're looking at. Arrows in the review move it.
+  function emptyWeekObj() { return { proverb:'', toCreate:[], people:[], beWord:'', proud:'', story:'', tasks:{} }; }
+  function wdFor(ws) { return weekData[fmt(ws)] || emptyWeekObj(); }
+  function setWDFor(ws, fn) {
+    const wk = fmt(ws);
+    setWeekData(all => ({ ...all, [wk]: typeof fn === 'function' ? fn(all[wk] || emptyWeekObj()) : fn }));
+  }
+  function defaultReviewWeek() {
+    const now = new Date();
+    const justStarted = [0, 1].includes(now.getDay());          // Sunday or Monday
+    const viewingCurrent = weekKey === fmt(getWeekStart(now));
+    return (viewingCurrent && justStarted) ? addDays(weekStart, -7) : weekStart;
+  }
+  useEffect(() => { setReviewWeek(reviewOpen ? defaultReviewWeek() : null); }, [reviewOpen]);
+  // The button is "due" while the week on offer hasn't been reviewed yet
+  const reviewTarget = reviewOpen && reviewWeek ? reviewWeek : defaultReviewWeek();
+  const reviewDue = !wdFor(reviewTarget).reviewedAt;
 
   // Tasks: { [dayKey]: [{id, title, details, done, color, expanded, order}] }
   function getTasks(dayKey) { return (wd.tasks||{})[dayKey] || []; }
@@ -3295,52 +4174,42 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
       return { ...w, tasks: { ...(w.tasks||{}), [dayKey]: typeof fn==='function' ? fn(current) : fn } };
     });
   }
-
-  // Propagate a repeat task across future days up to endDate
-  function propagateRepeat(sourceTask, sourceDayKey, repeatDays, endDate) {
-    if (!repeatDays || repeatDays.length === 0 || !endDate) return;
-    const end = new Date(endDate + 'T00:00:00');
-    const start = new Date(sourceDayKey + 'T00:00:00');
-    start.setDate(start.getDate() + 1); // start from day after source
-    const repeatId = sourceTask.repeatId || sourceTask.id;
-    // Stamp the source task with repeatId if not already set
-    if (!sourceTask.repeatId) {
-      setTasks(sourceDayKey, ts => ts.map(t => t.id === sourceTask.id ? {...t, repeatId} : t));
-    }
-    // Build all target dates
-    const cursor = new Date(start);
-    const targets = [];
-    while (cursor <= end) {
-      if (repeatDays.includes(cursor.getDay())) {
-        targets.push(fmt(new Date(cursor)));
-      }
-      cursor.setDate(cursor.getDate() + 1);
-    }
-    if (targets.length === 0) return;
-    // Write copies into weekData — accumulate into a single draft object
-    // so targets that share a week don't clobber each other
-    setWeekData(wd => {
-      const draft = JSON.parse(JSON.stringify(wd)); // deep clone
-      targets.forEach(dk => {
-        const dateObj = new Date(dk + 'T00:00:00');
-        const wk = fmt(getWeekStart(dateObj));
-        if (!draft[wk]) draft[wk] = { proverb:'', toCreate:[], people:[], beWord:'', proud:'', story:'', tasks:{} };
-        if (!draft[wk].tasks) draft[wk].tasks = {};
-        const dayTasks = draft[wk].tasks[dk] || [];
-        // Skip if a repeat copy already exists for this repeatId on this day
-        if (dayTasks.some(t => t.repeatId === repeatId)) return;
-        draft[wk].tasks[dk] = [...dayTasks, {
-          ...sourceTask,
-          id: `${repeatId}_${dk}`,
-          repeatId,
-          repeat: { days: repeatDays, endDate },
-          done: false,
-          expanded: false,
-          gcalId: null,
-        }];
-      });
-      return draft;
+  // v4.7.1 — same as setTasks/getTasks but resolving the week from the day itself rather than
+  // assuming the displayed week. The Weekly Review can point at a week other than the one on
+  // screen, and setWD/getTasks would silently read and write the wrong bucket.
+  function weekKeyOf(dayKey) { return fmt(getWeekStart(parseLocal(dayKey) || new Date(dayKey))); }
+  function getTasksAnyWeek(dayKey) { return (((weekDataRef.current[weekKeyOf(dayKey)]||{}).tasks)||{})[dayKey] || []; }
+  function setTasksAnyWeek(dayKey, fn) {
+    const wk = weekKeyOf(dayKey);
+    setWeekData(all => {
+      const week = all[wk] || { proverb:'', toCreate:[], people:[], beWord:'', proud:'', story:'', tasks:{} };
+      const current = (week.tasks||{})[dayKey] || [];
+      return { ...all, [wk]: { ...week, tasks: { ...(week.tasks||{}), [dayKey]: typeof fn==='function' ? fn(current) : fn } } };
     });
+  }
+
+  // Apply a repeat rule to a task (see repeatApply). split=true starts a new series from this task.
+  function applyRepeatRule(task, dayKey, rule, split) {
+    const todayKey = fmtLocal(new Date());
+    setWeekData(wd => repeatApply(wd, task, dayKey, rule, split, todayKey).wd);
+  }
+  // Changing the rule of a task that already has other copies asks which ones to change
+  function requestApplyRepeat(task, dayKey, rule) {
+    if (task.repeatId && collectInstances(t => t.repeatId === task.repeatId).length > 1) {
+      setRepeatScope({ kind: 'apply', task, dayKey, rule });
+    } else {
+      applyRepeatRule(task, dayKey, rule, false);
+    }
+  }
+  function runRepeatScope(sc, choice) {
+    const { task, dayKey } = sc;
+    if (sc.kind === 'delete') {
+      if (choice === 'one') deleteTask(dayKey, task.id);
+      else if (choice === 'following') deleteTaskAndFuture(dayKey, task.id);
+      else deleteRepeatGroup(null, task.repeatId, task.title, task.repeat && task.repeat.days);
+    } else {
+      applyRepeatRule(task, dayKey, sc.rule, choice === 'following');
+    }
   }
 
   // Scan all weekData and group repeat task instances.
@@ -3359,6 +4228,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
               key, title: t.title||'(untitled)',
               days: t.repeat?.days || [],
               endDate: t.repeat?.endDate || '',
+              rule: t.repeat || null,
               repeatId: t.repeatId || null,
               instances: [],
             };
@@ -3373,6 +4243,15 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
 
   // Delete ALL instances of a repeat group (regardless of date — used by cleanup tool)
   function deleteRepeatGroup(groupKey, repeatId, title, days) {
+    {
+      const sig = JSON.stringify((days||[]).slice().sort());
+      const removed = collectInstances(t => repeatId
+        ? t.repeatId === repeatId
+        : (t.title === title && JSON.stringify((t.repeat?.days||[]).slice().sort()) === sig));
+      if (removed.length) Undo.push(`Deleted ${removed.length} repeating task${removed.length===1?'':'s'}`, () => {
+        removed.forEach(r => insertTaskBack(r.wk, r.dk, r.task, r.idx));
+      });
+    }
     setWeekData(wd => {
       const draft = JSON.parse(JSON.stringify(wd));
       Object.keys(draft).forEach(wk => {
@@ -3452,8 +4331,38 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
       setTasks(dayKey, ts => ts.map(x => x.id===id ? {...x, gcalId: null} : x));
     }
   }
+  // Put a deleted task back (used by Undo). Only inserts if it isn't already there.
+  function insertTaskBack(wk, dayKey, task, idx) {
+    setWeekData(wd => {
+      const week = wd[wk] || { proverb:'', toCreate:[], people:[], beWord:'', proud:'', story:'', tasks:{} };
+      const list = (week.tasks||{})[dayKey] || [];
+      if (list.some(t => t.id === task.id)) return wd;
+      const next = [...list];
+      next.splice(Math.min(idx, next.length), 0, task);
+      return { ...wd, [wk]: { ...week, tasks: { ...(week.tasks||{}), [dayKey]: next } } };
+    });
+  }
+  // Every instance (from fromDayKey on, if given) that matches, with where it lives
+  function collectInstances(matcher, fromDayKey) {
+    const out = [];
+    Object.entries(weekDataRef.current).forEach(([wk, w]) => {
+      Object.entries((w && w.tasks) || {}).forEach(([dk, ts]) => {
+        if (fromDayKey && dk < fromDayKey) return;
+        (ts||[]).forEach((t, i) => { if (matcher(t)) out.push({ wk, dk, idx: i, task: t }); });
+      });
+    });
+    return out;
+  }
   function deleteTask(dayKey, id) {
-    const task = getTasks(dayKey).find(t => t.id===id);
+    // Week comes from the day, not from what's on screen — the Weekly Review may be reviewing
+    // a different week than the planner is showing (v4.7.1).
+    const wk = weekKeyOf(dayKey);
+    const dayTasks = getTasksAnyWeek(dayKey);
+    const idx = dayTasks.findIndex(t => t.id===id);
+    const task = dayTasks[idx];
+    const prevSched = task?.isProjectTask
+      ? (((pagesData||[]).find(d => d.id === task.projectDocId)?.tasks||[]).find(t => t.id===id)?.scheduledDate || dayKey)
+      : null;
     if (task && task.gcalId && getToken()) deleteEventFromCalendar(task.gcalId).catch(()=>{});
     // If this is a project task, clear its scheduledDate in pagesData (removes from planner but keeps in doc)
     if (task?.isProjectTask && task?.projectDocId && setPagesData) {
@@ -3461,7 +4370,28 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
         ...doc, tasks: (doc.tasks||[]).map(t => t.id===id ? {...t, scheduledDate:''} : t)
       }));
     }
-    setTasks(dayKey, t => t.filter(x=>x.id!==id));
+    setTasksAnyWeek(dayKey, t => t.filter(x=>x.id!==id));
+    // Offer Undo unless it was an empty, just-created card
+    if (task && ((task.title||'').trim() || (task.details||'').trim())) {
+      Undo.push(`Deleted "${(task.title||'task').trim().slice(0,40) || 'task'}"`, () => {
+        insertTaskBack(wk, dayKey, { ...task, gcalId: null }, idx);
+        if (task.isProjectTask && task.projectDocId && setPagesData) {
+          setPagesData(p => p.map(doc => doc.id !== task.projectDocId ? doc : {
+            ...doc, tasks: (doc.tasks||[]).map(t => t.id===id ? {...t, scheduledDate: prevSched} : t)
+          }));
+        }
+        // The calendar event was removed with the task — put it back
+        if (task.gcalId && task.isEvent && getToken()) {
+          pushEventToCalendar(task, dayKey).then(gcalId => {
+            if (!gcalId) return;
+            setWeekData(wd => {
+              const week = wd[wk]; if (!week) return wd;
+              return { ...wd, [wk]: { ...week, tasks: { ...(week.tasks||{}), [dayKey]: ((week.tasks||{})[dayKey]||[]).map(x => x.id===id ? {...x, gcalId} : x) } } };
+            });
+          }).catch(e => console.error('Calendar re-push failed:', e));
+        }
+      });
+    }
   }
 
   // Delete this instance and all future instances of a repeat task (same repeatId, on or after dayKey)
@@ -3471,13 +4401,29 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
     const repeatId = task.repeatId;
     const legacyTitle = task.title;
     const legacyDays = (task.repeat?.days||[]).slice().sort();
+    {
+      const removed = collectInstances(t => repeatId
+        ? t.repeatId === repeatId
+        : (t.title === legacyTitle && JSON.stringify((t.repeat?.days||[]).slice().sort()) === JSON.stringify(legacyDays)), dayKey);
+      if (removed.length) Undo.push(`Deleted ${removed.length} repeating task${removed.length===1?'':'s'}`, () => {
+        removed.forEach(r => insertTaskBack(r.wk, r.dk, r.task, r.idx));
+      });
+    }
     setWeekData(wd => {
       const draft = JSON.parse(JSON.stringify(wd));
       Object.keys(draft).forEach(wk => {
         const tasks = draft[wk]?.tasks;
         if (!tasks) return;
         Object.keys(tasks).forEach(dk => {
-          if (dk < dayKey) return; // keep past instances
+          if (dk < dayKey) {
+            // Keep earlier copies — but a "never ends" series must now end the day before, or it would be topped up again
+            if (repeatId && tasks[dk].some(t => t.repeatId === repeatId && t.repeat && t.repeat.endType === 'never')) {
+              const prevDay = fmtLocal(addDays(parseLocal(dayKey), -1));
+              tasks[dk] = tasks[dk].map(t => (t.repeatId === repeatId && t.repeat && t.repeat.endType === 'never')
+                ? { ...t, repeat: { ...t.repeat, endType: 'date', endDate: prevDay } } : t);
+            }
+            return;
+          }
           tasks[dk] = tasks[dk].filter(t => {
             if (repeatId) return t.repeatId !== repeatId;
             // Legacy: match by title + days
@@ -3509,7 +4455,32 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
     setShowPeoplePicker(false);
   }
   function updatePerson(id,patch) { setWD(w=>({...w, people:(w.people||[]).map(p=>p.id===id?{...p,...patch}:p)})); }
-  function deletePerson(id) { setWD(w=>({...w, people:(w.people||[]).filter(p=>p.id!==id)})); }
+  // Remove an item from one of this week's lists (people / toCreate / goals) with Undo
+  function removeFromWeekList(key, id, labelFor) {
+    const list = Array.isArray(getWD()[key]) ? getWD()[key] : [];
+    const idx = list.findIndex(x => x.id === id);
+    const item = list[idx];
+    const wk = weekKey;
+    setWD(w => ({...w, [key]: (Array.isArray(w[key]) ? w[key] : []).filter(x => x.id !== id)}));
+    const label = item ? labelFor(item) : null;
+    if (!label) return;
+    Undo.push(label, () => {
+      setWeekData(wd => {
+        const week = wd[wk] || { proverb:'', toCreate:[], people:[], beWord:'', proud:'', story:'', tasks:{} };
+        const cur = Array.isArray(week[key]) ? week[key] : [];
+        if (cur.some(x => x.id === id)) return wd;
+        const next = [...cur];
+        next.splice(Math.min(idx, next.length), 0, item);
+        return { ...wd, [wk]: { ...week, [key]: next } };
+      });
+    });
+  }
+  function deletePerson(id) {
+    removeFromWeekList('people', id, p => {
+      const nm = (peopleDirectory||[]).find(d => d.id === p.personId)?.name || p.name || 'person';
+      return `Removed ${nm}`;
+    });
+  }
   function reorderPeople(fromId, toId) {
     setWD(w=>{
       const list = [...(w.people||[])];
@@ -3524,7 +4495,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
 
   function addCreate() { setWD(w=>({...w, toCreate:[...(Array.isArray(w.toCreate)?w.toCreate:[]),{id:Date.now().toString(),name:'',done:false}]})); }
   function updateCreate(id,patch) { setWD(w=>({...w, toCreate:(Array.isArray(w.toCreate)?w.toCreate:[]).map(c=>c.id===id?{...c,...patch}:c)})); }
-  function deleteCreate(id) { setWD(w=>({...w, toCreate:(Array.isArray(w.toCreate)?w.toCreate:[]).filter(c=>c.id!==id)})); }
+  function deleteCreate(id) { removeFromWeekList('toCreate', id, c => (c.name||'').trim() ? `Removed "${c.name.trim().slice(0,40)}"` : null); }
 
   function addGoal(afterId, newId) {
     const newItem = {id: newId || Date.now().toString(), name:'', done:false};
@@ -3538,7 +4509,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
     });
   }
   function updateGoal(id,patch) { setWD(w=>({...w, goals:(w.goals||[]).map(g=>g.id===id?{...g,...patch}:g)})); }
-  function deleteGoal(id) { setWD(w=>({...w, goals:(w.goals||[]).filter(g=>g.id!==id)})); }
+  function deleteGoal(id) { removeFromWeekList('goals', id, g => (g.name||'').trim() ? `Removed "${g.name.trim().slice(0,40)}"` : null); }
   function reorderGoals(fromId, toId) {
     setWD(w=>{
       const list = [...(w.goals||[])];
@@ -3590,6 +4561,19 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
       const [moved] = next.splice(from, 1);
       next.splice(to, 0, moved);
       return next;
+    });
+  }
+
+  // Add a task to the TOP of a day (used by the Weekly Review's top 3). star shows a ★ on the card.
+  function prependTask(dayKey, title, star) {
+    const wk = fmt(getWeekStart(parseLocal(dayKey) || new Date(dayKey)));
+    const emptyWeek = () => ({ proverb:'', toCreate:[], people:[], beWord:'', proud:'', story:'', tasks:{} });
+    setWeekData(allWD => {
+      const week = allWD[wk] || emptyWeek();
+      const list = (week.tasks || {})[dayKey] || [];
+      const t = { id: Date.now().toString()+Math.random().toString(36).slice(2,5), title, details:'', done:false,
+        expanded:false, colorIndex: pickTaskColorIndex(list), isEvent:false, eventTime:'', gcalId:null, star: !!star };
+      return { ...allWD, [wk]: { ...week, tasks: { ...(week.tasks||{}), [dayKey]: [t, ...list] } } };
     });
   }
 
@@ -3695,6 +4679,15 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
         <span className="week-nav-label">{weekLabel}</span>
         <button className="nav-arrow" onClick={()=>setWeekStart(ws=>addDays(ws,7))}>›</button>
       </div>
+      {/* v4.7.0 — Weekly Review. Highlighted Sat–Mon, when closing out a week is the natural thing to do. */}
+      <button className={`wr-review-btn ${reviewDue ? 'due' : ''}`} onClick={()=>setReviewOpen(true)}
+        title={`Reviews ${fmtDisplay(reviewTarget)} – ${fmtDisplay(addDays(reviewTarget, 6))}`}>
+        <span aria-hidden="true">{reviewDue ? '◷' : '✓'}</span>
+        {reviewDue ? 'Weekly review' : 'Review again'}
+        {fmt(reviewTarget) !== weekKey && (
+          <span style={{fontSize:10,fontFamily:"'DM Mono',monospace",opacity:0.7}}>{fmtDisplay(reviewTarget)}</span>
+        )}
+      </button>
       <a className="sidebar-link daily" href="https://penzu.com">✍️ Daily Pages</a>
       <div className="sidebar-section">
         <div className="sidebar-section-title">Proverb of the Week</div>
@@ -3811,7 +4804,9 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
                         onUpdate={p=>updateTask(dk,task.id,p)}
                         onBlurSync={()=>syncTaskToCalendar(dk,task.id)}
                         onDelete={()=>deleteTask(dk,task.id)}
-                        onDeleteFuture={(task.repeatId || task.repeat?.days?.length) ? ()=>deleteTaskAndFuture(dk,task.id) : null}
+                        onDeleteFuture={taskIsRepeating(task) ? ()=>deleteTaskAndFuture(dk,task.id) : null}
+                        onAskScope={taskIsRepeating(task) ? ()=>setRepeatScope({kind:'delete',task,dayKey:dk}) : null}
+                        dayKey={dk}
                         onEnterKey={()=>addTask(dk,task.id)}
                         titleRef={el=>taskTitleRefs.current[task.id]=el}
                         deleteIfEmpty={()=>{if(!task.title.trim())deleteTask(dk,task.id);}}
@@ -3829,7 +4824,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
                           });
                         }}
                         onShowCtxMenu={(x,y,cp,pp,hp)=>setCtxMenu({x,y,onCopy:cp,onPaste:pp,hasCopied:hp})}
-                        onApplyRepeat={(days,endDate)=>propagateRepeat(task,dk,days,endDate)}
+                        onApplyRepeat={(rule)=>requestApplyRepeat(task,dk,rule)}
                         isDragOver={dragOver?.dayKey===dk && dragOver?.id===task.id}
                         onDragStart={()=>setDragging({dayKey:dk, id:task.id})}
                         onDragOver={()=>setDragOver({dayKey:dk, id:task.id})}
@@ -3927,11 +4922,13 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
                     onUpdate={p=>updateTask(mobileDayKey,task.id,p)}
                     onBlurSync={()=>syncTaskToCalendar(mobileDayKey,task.id)}
                     onDelete={()=>deleteTask(mobileDayKey,task.id)}
-                    onDeleteFuture={(task.repeatId || task.repeat?.days?.length) ? ()=>deleteTaskAndFuture(mobileDayKey,task.id) : null}
+                    onDeleteFuture={taskIsRepeating(task) ? ()=>deleteTaskAndFuture(mobileDayKey,task.id) : null}
+                    onAskScope={taskIsRepeating(task) ? ()=>setRepeatScope({kind:'delete',task,dayKey:mobileDayKey}) : null}
+                    dayKey={mobileDayKey}
                     onEnterKey={()=>addTask(mobileDayKey,task.id)}
                     titleRef={el=>taskTitleRefsMobile.current[task.id]=el}
                     deleteIfEmpty={()=>{if(!task.title.trim())deleteTask(mobileDayKey,task.id);}}
-                    onApplyRepeat={(days,endDate)=>propagateRepeat(task,mobileDayKey,days,endDate)}
+                    onApplyRepeat={(rule)=>requestApplyRepeat(task,mobileDayKey,rule)}
                     onReschedule={(toDayKey)=>{
                 moveTaskBetweenDays(mobileDayKey,toDayKey,task.id,null);
                 if(task.expanded) updateTask(toDayKey,task.id,{expanded:false});
@@ -4035,6 +5032,22 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
         />
       )}
 
+      {reviewOpen && reviewWeek && (
+        <WeekReview weekStart={reviewWeek} wd={wdFor(reviewWeek)} goals={goals} setGoals={setGoals}
+          habitGoals={habitGoals} habitCompletions={habitCompletions}
+          fitnessLog={fitnessLog} fitnessExercises={fitnessExercises} mctx={mctx}
+          onMoveTask={(from, to, id) => moveTaskBetweenDays(from, to, id, null)}
+          onDeleteTask={deleteTask} onAddTask={prependTask}
+          onSetWD={fn => setWDFor(reviewWeek, fn)}
+          onNavWeek={n => setReviewWeek(w => addDays(w, n * 7))}
+          onGoToWeek={() => { setWeekStart(reviewWeek); setReviewOpen(false); }}
+          onOpenGoal={onOpenGoal} onClose={() => setReviewOpen(false)} />
+      )}
+      {repeatScope && (
+        <RepeatScopeModal scope={repeatScope}
+          onClose={()=>setRepeatScope(null)}
+          onPick={(choice)=>{ const sc = repeatScope; setRepeatScope(null); runRepeatScope(sc, choice); }} />
+      )}
       {showRepeatCleanup && (
         <RepeatCleanupModal
           groups={getRepeatGroups()}
@@ -4052,6 +5065,52 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
 // Lists all repeat task groups across all weeks; lets user delete entire groups at once.
 // ─────────────────────────────────────────────
 const DAY_LABELS = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+// "Change which tasks?" — asked before deleting a repeating task, or before changing its repeat rule
+function RepeatScopeModal({ scope, onPick, onClose }) {
+  const isDelete = scope.kind === 'delete';
+  const opts = isDelete
+    ? [['one', 'Only this task', 'Just this one. The rest stay as they are.'],
+       ['following', 'This and following', 'This one and every later one. Earlier ones stay.'],
+       ['all', 'All tasks in the series', 'Every past and future one.']]
+    : [['following', 'This and following', 'Starts a new series from here. Earlier ones keep their old settings.'],
+       ['all', 'All tasks in the series', 'Keeps one series; unfinished later tasks are rewritten to match.']];
+  const [choice, setChoice] = useState(isDelete ? 'one' : 'following');
+  const title = (scope.task.title || 'This task').trim() || 'This task';
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-box" role="dialog" aria-label="Change which tasks?" style={{maxWidth:420,gap:12}} onClick={e=>e.stopPropagation()}>
+        <div>
+          <div style={{fontFamily:"'Playfair Display',serif",fontSize:17,fontWeight:700,color:'var(--ink)'}}>
+            {isDelete ? 'Delete which tasks?' : 'Change which tasks?'}
+          </div>
+          <div style={{fontSize:12,color:'var(--ink-light)',marginTop:4,lineHeight:1.5}}>
+            “{title}” — {repeatSummary(scope.task.repeat, scope.dayKey) || 'repeats'}. You're on {scope.dayKey}.
+          </div>
+        </div>
+        <div style={{display:'flex',flexDirection:'column',gap:8}}>
+          {opts.map(([val, label, desc]) => (
+            <label key={val} className={`rp-scope-opt ${choice===val?'on':''}`}>
+              <input type="radio" name="repeat-scope" checked={choice===val} onChange={()=>setChoice(val)} />
+              <span style={{display:'flex',flexDirection:'column',gap:2}}>
+                <span style={{fontSize:14,fontWeight:600,color:'var(--ink)'}}>{label}</span>
+                <span style={{fontSize:12,color:'var(--ink-light)',lineHeight:1.4}}>{desc}</span>
+              </span>
+            </label>
+          ))}
+        </div>
+        <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
+          <button onClick={onClose} style={{minHeight:44,padding:'0 18px',borderRadius:10,border:'1px solid var(--border)',background:'none',cursor:'pointer',fontSize:14,color:'var(--ink)'}}>Cancel</button>
+          <button onClick={()=>onPick(choice)}
+            style={{minHeight:44,padding:'0 22px',borderRadius:10,border:'none',cursor:'pointer',fontSize:14,fontWeight:700,color:'#fff',
+                    background: isDelete ? 'var(--red)' : 'var(--accent)'}}>
+            {isDelete ? 'Delete' : 'Apply'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function RepeatCleanupModal({ groups, onDeleteGroup, onClose }) {
   const [deletedKeys, setDeletedKeys] = useState(new Set());
   const [confirmKey, setConfirmKey] = useState(null);
@@ -4091,7 +5150,7 @@ function RepeatCleanupModal({ groups, onDeleteGroup, onClose }) {
                     {g.title||'(untitled)'}
                   </div>
                   <div style={{fontSize:10,color:'var(--ink-light)',marginTop:2}}>
-                    {dayStr || 'unknown days'}{g.endDate ? ` · until ${g.endDate}` : ''}
+                    {g.rule ? repeatSummary(g.rule) : (dayStr || 'unknown days')}
                     {' · '}<span style={{color:'var(--ink-faint)'}}>{g.instances.length} instance{g.instances.length!==1?'s':''}</span>
                   </div>
                 </div>
@@ -4592,13 +5651,14 @@ function pickTaskColorIndex(existingTasks) {
   }
   return Math.floor(Math.random() * TASK_COLORS.length);
 }
-function TaskCard({ task, onUpdate, onBlurSync, onDelete, onDeleteFuture, onEnterKey, titleRef, deleteIfEmpty, onCopy, hasCopied, onPasteBelow, onShowCtxMenu, onDragStart, onDragOver, onDragEnd, onDrop, isDragOver, onApplyRepeat, onReschedule, weekDays, currentDayKey }) {
+function TaskCard({ task, onUpdate, onBlurSync, onDelete, onDeleteFuture, onEnterKey, titleRef, deleteIfEmpty, onCopy, hasCopied, onPasteBelow, onShowCtxMenu, onDragStart, onDragOver, onDragEnd, onDrop, isDragOver, onApplyRepeat, onAskScope, dayKey, onReschedule, weekDays, currentDayKey }) {
   const textareaRef = useRef();
   const titleTextareaRef = useRef();
   const [confirming, setConfirming] = useState(false);
   const [mobileConfirming, setMobileConfirming] = useState(false);
   const [showColors, setShowColors] = useState(false);
   const [repeatOpen, setRepeatOpen] = useState(false);
+  const [repeatDraft, setRepeatDraft] = useState(null); // rule being edited in the Repeat panel (not saved until Apply)
   const [rescheduleWeekOffset, setRescheduleWeekOffset] = useState(0);
   const longPressTimer = useRef(null);
 
@@ -4628,6 +5688,8 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onDeleteFuture, onEnte
 
   function handleDeleteClick(e) {
     e.stopPropagation();
+    // Repeating task: ask which tasks to delete (this / this and following / all)
+    if (onDeleteFuture && onAskScope) { onAskScope(); return; }
     if (!onDeleteFuture) {
       // Non-repeat task: standard two-click confirm
       if (confirming) { onDelete(); } else { setConfirming(true); }
@@ -4703,6 +5765,11 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onDeleteFuture, onEnte
         {task.isEvent && task.calendarInvite && task.responseStatus==='needsAction' && (
           <span className="invite-badge needsAction" style={{fontSize:8,padding:'1px 4px'}}>📨</span>
         )}
+        {/* v4.7.0 — set by the Weekly Review's top 3; click to clear */}
+        {task.star && (
+          <span title="Top 3 for this week — click to unstar" onClick={e=>{e.stopPropagation();onUpdate({star:false});}}
+            style={{fontSize:11,color:'var(--gold)',cursor:'pointer',flexShrink:0,lineHeight:1}}>★</span>
+        )}
         <div className={`task-check ${task.done?'done':''}`}
           style={{borderColor: task.done ? '#6a50a7' : undefined, color: task.done ? '#6a50a7' : undefined, background: task.done ? '#f1edff' : undefined}}
           onClick={()=>onUpdate({done:!task.done})} />
@@ -4750,7 +5817,12 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onDeleteFuture, onEnte
         {mobileConfirming && onReschedule ? (
           <>
             {onDeleteFuture ? (
-              // Repeat task: two options
+              onAskScope ? (
+                <button className="task-mobile-delete-btn"
+                  onClick={e=>{e.stopPropagation();setMobileConfirming(false);onAskScope();}}>
+                  Delete…
+                </button>
+              ) : (
               <>
                 <button className="task-mobile-delete-btn"
                   onClick={e=>{e.stopPropagation();setMobileConfirming(false);onDelete();}}>
@@ -4762,6 +5834,7 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onDeleteFuture, onEnte
                   All future
                 </button>
               </>
+              )
             ) : (
               <button className="task-mobile-delete-btn"
                 onClick={e=>{e.stopPropagation();onDelete();}}>
@@ -4938,80 +6011,106 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onDeleteFuture, onEnte
           })()}
 
           {/* ── Repeat ── */}
-          {!task.isProjectTask && (
+          {!task.isProjectTask && (() => {
+            const hasRule = taskIsRepeating(task);
+            const dk = dayKey || '';
+            const dd = repeatDraft;
+            const open = repeatOpen && !!dd;
+            const set = patch => setRepeatDraft(d => ({ ...d, ...patch }));
+            const complete = open && repeatIsComplete(dd);
+            const anchorDate = parseLocal(dk);
+            const upcoming = complete && dk ? repeatDates(dd, dk, dk, '', 4).slice(0, 4) : [];
+            const unitWord = { daily: 'day', weekly: 'week', monthly: 'month', yearly: 'year' }[dd && dd.freq] || 'week';
+            const ordinalLabel = anchorDate ? `The ${repeatOrdinal(Math.ceil(anchorDate.getDate() / 7))} ${DAYS[anchorDate.getDay()]}` : 'The same weekday';
+            return (
             <div style={{paddingTop:6,borderTop:'1px solid rgba(0,0,0,0.07)',marginTop:6}} onClick={e=>e.stopPropagation()}>
-              <div style={{display:'flex',alignItems:'center',gap:6}}>
+              <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
                 <button
-                  className={`task-repeat-toggle ${task.repeat?.days?.length ? 'active' : ''}`}
+                  className={`task-repeat-toggle ${hasRule ? 'active' : ''}`}
                   onClick={e=>{
                     e.stopPropagation();
-                    if (task.repeat === null || task.repeat === undefined) {
-                      // Turn on repeat + open panel
-                      onUpdate({repeat:{days:[], endDate:''}});
+                    if (open) { setRepeatOpen(false); }
+                    else {
+                      const saved = normalizeRepeat(task.repeat);
+                      setRepeatDraft(saved && hasRule ? { ...saved } : defaultRepeat(dk));
                       setRepeatOpen(true);
-                    } else {
-                      // Toggle panel open/closed (repeat stays saved)
-                      setRepeatOpen(o => !o);
                     }
                   }}>
-                  🔁 Repeat {(task.repeat !== null && task.repeat !== undefined) ? (repeatOpen ? '▲' : '▼') : '▼'}
+                  🔁 Repeat {open ? '▲' : '▼'}
                 </button>
-                {task.repeat?.days?.length > 0 && (
-                  <span className="task-repeat-badge">
-                    {['S','M','T','W','T','F','S'].filter((_,i)=>task.repeat.days.includes(i)).join('')}
-                    {task.repeat.endDate ? ` until ${task.repeat.endDate}` : ''}
-                  </span>
+                {hasRule && task.repeat && (
+                  <span className="task-repeat-badge">{repeatSummary(task.repeat, dk)}</span>
                 )}
-                {/* Clear repeat entirely */}
-                {task.repeat !== null && task.repeat !== undefined && (
+                {/* Clear the rule from this one task only */}
+                {task.repeat && (
                   <button onClick={e=>{e.stopPropagation();onUpdate({repeat:null});setRepeatOpen(false);}}
                     style={{background:'none',border:'none',cursor:'pointer',fontSize:11,color:'var(--ink-faint)',padding:'0 2px',marginLeft:'auto'}}>
                     ✕ clear
                   </button>
                 )}
               </div>
-              {(task.repeat !== null && task.repeat !== undefined) && repeatOpen && (
-                <div>
-                  <div className="task-repeat-days">
-                    {['S','M','T','W','T','F','S'].map((d,i)=>(
-                      <button key={i}
-                        className={`task-repeat-day-btn ${(task.repeat?.days||[]).includes(i)?'active':''}`}
-                        onClick={e=>{
-                          e.stopPropagation();
-                          const cur = task.repeat?.days||[];
-                          const next = cur.includes(i) ? cur.filter(x=>x!==i) : [...cur,i].sort((a,b)=>a-b);
-                          const updated = {...(task.repeat||{}), days:next};
-                          onUpdate({repeat:updated});
-                          if (updated.endDate && next.length > 0 && onApplyRepeat) {
-                            onApplyRepeat(next, updated.endDate);
-                          }
-                        }}>
-                        {d}
-                      </button>
+              {open && (
+                <div className="rp-panel">
+                  <div className="rp-seg" role="group" aria-label="Repeat frequency">
+                    {[['daily','Daily'],['weekly','Weekly'],['monthly','Monthly'],['yearly','Yearly']].map(([v,l]) => (
+                      <button key={v} className={dd.freq===v?'active':''}
+                        onClick={e=>{e.stopPropagation(); set({ freq: v, days: v==='weekly' && !dd.days.length ? [anchorDate ? anchorDate.getDay() : 1] : dd.days }); }}>{l}</button>
                     ))}
                   </div>
-                  <div className="task-repeat-end">
-                    <span className="task-repeat-end-label" style={{color: !task.repeat?.endDate && (task.repeat?.days||[]).length > 0 ? '#ef4444' : undefined}}>
-                      Until{!task.repeat?.endDate && (task.repeat?.days||[]).length > 0 ? '*' : ''}:
-                    </span>
-                    <input type="date" className="task-repeat-end-input"
-                      value={task.repeat?.endDate||''}
-                      style={{borderColor: !task.repeat?.endDate && (task.repeat?.days||[]).length > 0 ? '#ef4444' : undefined}}
-                      onChange={e=>{
+                  <div className="rp-row">
+                    <label htmlFor={`rp-int-${task.id}`}>Every</label>
+                    <input id={`rp-int-${task.id}`} className="rp-num" type="number" inputMode="numeric" min="1" max="99" value={dd.interval}
+                      onChange={e=>set({ interval: Math.max(1, Math.min(99, parseInt(e.target.value, 10) || 1)) })} />
+                    <span>{unitWord}{dd.interval === 1 ? '' : 's'}</span>
+                  </div>
+                  {dd.freq === 'weekly' && (
+                    <div className="rp-days" role="group" aria-label="Days of the week">
+                      {['S','M','T','W','T','F','S'].map((d,i)=>(
+                        <button key={i} aria-label={DAYS[i]} aria-pressed={dd.days.includes(i)}
+                          className={`task-repeat-day-btn ${dd.days.includes(i)?'active':''}`}
+                          onClick={e=>{
+                            e.stopPropagation();
+                            set({ days: dd.days.includes(i) ? dd.days.filter(x=>x!==i) : [...dd.days,i].sort((x,y)=>x-y) });
+                          }}>{d}</button>
+                      ))}
+                    </div>
+                  )}
+                  {dd.freq === 'monthly' && (
+                    <div style={{display:'flex',flexDirection:'column'}}>
+                      {[['date', `Day ${anchorDate ? anchorDate.getDate() : ''} of the month`],['nth', ordinalLabel],['last','The last day of the month']].map(([v,l]) => (
+                        <label key={v} className="rp-radio"><input type="radio" name={`rp-mm-${task.id}`} checked={dd.monthMode===v} onChange={()=>set({ monthMode: v })} />{l}</label>
+                      ))}
+                    </div>
+                  )}
+                  <div style={{display:'flex',flexDirection:'column'}}>
+                    <div className="rp-label">Ends</div>
+                    <label className="rp-radio"><input type="radio" name={`rp-end-${task.id}`} checked={dd.endType==='never'} onChange={()=>set({ endType: 'never' })} />Never</label>
+                    <label className="rp-radio"><input type="radio" name={`rp-end-${task.id}`} checked={dd.endType==='date'} onChange={()=>set({ endType: 'date' })} />On
+                      <input type="date" className="rp-date" aria-label="End date" value={dd.endDate} onClick={e=>e.stopPropagation()}
+                        onChange={e=>set({ endType: 'date', endDate: e.target.value })} /></label>
+                    <label className="rp-radio"><input type="radio" name={`rp-end-${task.id}`} checked={dd.endType==='count'} onChange={()=>set({ endType: 'count' })} />After
+                      <input type="number" inputMode="numeric" className="rp-num" aria-label="Number of times" min="2" max="400" value={dd.count}
+                        onClick={e=>e.stopPropagation()}
+                        onChange={e=>set({ endType: 'count', count: Math.max(2, Math.min(400, parseInt(e.target.value, 10) || 2)) })} />times</label>
+                  </div>
+                  <div className="rp-summary">{repeatSummary({ ...dd, anchor: dk }, dk)}</div>
+                  {upcoming.length > 0 && (
+                    <div className="rp-next"><b>Next:</b> {upcoming.map(u => { const d = parseLocal(u); return `${DAYS[d.getDay()].slice(0,3)}, ${fmtDisplay(d)}`; }).join(' · ')}</div>
+                  )}
+                  <div className="rp-actions">
+                    <button className="rp-apply" disabled={!complete}
+                      onClick={e=>{
                         e.stopPropagation();
-                        const updated = {...(task.repeat||{}), endDate:e.target.value};
-                        onUpdate({repeat:updated});
-                        if (e.target.value && (updated.days||[]).length > 0 && onApplyRepeat) {
-                          onApplyRepeat(updated.days, e.target.value);
-                        }
-                      }}
-                      onClick={e=>e.stopPropagation()}
-                    />
+                        onApplyRepeat && onApplyRepeat({ ...dd });
+                        setRepeatOpen(false);
+                      }}>{task.repeatId ? 'Apply…' : 'Apply'}</button>
+                    {!complete && <span className="rp-next">{dd.freq==='weekly' && !dd.days.length ? 'Pick at least one day' : 'Pick an end date'}</span>}
                   </div>
                 </div>
               )}
             </div>
-          )}
+            );
+          })()}
           {/* Mobile delete — only in expanded section, only in mobile context */}
           {onReschedule && (
             <div style={{paddingTop:8,marginTop:6,borderTop:'1px solid rgba(0,0,0,0.07)',display:'flex',justifyContent:'flex-end'}}
@@ -5019,8 +6118,8 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onDeleteFuture, onEnte
               {mobileConfirming ? (
                 <div style={{display:'flex',gap:6,alignItems:'center'}}>
                   <button className="task-mobile-delete-btn"
-                    onClick={e=>{e.stopPropagation();onDelete();}}>
-                    Delete?
+                    onClick={e=>{e.stopPropagation();if (onDeleteFuture && onAskScope) { setMobileConfirming(false); onAskScope(); } else onDelete();}}>
+                    {onDeleteFuture && onAskScope ? 'Delete…' : 'Delete?'}
                   </button>
                   <button onClick={e=>{e.stopPropagation();setMobileConfirming(false);}}
                     style={{background:'none',border:'none',cursor:'pointer',fontSize:13,color:'var(--ink-faint)',padding:'0 4px'}}>✕</button>
@@ -5034,6 +6133,80 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onDeleteFuture, onEnte
               )}
             </div>
           )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Streak badge: 🔥N (days) or 🔥Nw plus "2/3" this-week progress for × per week habits
+function HabitStreakChip({ goal, streak, completions }) {
+  const wp = habitWeekProgress(goal, completions, new Date());
+  const weekly = !!(goal.freq && goal.freq.type === 'perWeek');
+  return (
+    <>
+      {wp && <span title="Done this week" style={{marginRight:4}}>{wp.done}/{wp.n}</span>}
+      <span title={weekly ? 'Current streak (weeks)' : 'Current streak'} style={{color:'var(--gold)'}}>🔥{streak}{weekly ? 'w' : ''}</span>
+    </>
+  );
+}
+
+// "How often" editor shown in a habit's expanded section: every day / certain days / × per week,
+// plus a rest-day toggle for the selected day (rest days never break a streak).
+function HabitFreqEditor({ goal, onChange, dayKey }) {
+  const type = (goal.freq && goal.freq.type) || 'daily';
+  const days = (goal.freq && goal.freq.days) || [];
+  const n = (goal.freq && goal.freq.n) || 3;
+  const restDates = goal.restDates || [];
+  const isRest = restDates.includes(dayKey);
+  const dayDate = parseLocal(dayKey);
+  const dayLabel = dayDate ? `${DAYS[dayDate.getDay()].slice(0,3)} ${fmtDisplay(dayDate)}` : dayKey;
+  function pick(t) {
+    if (t === 'daily') onChange({ freq: undefined });
+    else if (t === 'days') onChange({ freq: { type: 'days', days: days.length ? days : [1,3,5] } });
+    else onChange({ freq: { type: 'perWeek', n } });
+  }
+  const label = { fontSize:10, color:'var(--ink-faint)', fontFamily:"'DM Mono',monospace", flexShrink:0 };
+  return (
+    <div style={{display:'flex',flexDirection:'column',gap:6}} onClick={e=>e.stopPropagation()}>
+      <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+        <span style={label}>How often:</span>
+        <div className="habit-schedule-selector">
+          {[['daily','Every day'],['days','Certain days'],['perWeek','× a week']].map(([val,lab]) => (
+            <button key={val} className={`habit-schedule-btn ${type===val?'active':''}`}
+              onClick={e=>{e.stopPropagation();pick(val);}}>{lab}</button>
+          ))}
+        </div>
+      </div>
+      {type === 'days' && (
+        <div className="task-repeat-days">
+          {['S','M','T','W','T','F','S'].map((d,i)=>(
+            <button key={i} aria-label={DAYS[i]} className={`task-repeat-day-btn ${days.includes(i)?'active':''}`}
+              onClick={e=>{
+                e.stopPropagation();
+                const next = days.includes(i) ? days.filter(x=>x!==i) : [...days,i].sort((a,b)=>a-b);
+                onChange({ freq: { type: 'days', days: next } });
+              }}>{d}</button>
+          ))}
+        </div>
+      )}
+      {type === 'perWeek' && (
+        <div style={{display:'flex',alignItems:'center',gap:8}}>
+          <button className="habit-schedule-btn" aria-label="Fewer times a week"
+            onClick={e=>{e.stopPropagation();onChange({ freq: { type:'perWeek', n: Math.max(1, n-1) } });}}>−</button>
+          <span style={{fontSize:12,fontFamily:"'DM Sans',sans-serif",color:'var(--ink)'}}>{n} time{n===1?'':'s'} a week</span>
+          <button className="habit-schedule-btn" aria-label="More times a week"
+            onClick={e=>{e.stopPropagation();onChange({ freq: { type:'perWeek', n: Math.min(7, n+1) } });}}>+</button>
+        </div>
+      )}
+      {type !== 'perWeek' && (
+        <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+          <span style={label}>Rest day:</span>
+          <button className={`habit-schedule-btn ${isRest?'active':''}`}
+            onClick={e=>{
+              e.stopPropagation();
+              onChange({ restDates: isRest ? restDates.filter(d=>d!==dayKey) : [...restDates, dayKey].sort() });
+            }}>{isRest ? `✓ ${dayLabel} is a rest day` : `Make ${dayLabel} a rest day`}</button>
         </div>
       )}
     </div>
@@ -5076,7 +6249,19 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
     setNewCdTitle(''); setNewCdEnd(''); setNewCdStart(fmt(new Date())); setNewCdColor(COUNTDOWN_COLORS[0]);
     setAddingCountdown(false);
   }
-  function deleteCountdown(id) { setCountdowns(cs => cs.filter(c => c.id !== id)); }
+  function deleteCountdown(id) {
+    const idx = (countdowns||[]).findIndex(c => c.id === id);
+    const cd = (countdowns||[])[idx];
+    setCountdowns(cs => cs.filter(c => c.id !== id));
+    if (cd) Undo.push(`Deleted countdown "${(cd.title||'countdown').slice(0,40)}"`, () => {
+      setCountdowns(cs => {
+        if ((cs||[]).some(c => c.id === id)) return cs;
+        const next = [...(cs||[])];
+        next.splice(Math.min(idx, next.length), 0, cd);
+        return next;
+      });
+    });
+  }
 
   function renderCountdownCards() {
     if (!countdowns || countdowns.length === 0) return null;
@@ -5238,7 +6423,20 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
     setGoals(g=>[...g, {id, name:'New Goal', color: GOAL_COLORS[g.length % GOAL_COLORS.length]}]);
   }
   function updateGoal(id, patch) { setGoals(g=>g.map(x=>x.id===id?{...x,...patch}:x)); }
-  function deleteGoal(id) { setGoals(g=>g.filter(x=>x.id!==id)); }
+  function deleteGoal(id) {
+    const idx = goals.findIndex(x => x.id === id);
+    const habit = goals[idx];
+    setGoals(g=>g.filter(x=>x.id!==id));
+    // Completions are kept in their own data, so restoring the habit brings its history back too
+    if (habit) Undo.push(`Deleted habit "${(habit.name||'habit').slice(0,40)}"`, () => {
+      setGoals(gs => {
+        if (gs.some(x => x.id === id)) return gs;
+        const next = [...gs];
+        next.splice(Math.min(idx, next.length), 0, habit);
+        return next;
+      });
+    });
+  }
 
   // Count completions for a goal in current view window
   function countInView(goalId) {
@@ -5284,23 +6482,9 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
   }
 
   function calcStreak(goalId) {
-    const todayDate = new Date(); todayDate.setHours(0,0,0,0);
-    const todayKey = fmt(todayDate);
-    // If today is completed, start counting from today, else start from yesterday
-    let cursor = isCompleted(goalId, todayKey)
-      ? new Date(todayDate)
-      : addDays(todayDate, -1);
-    let streak = 0;
-    while (true) {
-      const dk = fmt(cursor);
-      if (isCompleted(goalId, dk)) {
-        streak++;
-        cursor = addDays(cursor, -1);
-      } else {
-        break;
-      }
-    }
-    return streak;
+    // Handles every-day, certain-days and × per week habits, plus rest days (see habitStreak)
+    const goal = goals.find(g => g.id === goalId) || { id: goalId };
+    return habitStreak(goal, completions, new Date());
   }
 
   const selectedDayKey = fmt(selectedDate);
@@ -5401,7 +6585,7 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
               <span className="goal-count" style={{flexShrink:0}}>
                 {countInView(goal.id)}
                 <span style={{margin:'0 3px',opacity:0.6}}>·</span>
-                <span title="Current streak" style={{color:'var(--gold)'}}>🔥{calcStreak(goal.id)}</span>
+                <HabitStreakChip goal={goal} streak={calcStreak(goal.id)} completions={completions} />
               </span>
               <button
                 style={{background:'none',border:'none',cursor:'pointer',fontSize:11,color:'var(--ink-faint)',padding:'0 2px',flexShrink:0}}
@@ -5428,6 +6612,8 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
                     ))}
                   </div>
                 </div>
+                {/* How often (every day / certain days / × a week) + rest day */}
+                <HabitFreqEditor goal={goal} dayKey={selectedDayKey} onChange={patch=>updateGoal(goal.id, patch)} />
                 {/* Link to fitness exercise */}
                 {fitnessExercises && fitnessExercises.length > 0 && (
                   <div style={{display:'flex',flexDirection:'column',gap:3}}>
@@ -5930,7 +7116,7 @@ function HabitChecklist({ date, goals, completions, onToggle, onAdd, onDelete, o
                   <span style={{fontSize:10,color:'var(--ink-light)',fontFamily:"'DM Mono',monospace",flexShrink:0,whiteSpace:'nowrap'}}>
                     {countInView(g.id)}
                     <span style={{margin:'0 2px',opacity:0.6}}>·</span>
-                    <span style={{color:'var(--gold)'}}>🔥{calcStreak(g.id)}</span>
+                    <HabitStreakChip goal={g} streak={calcStreak(g.id)} completions={completions} />
                   </span>
                 )}
                 {/* Expand toggle */}
@@ -5969,6 +7155,9 @@ function HabitChecklist({ date, goals, completions, onToggle, onAdd, onDelete, o
                         ))}
                       </div>
                     </div>
+                  )}
+                  {onRename && (
+                    <HabitFreqEditor goal={g} dayKey={fmt(date)} onChange={patch=>onRename(g.id, patch)} />
                   )}
                   {onRename && fitnessExercises && fitnessExercises.length > 0 && (
                     <div style={{display:'flex',flexDirection:'column',gap:3}}>
@@ -7461,6 +8650,115 @@ function glNewMilestone(g) {
 
 function GlHealthPill({ h }) { return <span className={`gl-health ${h.key}`}>{h.label}</span>; }
 
+// ── Linked habits & training (v4.7.0) ──
+// Read-only roll-up of the habits and exercises a goal is built on. Shown in the goal detail,
+// on the goal card and in the Weekly Review. Does not feed glProgress — milestones still do that.
+// Tiny trend line for a measurement (v4.8.0)
+function GlSpark({ vals, color }) {
+  if (!vals || vals.length < 3) return null;
+  const w = 64, h = 18, lo = Math.min(...vals), hi = Math.max(...vals);
+  const pts = vals.map((v, i) => `${(i / (vals.length - 1) * w).toFixed(1)},${(h - 2 - (hi === lo ? 0.5 : (v - lo) / (hi - lo)) * (h - 4)).toFixed(1)}`).join(' ');
+  return <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} aria-hidden="true" style={{ flexShrink: 0 }}>
+    <polyline fill="none" stroke={color || 'currentColor'} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" points={pts} /></svg>;
+}
+function GlLinksRow({ goal, habitGoals, fitnessExercises, habitCompletions, fitnessLog, weekStart, compact, mctx }) {
+  const links = glLinks(goal, habitGoals, fitnessExercises, habitCompletions, fitnessLog, weekStart, mctx);
+  if (!links.length) return null;
+  const c = goal.color || '#7c3f6e';
+  if (compact) {
+    return (
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+        {links.map(l => (
+          <span key={l.kind + l.id} className="gl-chip" style={{ cursor: 'default', fontSize: 11, padding: '3px 8px' }}>
+            {l.kind === 'metric' ? l.icon : l.kind === 'habit' ? '◷' : '◆'} {l.name} · {l.detail}
+          </span>
+        ))}
+      </div>
+    );
+  }
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {links.map(l => l.kind === 'metric' ? (
+        // Measurements get two lines: name + value, then progress bar + trend
+        <div key={l.kind + l.id} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span aria-hidden="true" style={{ fontSize: 12, color: 'var(--ink-faint)', width: 12, flexShrink: 0 }}>{l.icon}</span>
+            <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: 'var(--ink)' }}>{l.name}</span>
+            <span className="gl-mono" style={{ fontSize: 11, color: 'var(--ink-light)', textAlign: 'right' }}>{l.detail}</span>
+          </div>
+          {(l.pct != null || l.spark.length > 2) && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, paddingLeft: 22 }}>
+              {l.pct != null
+                ? <div className="gl-bar" style={{ flex: 1, height: 6, background: glTint(c, 0.15) }}><div style={{ width: Math.round(l.pct * 100) + '%', background: c }} /></div>
+                : <div style={{ flex: 1 }} />}
+              <GlSpark vals={l.spark} color={c} />
+            </div>
+          )}
+        </div>
+      ) : (
+        <div key={l.kind + l.id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span aria-hidden="true" style={{ fontSize: 11, color: 'var(--ink-faint)', width: 12, flexShrink: 0 }}>{l.kind === 'habit' ? '◷' : '◆'}</span>
+          <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.name}</span>
+          <div className="gl-bar" style={{ width: 70, height: 6, flexShrink: 0, background: glTint(c, 0.15) }}>
+            <div style={{ width: Math.round(l.pct * 100) + '%', background: c }} />
+          </div>
+          <span className="gl-mono" style={{ fontSize: 11, color: 'var(--ink-light)', flexShrink: 0, minWidth: 96, textAlign: 'right' }}>{l.detail}</span>
+          {l.kind === 'habit' && l.streak > 0 && (
+            <span className="gl-mono" title={l.perWeek ? 'Current streak (weeks)' : 'Current streak'}
+              style={{ fontSize: 11, color: 'var(--gold)', flexShrink: 0 }}>🔥{l.streak}{l.perWeek ? 'w' : ''}</span>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Chip pickers for choosing which habits and exercises a goal is built on.
+function GlLinkPicker({ goal, onChange, habitGoals, fitnessExercises }) {
+  const habitIds = goal.linkedHabitIds || [];
+  const exIds = goal.linkedExerciseIds || [];
+  const metricIds = goal.linkedMetrics || [];
+  const toggle = (key, id) => onChange(g => {
+    const cur = g[key] || [];
+    return { ...g, [key]: cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id] };
+  });
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+        <span style={{ fontSize: 11, color: 'var(--ink-faint)', fontFamily: "'DM Mono',monospace" }}>Measurements</span>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+          {Object.entries(GL_METRICS).map(([id, mm]) => (
+            <button key={id} className={`gl-chip ${metricIds.includes(id) ? 'on' : ''}`}
+              aria-pressed={metricIds.includes(id)} onClick={() => toggle('linkedMetrics', id)}>{mm.icon} {mm.label}</button>
+          ))}
+        </div>
+      </div>
+      {(habitGoals || []).length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+          <span style={{ fontSize: 11, color: 'var(--ink-faint)', fontFamily: "'DM Mono',monospace" }}>Habits</span>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+            {habitGoals.map(h => (
+              <button key={h.id} className={`gl-chip ${habitIds.includes(h.id) ? 'on' : ''}`}
+                aria-pressed={habitIds.includes(h.id)} onClick={() => toggle('linkedHabitIds', h.id)}>{h.name || 'Habit'}</button>
+            ))}
+          </div>
+        </div>
+      )}
+      {(fitnessExercises || []).length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+          <span style={{ fontSize: 11, color: 'var(--ink-faint)', fontFamily: "'DM Mono',monospace" }}>Exercises</span>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, maxHeight: 132, overflowY: 'auto' }}>
+            {fitnessExercises.map(ex => (
+              <button key={ex.id} className={`gl-chip ${exIds.includes(ex.id) ? 'on' : ''}`}
+                aria-pressed={exIds.includes(ex.id)} onClick={() => toggle('linkedExerciseIds', ex.id)}>{ex.name || 'Exercise'}</button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Day picker used to schedule a goal task onto a day (Goals tab and Weekly Planner menu).
 function GlSchedulePicker({ value, onPick, onClose, extra, anchor }) {
   const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -7609,7 +8907,7 @@ function glRange(zoom, offset) {
   return { start: s, end: new Date(s.getFullYear(), s.getMonth() + count * per, 1), cols };
 }
 
-function GlTimeline({ goals, onOpenGoal }) {
+function GlTimeline({ goals, onOpenGoal, onChangeGoal }) {
   const today = glToday();
   const [zoom, setZoom] = useState(() => sessionStorage.getItem('lp_glZoom') || 'month');
   const [offset, setOffset] = useState(0);
@@ -7617,6 +8915,86 @@ function GlTimeline({ goals, onOpenGoal }) {
   const [collapsed, setCollapsed] = useState({});
   const range = glRange(zoom, offset);
   const total = range.end - range.start;
+
+  // ── Drag to reschedule (v4.7.0) ──
+  // Bars move whole; their left/right edges resize one end. Snaps to whole days. Live values are
+  // kept in a ref so the window listeners never close over stale state; `drag` only mirrors it
+  // for rendering the preview. Committing pushes an Undo entry.
+  const areaRef = useRef(null);
+  const dragRef = useRef(null);
+  const suppressClick = useRef(false);
+  const [drag, setDrag] = useState(null);
+  const canDrag = !!onChangeGoal;
+  function glShift(s, e, d) {
+    if (!d || !d.days) return [s, e];
+    if (d.kind === 'move') return [glAddDays(s, d.days), glAddDays(e, d.days)];
+    if (d.kind === 'start') { const ns = glAddDays(s, d.days); return [ns > e ? e : ns, e]; }
+    const ne = glAddDays(e, d.days); return [s, ne < s ? s : ne];
+  }
+  // The live drag for this bar, or null
+  function dragOn(gid, mid) {
+    const d = drag;
+    return (d && d.moved && d.gid === gid && d.mid === mid) ? d : null;
+  }
+  function beginDrag(e, kind, gid, mid, s0, e0) {
+    if (!canDrag || !s0 || !e0 || (e.button != null && e.button !== 0)) return;
+    const el = areaRef.current;
+    if (!el) return;
+    e.preventDefault(); e.stopPropagation();
+    const w = el.getBoundingClientRect().width;
+    const totalDays = total / 86400000;
+    dragRef.current = { kind, gid, mid, s0, e0, x0: e.clientX, days: 0, moved: false,
+      pxPerDay: (w && totalDays) ? w / totalDays : 0 };
+    setDrag({ ...dragRef.current });
+  }
+  useEffect(() => {
+    if (!drag) return;
+    const onMove = ev => {
+      const d = dragRef.current;
+      if (!d || !d.pxPerDay) return;
+      const dx = ev.clientX - d.x0;
+      const days = Math.round(dx / d.pxPerDay);
+      const moved = d.moved || Math.abs(dx) > 3;
+      if (days === d.days && moved === d.moved) return;
+      d.days = days; d.moved = moved;
+      setDrag({ ...d });
+    };
+    const onUp = () => {
+      const d = dragRef.current;
+      dragRef.current = null;
+      setDrag(null);
+      if (!d || !d.moved) return;
+      suppressClick.current = true;
+      setTimeout(() => { suppressClick.current = false; }, 0);
+      const [ns, ne] = glShift(d.s0, d.e0, d);
+      if (ns === d.s0 && ne === d.e0) return;
+      const { gid, mid, s0, e0 } = d;
+      const put = (a, b) => onChangeGoal(gid, g => mid
+        ? glPatchMs(g, mid, m => ({ ...m, startDate: a, dueDate: b }))
+        : { ...g, startDate: a, targetDate: b });
+      put(ns, ne);
+      Undo.push(mid ? 'Moved milestone dates' : 'Moved goal dates', () => put(s0, e0));
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+    };
+  }, [!!drag]);
+  const openGoal = gid => { if (!suppressClick.current) onOpenGoal(gid); };
+  // Grab handles drawn inside a bar, for resizing one end
+  function dragHandles(gid, mid, s0, e0) {
+    if (!canDrag || !s0 || !e0) return null;
+    return (
+      <>
+        <div className="gl-tl-grip l" onPointerDown={e => beginDrag(e, 'start', gid, mid, s0, e0)} />
+        <div className="gl-tl-grip r" onPointerDown={e => beginDrag(e, 'end', gid, mid, s0, e0)} />
+      </>
+    );
+  }
   const pct = (s, endOfDay) => { const d = parseLocal(s); if (!d) return null; if (endOfDay) d.setDate(d.getDate() + 1); return (d - range.start) / total * 100; };
   const clip = (a, b) => { if (a == null || b == null) return null; const l = Math.max(0, a), r = Math.min(100, b); return r > l ? { left: l, width: r - l } : null; };
 
@@ -7684,7 +9062,7 @@ function GlTimeline({ goals, onOpenGoal }) {
               </div>
             ))}
           </div>
-          <div className="gl-tl-area">
+          <div className="gl-tl-area" ref={areaRef}>
             {range.cols.slice(1).map((c, i) => (
               <div key={i} aria-hidden="true" style={{ position: 'absolute', top: 0, bottom: 0, left: ((c.start - range.start) / total * 100) + '%', width: 1, background: 'var(--grid-line)' }} />
             ))}
@@ -7696,25 +9074,35 @@ function GlTimeline({ goals, onOpenGoal }) {
             {rows.map(r => {
               if (r.type === 'goal') {
                 const g = r.g;
-                const s = pct(g.startDate), e = pct(g.targetDate, true);
+                const d = dragOn(g.id, null);
+                const [gs, ge] = glShift(g.startDate, g.targetDate, d);
+                const s = pct(gs), e = pct(ge, true);
                 const bar = clip(s, e);
                 const fill = (s != null && e != null) ? clip(s, s + (e - s) * glProgress(g)) : null;
                 const dia = e != null && e - 0.0001 <= 100 && e >= 0 ? e : null;
+                const grab = canDrag && g.startDate && g.targetDate;
                 return (
                   <div key={g.id} className="gl-tl-row goal" style={{ background: glTint(g.color, 0.04) }}>
-                    {bar && <div className="gl-tl-bar" onClick={() => onOpenGoal(g.id)} title={`${g.title || 'Goal'}: ${glShort(g.startDate)} – ${glShort(g.targetDate)}`}
-                      style={{ top: 13, height: 20, left: bar.left + '%', width: bar.width + '%', background: glTint(g.color, 0.2) }} />}
-                    {fill && <div className="gl-tl-bar" onClick={() => onOpenGoal(g.id)}
-                      style={{ top: 13, height: 20, left: fill.left + '%', width: fill.width + '%', background: g.color, borderRadius: '9px 0 0 9px' }} />}
-                    {dia != null && <div className="gl-tl-dia" style={{ top: 17.5, left: `calc(${dia}% - 5.5px)`, background: 'var(--surface)', border: `2px solid ${g.color}` }} />}
+                    {bar && <div className={`gl-tl-bar${grab ? ' grab' : ''}${d ? ' dragging' : ''}`} onClick={() => openGoal(g.id)}
+                      onPointerDown={e2 => beginDrag(e2, 'move', g.id, null, g.startDate, g.targetDate)}
+                      title={grab ? `${g.title || 'Goal'}: ${glShort(gs)} – ${glShort(ge)} · drag to move, drag an edge to resize` : `${g.title || 'Goal'}: ${glShort(gs)} – ${glShort(ge)}`}
+                      style={{ top: 13, height: 20, left: bar.left + '%', width: bar.width + '%', background: glTint(g.color, 0.2) }}>
+                      {dragHandles(g.id, null, g.startDate, g.targetDate)}
+                    </div>}
+                    {fill && <div className="gl-tl-bar" style={{ top: 13, height: 20, left: fill.left + '%', width: fill.width + '%', background: g.color, borderRadius: '9px 0 0 9px', pointerEvents: 'none' }} />}
+                    {dia != null && <div className="gl-tl-dia" style={{ top: 17.5, left: `calc(${dia}% - 5.5px)`, background: 'var(--surface)', border: `2px solid ${g.color}`, pointerEvents: 'none' }} />}
+                    {d && <span className="gl-tl-drag-tip" style={{ left: Math.max(0, Math.min(86, bar ? bar.left : 0)) + '%' }}>{glShort(gs)} – {glShort(ge)}</span>}
                   </div>
                 );
               }
               const { g, m } = r;
+              const md = dragOn(g.id, m.id);
+              const [mS, mE] = glShift(m.startDate || m.dueDate, m.dueDate, md);
               const late = glMsOverdue(m, today);
               const current = !m.done && !late && (!m.startDate || m.startDate <= today);
-              const s = pct(m.startDate || m.dueDate), e = pct(m.dueDate, true);
+              const s = pct(mS), e = pct(mE, true);
               const bar = clip(s, e);
+              const mGrab = canDrag && m.startDate && m.dueDate;
               const st = m.done ? { background: g.color, opacity: 0.55 }
                 : late ? { background: 'rgba(220,74,58,0.12)', border: '1.5px solid var(--red)' }
                 : current ? { background: glTint(g.color, 0.16), border: `1.5px solid ${g.color}` }
@@ -7724,13 +9112,17 @@ function GlTimeline({ goals, onOpenGoal }) {
               return (
                 <div key={m.id} className="gl-tl-row ms">
                   {bar && (
-                    <div className="gl-tl-bar" onClick={() => onOpenGoal(g.id)} title={`${m.title || 'Milestone'}: ${glShort(m.startDate)} – ${glShort(m.dueDate)}`}
+                    <div className={`gl-tl-bar${mGrab ? ' grab' : ''}${md ? ' dragging' : ''}`} onClick={() => openGoal(g.id)}
+                      onPointerDown={e2 => beginDrag(e2, 'move', g.id, m.id, m.startDate, m.dueDate)}
+                      title={mGrab ? `${m.title || 'Milestone'}: ${glShort(mS)} – ${glShort(mE)} · drag to move, drag an edge to resize` : `${m.title || 'Milestone'}: ${glShort(mS)} – ${glShort(mE)}`}
                       style={{ top: 10, height: 14, left: bar.left + '%', width: bar.width + '%', ...st }}>
-                      {current && prog > 0 && <div style={{ width: (prog * 100) + '%', height: '100%', background: glTint(g.color, 0.45) }} />}
+                      {current && prog > 0 && <div style={{ width: (prog * 100) + '%', height: '100%', background: glTint(g.color, 0.45), pointerEvents: 'none' }} />}
+                      {dragHandles(g.id, m.id, m.startDate, m.dueDate)}
                     </div>
                   )}
-                  {dia != null && <div className="gl-tl-dia" style={{ top: 11.5, left: `calc(${dia}% - 5.5px)`,
+                  {dia != null && <div className="gl-tl-dia" style={{ top: 11.5, left: `calc(${dia}% - 5.5px)`, pointerEvents: 'none',
                     background: late ? 'var(--red)' : current ? g.color : 'var(--surface)', border: late || current ? 'none' : `2px solid ${g.color}` }} />}
+                  {md && <span className="gl-tl-drag-tip" style={{ left: Math.max(0, Math.min(86, bar ? bar.left : 0)) + '%' }}>{glShort(mS)} – {glShort(mE)}</span>}
                 </div>
               );
             })}
@@ -7749,14 +9141,14 @@ function GlTimeline({ goals, onOpenGoal }) {
         <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 18, height: 8, borderRadius: 4, border: '1.5px solid #6a50a7', boxSizing: 'border-box' }} />In progress</span>
         <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 18, height: 8, borderRadius: 4, border: '1.5px dashed #6a50a7', boxSizing: 'border-box' }} />Upcoming</span>
         <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 18, height: 8, borderRadius: 4, border: '1.5px solid var(--red)', boxSizing: 'border-box' }} />Overdue</span>
-        <span style={{ marginLeft: 'auto' }}>Click a bar or name to open the goal</span>
+        <span style={{ marginLeft: 'auto' }}>{canDrag ? 'Click to open · drag a bar to move it · drag an edge to resize' : 'Click a bar or name to open the goal'}</span>
       </div>
     </section>
   );
 }
 
 // One milestone in the goal editor: header row plus (when open) its tasks.
-function GlMilestoneEditor({ m, color, open, onToggleOpen, onChange, onDelete }) {
+function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange, onDelete }) {
   const today = glToday();
   const [newTask, setNewTask] = useState('');
   const [focusId, setFocusId] = useState(null);
@@ -7782,7 +9174,9 @@ function GlMilestoneEditor({ m, color, open, onToggleOpen, onChange, onDelete })
       <div className="gl-ms-head" style={{ background: open ? glTint(color, 0.06) : late ? '#fdf3f1' : undefined }}>
         <button className="gl-caret" aria-label={open ? 'Collapse milestone' : 'Expand milestone'} onClick={onToggleOpen}>{open ? '▾' : '▸'}</button>
         <button className={`gl-check ${m.done ? 'on' : ''}`} aria-label={m.done ? 'Mark milestone not done' : 'Mark milestone done'}
-          onClick={() => onChange(mm => ({ ...mm, done: !mm.done, completedAt: !mm.done ? Date.now() : null }))}>{m.done ? '✓' : ''}</button>
+          onClick={() => onChange(mm => ({ ...mm, done: !mm.done, completedAt: !mm.done ? Date.now() : null,
+            // Reopening a weight milestone by hand must stick, or the next check would just re-complete it
+            ...(mm.done && mm.metric ? { metricHold: true, autoDone: false } : {}) }))}>{m.done ? '✓' : ''}</button>
         <input className="gl-inline" style={{ flex: '1 1 160px', fontSize: 14, fontWeight: open ? 600 : 500, textDecoration: m.done ? 'line-through' : 'none', color: m.done ? 'var(--ink-light)' : late ? '#b03a2e' : 'var(--ink)' }}
           placeholder="Milestone name" value={m.title} autoFocus={!m.title}
           onChange={e => onChange(mm => ({ ...mm, title: e.target.value }))} />
@@ -7801,6 +9195,49 @@ function GlMilestoneEditor({ m, color, open, onToggleOpen, onChange, onDelete })
       </div>
       {open && (
         <div>
+          {/* v4.8.0 — complete this milestone from my weight */}
+          {(() => {
+            const asOf = new Date(); asOf.setHours(0, 0, 0, 0);
+            const c = m.metric;
+            const cur = mctx ? smoothWeight(mctx.metrics, asOf, goal && goal.startDate) : { n: 0, avg: null };
+            const setMetric = patch => onChange(mm => ({ ...mm, metric: { ...mm.metric, ...patch }, metricHold: false }));
+            function enable(on) {
+              if (!on) { onChange(mm => { const { metric, metricHold, autoDone, ...rest } = mm; return rest; }); return; }
+              // Default the value to the chart's weight target (one source of truth); direction from where you started
+              const tgt = mctx ? mNum(mctx.weightTarget) : null;
+              const b = mctx && goal ? weightBaseline(mctx.metrics, goal.startDate, asOf) : null;
+              const ref = b ? b.value : cur.avg;
+              const op = ref !== null && tgt !== null && ref < tgt ? '>=' : '<=';
+              onChange(mm => ({ ...mm, metric: { id: 'weight', op, value: tgt !== null ? String(tgt) : '' }, metricHold: false }));
+            }
+            return (
+              <div className="gl-task" style={{ flexWrap: 'wrap', rowGap: 6 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--ink)', minHeight: 32, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={!!c} style={{ width: 16, height: 16, accentColor: 'var(--accent)' }}
+                    onChange={e => enable(e.target.checked)} />
+                  ⚖ Complete automatically from my weight
+                </label>
+                {c && (
+                  <>
+                    <select className="gl-input" style={{ padding: '4px 6px', fontSize: 12 }} aria-label="Direction" value={c.op}
+                      onChange={e => setMetric({ op: e.target.value })}>
+                      <option value="<=">drops to</option>
+                      <option value=">=">rises to</option>
+                    </select>
+                    <input type="number" step="0.1" inputMode="decimal" className="gl-input" style={{ padding: '4px 6px', fontSize: 12, width: 78 }}
+                      aria-label="Weight to reach" placeholder="weight" value={c.value}
+                      onChange={e => setMetric({ value: e.target.value })} />
+                    <span style={{ fontSize: 11.5, color: 'var(--ink-light)', flexBasis: '100%', paddingLeft: 24 }}>
+                      {m.metricHold ? 'Auto-complete is paused because you reopened this. Change the number to turn it back on.'
+                        : m.autoDone && m.done ? 'Completed automatically.'
+                        : cur.avg !== null ? `Now ${mRound(cur.avg)} (7-day average).`
+                        : `Needs ${GL_MIN_READINGS} weigh-ins in 7 days since the goal started${cur.n ? ` — has ${cur.n}` : ''}. One reading never counts.`}
+                    </span>
+                  </>
+                )}
+              </div>
+            );
+          })()}
           {tasks.map(t => (
             <div key={t.id} className="gl-task">
               <button className={`gl-check ${t.done ? 'on' : ''}`} aria-label={t.done ? 'Mark task not done' : 'Mark task done'}
@@ -7831,9 +9268,11 @@ function GlMilestoneEditor({ m, color, open, onToggleOpen, onChange, onDelete })
   );
 }
 
-function GlDetail({ goal, onChange, onDelete, onBack, pagesData, onOpenPage }) {
+function GlDetail({ goal, onChange, onDelete, onBack, pagesData, onOpenPage, habitGoals, fitnessExercises, habitCompletions, fitnessLog, mctx }) {
   const today = glToday();
+  const linkWeekStart = getWeekStart(new Date());
   const [openMs, setOpenMs] = useState(() => { const n = glNextMilestone(goal); return n ? { [n.id]: true } : {}; });
+  const [linksOpen, setLinksOpen] = useState(false);
   const h = glHealth(goal, today);
   const counts = glTaskCounts(goal);
   const c = goal.color || '#7c3f6e';
@@ -7878,7 +9317,7 @@ function GlDetail({ goal, onChange, onDelete, onBack, pagesData, onOpenPage }) {
             </div>
             {!ms.length && <div style={{ fontSize: 13, color: 'var(--ink-light)', padding: '6px 2px' }}>Break the goal into milestones — checkpoints with dates — then add tasks under each one and schedule them into your weeks.</div>}
             {ms.map(m => (
-              <GlMilestoneEditor key={m.id} m={m} color={c} open={!!openMs[m.id]}
+              <GlMilestoneEditor key={m.id} m={m} goal={goal} mctx={mctx} color={c} open={!!openMs[m.id]}
                 onToggleOpen={() => setOpenMs(o => ({ ...o, [m.id]: !o[m.id] }))}
                 onChange={fn => setMs(m.id, fn)}
                 onDelete={() => onChange(g => ({ ...g, milestones: (g.milestones || []).filter(x => x.id !== m.id) }))} />
@@ -7943,6 +9382,26 @@ function GlDetail({ goal, onChange, onDelete, onBack, pagesData, onOpenPage }) {
             </label>
           </div>
 
+          {/* v4.7.0 — habits and training this goal is built on */}
+          <div className="gl-card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+              <span className="gl-label">Habits &amp; training</span>
+              <button className="gl-btn ghost" style={{ fontSize: 12, padding: '2px 6px' }}
+                onClick={() => setLinksOpen(o => !o)}>{linksOpen ? 'Done' : 'Edit'}</button>
+            </div>
+            {linksOpen ? (
+              <GlLinkPicker goal={goal} onChange={onChange} habitGoals={habitGoals} fitnessExercises={fitnessExercises} />
+            ) : glHasLinks(goal) ? (
+              <>
+                <GlLinksRow goal={goal} habitGoals={habitGoals} fitnessExercises={fitnessExercises} mctx={mctx}
+                  habitCompletions={habitCompletions} fitnessLog={fitnessLog} weekStart={linkWeekStart} />
+                <span style={{ fontSize: 11, color: 'var(--ink-faint)' }}>This week. Shown alongside the milestones — it doesn't change the goal's progress.</span>
+              </>
+            ) : (
+              <span style={{ fontSize: 13, color: 'var(--ink-light)' }}>Link the habits and exercises this goal rests on, and their weekly progress shows here.</span>
+            )}
+          </div>
+
           <div className="gl-card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 6, borderStyle: goal.status === 'done' ? 'solid' : 'dashed' }}>
             <span className="gl-label">Retro</span>
             {goal.status === 'done' ? (
@@ -7969,7 +9428,7 @@ function GlDetail({ goal, onChange, onDelete, onBack, pagesData, onOpenPage }) {
   );
 }
 
-function GoalsView({ goals, setGoals, pagesData, countdowns, setCountdowns, selectedId, setSelectedId, onOpenPage }) {
+function GoalsView({ goals, setGoals, pagesData, countdowns, setCountdowns, selectedId, setSelectedId, onOpenPage, habitGoals, fitnessExercises, habitCompletions, fitnessLog, mctx }) {
   const today = glToday();
   const [statusTab, setStatusTab] = useState('active');
   const [sideCollapsed, setSideCollapsedRaw] = useState(() => lsGet('glSideCollapsed') === '1'); // desktop only; per device
@@ -8065,6 +9524,10 @@ function GoalsView({ goals, setGoals, pagesData, countdowns, setCountdowns, sele
                     : <><span style={{ color: 'var(--ink-light)' }}>Next:</span> {m.title || 'Untitled milestone'}{m.dueDate ? ` · due ${glShort(m.dueDate)}` : ''}</>}
                 </div>
               )}
+              {g.status === 'active' && (
+                <GlLinksRow compact goal={g} habitGoals={habitGoals} fitnessExercises={fitnessExercises} mctx={mctx}
+                  habitCompletions={habitCompletions} fitnessLog={fitnessLog} weekStart={getWeekStart(new Date())} />
+              )}
             </button>
           );
         })}
@@ -8079,12 +9542,14 @@ function GoalsView({ goals, setGoals, pagesData, countdowns, setCountdowns, sele
       <main className="gl-main">
         {sel ? (
           <GlDetail key={sel.id} goal={sel} pagesData={pagesData} onOpenPage={onOpenPage}
+            habitGoals={habitGoals} fitnessExercises={fitnessExercises} mctx={mctx}
+            habitCompletions={habitCompletions} fitnessLog={fitnessLog}
             onChange={fn => changeGoal(sel.id, fn)}
             onBack={() => setSelectedId(null)}
             onDelete={() => { setGoals(gs => gs.filter(g => g.id !== sel.id)); setSelectedId(null); }} />
         ) : (
           <>
-            <GlTimeline goals={list} onOpenGoal={setSelectedId} />
+            <GlTimeline goals={list} onOpenGoal={setSelectedId} onChangeGoal={changeGoal} />
 
             {weekItems.length > 0 && (
               <section className="gl-card gl-mobile-only" style={{ flexDirection: 'column', overflow: 'hidden' }}>
@@ -8157,10 +9622,35 @@ function App() {
   const [fitnessGoals, setFitnessGoals] = useSynced('fitnessGoals', []); // [{id, exerciseId, period, target, unit}]
   const [countdowns, setCountdowns] = useSynced('countdowns', []); // [{id, title, startDate, endDate, color}]
   const [goals, setGoals] = useSynced('goals', []); // [{id,title,why,color,status,startDate,targetDate,milestones:[{id,title,startDate,dueDate,done,tasks:[{id,title,scheduledDate,done}]}]}] — see GOALS section
+  // Weight / calorie readings and their targets, bundled for the goal views (v4.8.0)
+  const mctx = { metrics: habitMetrics, weightTarget, calsTarget };
+  // Complete weight milestones whose condition is met (7-day average, 3+ readings since the goal began).
+  // Debounced; writes only when something changed. The Undo toast reopens it and holds auto-complete.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const asOf = new Date(); asOf.setHours(0, 0, 0, 0);
+      const ctx = { metrics: habitMetrics, weightTarget, calsTarget };
+      const r = glAutoComplete(goals, ctx, asOf);
+      if (r.goals === goals) return;
+      setGoals(gs => glAutoComplete(gs, ctx, asOf).goals);
+      r.reached.forEach(x => Undo.push(`Reached: ${x.title || 'milestone'}`, () => setGoals(gs => glPatchGoal(gs, x.gid, g =>
+        glPatchMs(g, x.mid, m => ({ ...m, done: false, completedAt: null, autoDone: false, metricHold: true }))))));
+    }, 2500);
+    return () => clearTimeout(t);
+  }, [goals, habitMetrics, weightTarget]);
+  // Keep "never ends" repeating tasks topped up as time passes (v4.6.0). Debounced; only writes when something was added.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const next = repeatExtend(weekData, fmtLocal(new Date()));
+      if (next !== weekData) setWeekData(wd => (wd === weekData ? next : repeatExtend(wd, fmtLocal(new Date()))));
+    }, 2500);
+    return () => clearTimeout(t);
+  }, [weekData]);
   const [selectedGoalId, setSelectedGoalIdRaw] = useState(() => sessionStorage.getItem('lp_selectedGoalId') || null);
   const setSelectedGoalId = (id) => { if(id) sessionStorage.setItem('lp_selectedGoalId', id); else sessionStorage.removeItem('lp_selectedGoalId'); setSelectedGoalIdRaw(id); };
   const openGoal = (id) => { setSelectedGoalId(id || null); setPage('goals'); };
   const [moreOpen, setMoreOpen] = useState(false); // mobile bottom-nav "More" sheet
+  const [reviewOpen, setReviewOpen] = useState(false); // Weekly Review overlay (v4.7.0)
   // v4.4.0: theme preference — 'auto' (follow device) | 'light' | 'dark'; per device, like the swipe toggle
   const [themePref, setThemePref] = useState(() => { try { return localStorage.getItem('lp_theme') || 'auto'; } catch { return 'auto'; } });
   useEffect(() => {
@@ -8186,6 +9676,13 @@ function App() {
   // Auth & sync state
   const [authUser, setAuthUser] = useState(null); // {name, email, picture}
   const [saveStatus, setSaveStatus] = useState(''); // '', 'saving', 'saved', 'merged', 'ERR:<message>'
+  const [online, setOnline] = useState(typeof navigator === 'undefined' || navigator.onLine !== false);
+  useEffect(() => {
+    const on = () => { setOnline(true); try { Sync.pull?.(); if (Sync.pendingCount?.()) Sync.flush?.({ manual: true }); } catch {} };
+    const off = () => setOnline(false);
+    window.addEventListener('online', on); window.addEventListener('offline', off);
+    return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
+  }, []);
   const [saveRetrying, setSaveRetrying] = useState(false); // true while manual retry is in flight
   const [authError, setAuthError] = useState(false); // true when the session ended — edits wait on this device
   const [authLoading, setAuthLoading] = useState(true); // true while session restore + first load is in progress on mount
@@ -8447,7 +9944,7 @@ function App() {
     }
   }
 
-  const isErr = saveStatus.startsWith('ERR:');
+  const isErr = saveStatus.startsWith('ERR:') && online;   // offline is expected, not an error
   const errDetail = isErr ? saveStatus.slice(4) : '';
   const saveLabel = saveStatus === 'saving' ? '↑ Saving…'
     : saveStatus === 'saved' ? '✓ Saved'
@@ -8458,6 +9955,7 @@ function App() {
 
   return (
     <div className="app">
+      <UndoToast lift={isErr || !!authError} />
       {/* ── SAVE ERROR TOAST — bottom, persistent until save actually succeeds ── */}
       {(isErr || authError) && (
         <div className="save-error-toast" style={{
@@ -8579,7 +10077,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themeColor(navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v4.5.5</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v4.9.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -8591,7 +10089,8 @@ function App() {
           <button className={`nav-tab ${page==='goals'?'active':''}`} onClick={()=>setPage('goals')}>Goals</button>
         </div>
         <div className="auth-area">
-          {saveLabel && <span className={`save-status ${saveClass || saveStatus}`}>{saveLabel}</span>}
+          {!online && <span className="save-status" style={{color:'#fcd34d'}} title="No connection — changes are saved on this device and upload when you're back online">● Offline</span>}
+          {online && saveLabel && <span className={`save-status ${saveClass || saveStatus}`}>{saveLabel}</span>}
           <button className="auth-btn theme-btn" onClick={cycleTheme} title="Appearance: Auto follows your device. Click to switch Auto → Light → Dark.">{themeLabel}</button>
           {authUser ? (
             <>
@@ -8656,7 +10155,7 @@ function App() {
           pullDeltaY.current = 0;
           pullActive.current = false;
         }}>
-      {page==='planner' && <WeeklyPlanner weekData={weekData} setWeekData={setWeekData} pagesData={pagesData} setPagesData={setPagesData} onGoToHabit={()=>setPage('habit')} calHeaderColor={calHeaderColor} setCalHeaderColor={setCalHeaderColor} habitGoals={habitGoals} habitCompletions={habitCompletions} setHabitCompletions={setHabitCompletions} habitQty={habitQty} setHabitQty={setHabitQty} habitNotes={habitNotes} setHabitNotes={setHabitNotes} peopleDirectory={peopleDirectory} setPeopleDirectory={setPeopleDirectory} goals={goals} setGoals={setGoals} onOpenGoal={openGoal} />}
+      {page==='planner' && <WeeklyPlanner weekData={weekData} setWeekData={setWeekData} pagesData={pagesData} setPagesData={setPagesData} onGoToHabit={()=>setPage('habit')} calHeaderColor={calHeaderColor} setCalHeaderColor={setCalHeaderColor} habitGoals={habitGoals} habitCompletions={habitCompletions} setHabitCompletions={setHabitCompletions} habitQty={habitQty} setHabitQty={setHabitQty} habitNotes={habitNotes} setHabitNotes={setHabitNotes} peopleDirectory={peopleDirectory} setPeopleDirectory={setPeopleDirectory} goals={goals} setGoals={setGoals} onOpenGoal={openGoal} fitnessLog={fitnessLog} fitnessExercises={fitnessExercises} mctx={mctx} reviewOpen={reviewOpen} setReviewOpen={setReviewOpen} />}
       {page==='monthly' && <MonthlyCalendar weekData={weekData} setWeekData={setWeekData} monthlyGoals={monthlyGoals} setMonthlyGoals={setMonthlyGoals} />}
       {page==='habit' && <HabitTracker
         goals={habitGoals} setGoals={setHabitGoals}
@@ -8678,6 +10177,8 @@ function App() {
       {page==='goals' && <GoalsView goals={goals} setGoals={setGoals} pagesData={pagesData}
         countdowns={countdowns} setCountdowns={setCountdowns}
         selectedId={selectedGoalId} setSelectedId={setSelectedGoalId}
+        habitGoals={habitGoals} fitnessExercises={fitnessExercises} mctx={mctx}
+        habitCompletions={habitCompletions} fitnessLog={fitnessLog}
         onOpenPage={(id)=>{ setSelectedPagesId(id); setPage('pages'); }} />}
       </div>
 
@@ -8686,6 +10187,10 @@ function App() {
       {moreOpen && (
         <div className="more-sheet" role="dialog" aria-label="More">
           <div className="mobile-sheet-handle" />
+          <button className="more-sheet-btn" onClick={()=>{setPage('planner');setMoreOpen(false);setReviewOpen(true);}}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#6a50a7" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>
+            Weekly Review
+          </button>
           <button className={`more-sheet-btn ${page==='monthly'?'active':''}`} onClick={()=>{setPage('monthly');setMoreOpen(false);}}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#6a50a7" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M8 14h.01M12 14h.01M16 14h.01M8 17.5h.01M12 17.5h.01"/></svg>
             Monthly Calendar
@@ -8916,7 +10421,23 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
     setDayExs(dk, exs=>[...exs, newEx]);
     if (fitView!=='day') { setSelectedDate(new Date(dk+'T00:00:00')); setFitView('day'); }
   }
-  function deleteExercise(dk, exId) { setDayExs(dk, exs=>exs.filter(e=>e.id!==exId)); }
+  function deleteExercise(dk, exId) {
+    const cur = getDayExercises(dk);
+    const idx = cur.findIndex(e => e.id === exId);
+    const ex = cur[idx];
+    setDayExs(dk, exs=>exs.filter(e=>e.id!==exId));
+    if (ex) {
+      const nm = (fitnessExercises.find(l => l.id === ex.exerciseId) || {}).name || 'exercise';
+      Undo.push(`Removed ${nm}`, () => {
+        setDayExs(dk, exs => {
+          if (exs.some(e => e.id === exId)) return exs;
+          const next = [...exs];
+          next.splice(Math.min(idx, next.length), 0, ex);
+          return next;
+        });
+      });
+    }
+  }
   function reorderExercises(dk, fromExId, toExId) {
     if (fromExId === toExId) return;
     setDayExs(dk, exs => {
@@ -8958,7 +10479,18 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
     }
   });
   function deleteSet(dk, exId, setId) {
+    const exNow = getDayExercises(dk).find(e => e.id === exId);
+    const sIdx = exNow ? exNow.sets.findIndex(s => s.id === setId) : -1;
+    const setObj = sIdx >= 0 ? exNow.sets[sIdx] : null;
     setDayExs(dk, exs=>exs.map(e=>e.id!==exId?e:{...e,sets:e.sets.filter(s=>s.id!==setId)}));
+    if (setObj) Undo.push(`Deleted set ${sIdx + 1}`, () => {
+      setDayExs(dk, exs => exs.map(e => {
+        if (e.id !== exId || e.sets.some(s => s.id === setId)) return e;
+        const sets = [...e.sets];
+        sets.splice(Math.min(sIdx, sets.length), 0, setObj);
+        return { ...e, sets };
+      }));
+    });
   }
 
   // ── Library helpers ──────────────────────────────────────────────────────
@@ -8969,7 +10501,19 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
     return id;
   }
   function updateExercise(id, patch) { setFitnessExercises(es=>es.map(e=>e.id===id?{...e,...patch}:e)); }
-  function deleteExercise_lib(id) { setFitnessExercises(es=>es.filter(e=>e.id!==id)); }
+  function deleteExercise_lib(id) {
+    const idx = fitnessExercises.findIndex(e => e.id === id);
+    const ex = fitnessExercises[idx];
+    setFitnessExercises(es=>es.filter(e=>e.id!==id));
+    if (ex) Undo.push(`Deleted "${(ex.name||'exercise').slice(0,40)}" from library`, () => {
+      setFitnessExercises(es => {
+        if (es.some(e => e.id === id)) return es;
+        const next = [...es];
+        next.splice(Math.min(idx, next.length), 0, ex);
+        return next;
+      });
+    });
+  }
 
   // ── Progress calculation ─────────────────────────────────────────────────
   function goalProgressFull(goal, refDate) {
@@ -11192,6 +12736,9 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
 
 
 ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
+}
 </script>
 </body>
 </html>
