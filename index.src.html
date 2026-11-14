@@ -1,5 +1,10 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.65.0 -->
+<!-- LP Planner v5.65.7 -->
+<!-- v5.65.7 — Projects: the ▲ ▼ move buttons now sit in the milestone's top row, between the caret and the checkbox, in the caret's style; the phone row is one notch smaller. (v5.65.6: each milestone header has ▲ ▼ buttons to move it one place (a backup for the drag grip, which on some phones did nothing for milestones below the 3rd). Also: the milestone and task drag grips now claim the touch the moment your finger lands (a native, non-passive touchstart handler), so iPhone/iPad Safari cannot hand the touch to page scrolling first. Targets milestones below the 3rd that showed no fade or drop line when pressed. -->
+<!-- v5.65.4 — Projects: hardened touch dragging for milestones and tasks (the finger now stays "captured" by the grip, the page cannot scroll under it while you drag, and the scroll area is frozen until you let go) — fixes drags that would not start on a phone once the list was scrolled. Auto-scroll at the screen edges stays. -->
+<!-- v5.65.3 — Projects: dragging a milestone (or a task) now auto-scrolls when you hold it near the top or bottom edge of the screen, so you can move it past what fits on screen (before, only the first few milestones could be reordered on a phone). Phone: the caret and drag grip are a little smaller (40px) and the milestone checkbox is larger (28px) to match. -->
+<!-- v5.65.2 — Projects, phone only: in a milestone header the done checkbox moves to the right edge, the expand/collapse caret is a larger rounded chevron button, and the drag grip is bigger (44px) so it is easier to hit. Desktop and iPad are unchanged. -->
+<!-- v5.65.1 — Projects: the expand/collapse carets are bigger and easier to tap — the milestone caret in a project is now a 40px (44px on phones) tap target with a larger arrow; the project and milestone carets on the timeline are wider with a larger arrow. -->
 <!-- v5.65.0 — Goals: a General goal can be linked to a Project ("Linked project" in the goal form, or "Linked goal" on the project page). The goal tile then shows the project's progress bar (percent and tasks done) instead of a Done box, an "Open project" button, and the goal is Done as soon as the project is marked done (and reopens if the project is reopened). -->
 <!-- v5.64.0 — Goals › Reading log: pages can be logged two ways — "Pages read" (a number to add) or "Now on page" (type the page you are on; the app logs the difference from what you already logged). The choice is remembered per device. "Log pages" is now a filled button so it reads as the action that saves. -->
 <!-- v5.63.4 — Goals › Reading log: on each book the numbers are stacked (pages read / total over pages left; finished books: pages over dates), so long titles get more room on a phone. -->
@@ -2566,7 +2571,24 @@
   .gl-sec-toggle .gl-sec-caret { font-size: 20px; line-height: 1; color: var(--ink-light); width: 22px; }
   .rl-book { background: var(--cream); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; margin: 0 0 10px; }
   .gl-ms-drop { height: 3px; border-radius: 2px; background: var(--accent); margin: -2px 0; }
-  .gl-caret { border: none; background: none; cursor: pointer; color: var(--ink-light); font-size: 11px; width: 22px; height: 28px; padding: 0; }
+  .gl-caret { border: none; background: none; cursor: pointer; color: var(--ink-light); font-size: 18px; line-height: 1; width: 32px; height: 28px; padding: 0; }
+  .gl-caret.lg { font-size: 22px; width: 40px; height: 40px; }
+  .gl-caret.lg .gl-caret-svg { display: none; width: 26px; height: 26px; transition: transform 0.15s; }
+  .gl-caret.lg:not(.open) .gl-caret-svg { transform: rotate(-90deg); }
+  .gl-mvpair { display: flex; gap: 4px; }
+  .gl-mv { border: none; background: var(--cream); color: var(--ink); cursor: pointer; width: 28px; height: 28px; border-radius: 8px; padding: 0; display: flex; align-items: center; justify-content: center; }
+  .gl-mv svg { width: 18px; height: 18px; }
+  .gl-mv:disabled { opacity: 0.3; cursor: default; }
+  @media (max-width: 767px) {
+    .gl-mvpair { margin: 0 auto; gap: 6px; }
+    .gl-mv { width: 36px; height: 36px; border-radius: 10px; }
+    .gl-mv svg { width: 20px; height: 20px; }
+    .gl-caret.lg { width: 36px; height: 36px; background: var(--cream); border-radius: 10px; color: var(--ink); }
+    .gl-caret.lg .gl-caret-glyph { display: none; }
+    .gl-caret.lg .gl-caret-svg { display: block; margin: 0 auto; width: 20px; height: 20px; }
+    .gl-ms-head .gl-grip { font-size: 20px; letter-spacing: -4px; width: 36px; height: 36px; }
+    .gl-ms-head .gl-check { margin-left: auto; width: 26px; height: 26px; border-radius: 7px; font-size: 16px; }
+  }
   .gl-task { display: flex; align-items: center; gap: 8px; min-height: 38px; border-top: 1px solid var(--neutral-line); padding: 2px 10px 2px 40px; position: relative; }
   .gl-x { border: none; background: none; cursor: pointer; color: var(--ink-faint); font-size: 13px; padding: 4px 6px; opacity: 0; }
   .gl-task:hover .gl-x, .gl-ms-head:hover .gl-x { opacity: 1; }
@@ -12511,7 +12533,7 @@ function GlTimeline({ goals, onOpenGoal, onChangeGoal }) {
                 {(r.m.tasks || []).length > 0
                   ? <button className="gl-caret" aria-expanded={!!msOpen[r.m.id]} aria-label={msOpen[r.m.id] ? 'Hide tasks' : 'Show tasks'} style={{ flexShrink: 0 }}
                       onClick={() => setMsOpen(o => ({ ...o, [r.m.id]: !o[r.m.id] }))}>{msOpen[r.m.id] ? '▾' : '▸'}</button>
-                  : <span aria-hidden="true" style={{ width: 22, flexShrink: 0 }} />}
+                  : <span aria-hidden="true" style={{ width: 32, flexShrink: 0 }} />}
                 <span aria-hidden="true" style={{ color: r.m.done ? 'var(--accent)' : glMsOverdue(r.m, today) ? 'var(--red)' : r.g.color, width: 12 }}>{r.m.done ? '✓' : '◆'}</span>
                 <span className="t" style={{ color: r.m.done ? 'var(--ink-light)' : glMsOverdue(r.m, today) ? '#b03a2e' : 'var(--ink)', textDecoration: r.m.done ? 'line-through' : 'none', cursor: 'pointer' }}
                   onClick={() => onOpenGoal(r.g.id)}>{r.m.title || 'Untitled milestone'}</span>
@@ -12743,7 +12765,54 @@ function glRuleShutSet(id, shut) {
   lsSet('msRuleShut', JSON.stringify(mp));
 }
 // One milestone in the goal editor: header row plus (when open) its tasks.
-function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange, onDelete, onClone, onGripDown, dragging }) {
+// v5.65.3 — while a drag is in progress, scroll the nearest scrollable parent (or the page) when the pointer is
+// within 80px of the top/bottom edge. getY() = latest pointer clientY; onTick() re-computes the drop slot. Returns stop().
+// A drag grip. React attaches touchstart as a passive listener, which cannot block scrolling, so the grip adds its own
+// non-passive native one: Safari then never starts scrolling the page from a touch that begins on the grip.
+function GlGrip(props) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const el = ref.current; if (!el) return;
+    const f = ev => { if (ev.cancelable) ev.preventDefault(); };
+    el.addEventListener('touchstart', f, { passive: false });
+    return () => el.removeEventListener('touchstart', f);
+  }, []);
+  return <button ref={ref} type="button" {...props} />;
+}
+function glScrollParent(el) {
+  let n = el && el.parentElement;
+  while (n && n !== document.documentElement) { const o = getComputedStyle(n).overflowY; if ((o === 'auto' || o === 'scroll') && n.scrollHeight > n.clientHeight + 1) return n; n = n.parentElement; }
+  return null;
+}
+function glAutoScroll(e, getY, onTick) {
+  const el = e.currentTarget || e.target, pid = e.pointerId, sp = glScrollParent(el);
+  // Keep the finger "captured" by the grip, stop the page scrolling under it (touchmove must be non-passive for iOS),
+  // and freeze the scroll area until the drag ends. Auto-scroll below still moves it by script.
+  try { if (pid != null && el.setPointerCapture) el.setPointerCapture(pid); } catch (x) {}
+  const block = ev => { if (ev.cancelable) ev.preventDefault(); };
+  window.addEventListener('touchmove', block, { passive: false });
+  const prevOv = sp ? sp.style.overflowY : '';
+  if (sp) sp.style.overflowY = 'hidden';
+  let raf = 0, stopped = false;
+  const tick = () => {
+    if (stopped) return;
+    const y = getY(), r = sp ? sp.getBoundingClientRect() : { top: 0, bottom: window.innerHeight };
+    const top = Math.max(r.top, 0), bottom = Math.min(r.bottom, window.innerHeight), edge = 80;
+    let dy = 0;
+    if (y < top + edge) dy = -Math.ceil((top + edge - y) / 5); else if (y > bottom - edge) dy = Math.ceil((y - (bottom - edge)) / 5);
+    dy = Math.max(-24, Math.min(24, dy));
+    if (dy) { if (sp) sp.scrollTop += dy; else window.scrollBy(0, dy); onTick(); }
+    raf = requestAnimationFrame(tick);
+  };
+  raf = requestAnimationFrame(tick);
+  return () => {
+    stopped = true; cancelAnimationFrame(raf);
+    window.removeEventListener('touchmove', block);
+    if (sp) sp.style.overflowY = prevOv;
+    try { if (pid != null && el.releasePointerCapture) el.releasePointerCapture(pid); } catch (x) {}
+  };
+}
+function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange, onDelete, onClone, onGripDown, onMove, dragging }) {
   const today = glToday();
   const [newTask, setNewTask] = useState('');
   const [focusId, setFocusId] = useState(null);
@@ -12764,10 +12833,12 @@ function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange,
       for (let i = 0; i < els.length; i++) { const r = els[i].getBoundingClientRect(); if (y < r.top + r.height / 2) return i; }
       return els.length;
     };
-    let idx = slotAt(e.clientY);
+    let lastY = e.clientY, idx = slotAt(lastY);
     setTaskDrag({ id, idx });
-    const move = ev => { idx = slotAt(ev.clientY); setTaskDrag({ id, idx }); };
+    const move = ev => { lastY = ev.clientY; idx = slotAt(lastY); setTaskDrag({ id, idx }); };
+    const stopScroll = glAutoScroll(e, () => lastY, () => { idx = slotAt(lastY); setTaskDrag({ id, idx }); });
     const end = cancel => {
+      stopScroll();
       window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', cn);
       setTaskDrag(null);
       if (cancel) return;
@@ -12828,8 +12899,16 @@ function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange,
   return (
     <div className={`gl-ms${dragging ? ' dragging' : ''}`} style={{ borderColor: open ? color : late ? '#f0c9c3' : undefined, borderWidth: open ? 2 : 1 }}>
       <div className="gl-ms-head" style={{ background: open ? glTint(color, 0.06) : late ? '#fdf3f1' : undefined }}>
-        {onGripDown && <button className="gl-grip" aria-label="Drag to reorder milestone" title="Drag to reorder" onPointerDown={onGripDown}>⋮⋮</button>}
-        <button className="gl-caret" aria-label={open ? 'Collapse milestone' : 'Expand milestone'} onClick={onToggleOpen}>{open ? '▾' : '▸'}</button>
+        {onGripDown && <GlGrip className="gl-grip" aria-label="Drag to reorder milestone" title="Drag to reorder" onPointerDown={onGripDown}>⋮⋮</GlGrip>}
+        <button className={`gl-caret lg${open ? ' open' : ''}`} aria-label={open ? 'Collapse milestone' : 'Expand milestone'} aria-expanded={!!open} onClick={onToggleOpen}>
+          <span className="gl-caret-glyph">{open ? '▾' : '▸'}</span>
+          <svg className="gl-caret-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
+        </button>
+        {onMove && <div className="gl-mvpair">
+          {[['up', 'Move milestone up', 'M6 15l6-6 6 6'], ['down', 'Move milestone down', 'M6 9l6 6 6-6']].map(([k, lbl, d]) =>
+            <button key={k} className="gl-mv" aria-label={lbl} title={k === 'up' ? 'Move up' : 'Move down'} disabled={!onMove[k]} onClick={() => onMove[k] && onMove[k]()}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={d} /></svg></button>)}
+        </div>}
         <button className={`gl-check ${m.done ? 'on' : ''}`} aria-label={m.done ? 'Mark milestone not done' : 'Mark milestone done'}
           onClick={() => onChange(mm => ({ ...mm, done: !mm.done, completedAt: !mm.done ? Date.now() : null,
             // Reopening a weight milestone by hand must stick, or the next check would just re-complete it
@@ -12914,7 +12993,7 @@ function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange,
             <React.Fragment key={t.id}>
             {taskDrag && taskDrag.idx === ti && <div className="gl-ms-drop" data-testid="task-drop" />}
             <div data-tid={t.id} className={`gl-task${tasks.length > 1 ? ' has-grip' : ''}${taskDrag && taskDrag.id === t.id ? ' dragging' : ''}`} style={ruleOpen === t.id ? { flexWrap: 'wrap', rowGap: 6 } : undefined}>
-              {tasks.length > 1 && <button className="gl-grip gl-tgrip" aria-label="Drag to reorder task" title="Drag to reorder" onPointerDown={e => beginTaskDrag(e, t.id)}>⋮⋮</button>}
+              {tasks.length > 1 && <GlGrip className="gl-grip gl-tgrip" aria-label="Drag to reorder task" title="Drag to reorder" onPointerDown={e => beginTaskDrag(e, t.id)}>⋮⋮</GlGrip>}
               <button className={`gl-check ${t.done ? 'on' : ''}`} aria-label={t.done ? 'Mark task not done' : 'Mark task done'}
                 onClick={() => setTask(t.id, { done: !t.done })}>{t.done ? '✓' : ''}</button>
               <input className="gl-inline" style={{ flex: 1, fontSize: 14, textDecoration: t.done ? 'line-through' : 'none', color: t.done ? 'var(--ink-light)' : 'var(--ink)' }}
@@ -12985,10 +13064,12 @@ function GlDetail({ targets, setTargets, allTags, books, goal, onChange, onDelet
       for (let i = 0; i < els.length; i++) { const r = els[i].getBoundingClientRect(); if (y < r.top + r.height / 2) return i; }
       return els.length;
     };
-    let idx = slotAt(e.clientY);
+    let lastY = e.clientY, idx = slotAt(lastY);
     setMsDrag({ id, idx });
-    const move = ev => { idx = slotAt(ev.clientY); setMsDrag({ id, idx }); };
+    const move = ev => { lastY = ev.clientY; idx = slotAt(lastY); setMsDrag({ id, idx }); };
+    const stopScroll = glAutoScroll(e, () => lastY, () => { idx = slotAt(lastY); setMsDrag({ id, idx }); });
     const end = (ev, cancel) => {
+      stopScroll();
       window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', cn);
       setMsDrag(null);
       if (cancel) return;
@@ -13004,6 +13085,15 @@ function GlDetail({ targets, setTargets, allTags, books, goal, onChange, onDelet
     };
     const up = ev => end(ev, false), cn = ev => end(ev, true);
     window.addEventListener('pointermove', move); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', cn);
+  }
+  function moveMs(id, dir) {   // v5.65.7 — button fallback for drag: nudge a milestone one place up (-1) or down (+1)
+    onChange(g => {
+      const list = [...(g.milestones || [])];
+      const i = list.findIndex(x => x.id === id), j = i + dir;
+      if (i < 0 || j < 0 || j >= list.length) return g;
+      [list[i], list[j]] = [list[j], list[i]];
+      return { ...g, milestones: list };
+    });
   }
   function addMs() {
     const m = glNewMilestone(goal);
@@ -13066,6 +13156,7 @@ function GlDetail({ targets, setTargets, allTags, books, goal, onChange, onDelet
                       onToggleOpen={() => setOpenMs(o => ({ ...o, [m.id]: !o[m.id] }))}
                       onChange={fn => setMs(m.id, fn)}
                       onClone={() => cloneMs(m.id)}
+                      onMove={ms.length > 1 ? { up: i > 0 ? () => moveMs(m.id, -1) : null, down: i < ms.length - 1 ? () => moveMs(m.id, 1) : null } : null}
                       onDelete={() => onChange(g => ({ ...g, milestones: (g.milestones || []).filter(x => x.id !== m.id) }))} />
                   </div>
                 </React.Fragment>
@@ -14677,7 +14768,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.65.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.65.7</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
