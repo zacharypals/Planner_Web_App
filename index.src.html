@@ -1,5 +1,10 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.59.4 -->
+<!-- LP Planner v5.63.0 -->
+<!-- v5.63.0 — Goals › Reading log: filter chips Active | To read | Parked | Finished | All (with counts, remembered per device; default Active). Books can now be put on a "To read" shelf (choose it when adding a book) or Parked (new Park button on a book in progress). Start reading / Resume moves them back to Active. Finished books are listed under Finished only. -->
+<!-- v5.62.1 — Goals sub-tab: the collapse caret next to the Goals and Reading log titles is larger. -->
+<!-- v5.62.0 — Goals: (1) drag tasks to reorder them inside a milestone — grab the ⋮⋮ handle at the left of a task (finger, Pencil or mouse). Order matters for Reading-log tasks, so this is how you fix the running-total order. (2) On the Goals sub-tab, the Goals and Reading log sections now collapse: tap the section title (remembered per device). -->
+<!-- v5.61.0 — Goals › Projects: a project task can check itself off from the Reading log. In a task's ↻ editor choose "Reading log", set the pages for that task, and it is checked when the pages logged for the project's linked book reach that task's place in a running total (scheduled tasks by day, then unscheduled tasks in milestone order). Counting starts at the project's start date. Reading ahead or catching up just works; checked tasks never reopen by themselves. -->
+<!-- v5.60.0 — Projects: tags. Each project can carry several tags (Projects › open a project › the tag row under its name; suggestions come from tags already in use, matched ignoring case). Tags show as small chips on the project cards, and the Timeline has a tag filter row: tap one or more tags to show only projects with any of them (it combines with the Show menu; picking one specific project ignores it). New optional `tags: []` on each project inside the existing goals collection — no new synced key, no Worker change. -->
 <!-- v5.59.4 — Weekly: a task moved with the "Move to" picker now arrives collapsed on its new day (previously it stayed expanded, and the old collapse didn't work when the new day was in a different week). -->
 <!-- v5.59.3 — Pages: the delete button in the page header is now a matching line-drawn trash icon (turns red on hover). -->
 <!-- v5.59.2 — Pages download button uses a line-drawn download-tray icon (inline SVG) instead of the ⬇ character, centered with the title row. -->
@@ -2511,6 +2516,10 @@
   .gl-btn.danger { color: var(--red); }
   .gl-chip { font-family: 'DM Sans', sans-serif; font-size: 12px; padding: 5px 10px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--ink-light); cursor: pointer; }
   .gl-chip.on { background: var(--ink); color: #fff; border-color: var(--ink); font-weight: 600; }
+  /* v5.60.0 — project tags */
+  .gl-tag { display: inline-flex; align-items: center; gap: 4px; font-family: 'DM Sans', sans-serif; font-size: 11.5px; line-height: 1.3; padding: 2px 8px; border-radius: 999px; background: var(--tint); color: var(--ink-light); border: 1px solid var(--border); white-space: nowrap; }
+  .gl-tag button { background: none; border: none; padding: 0 0 0 2px; margin: 0; font-size: 10px; color: var(--ink-faint); cursor: pointer; line-height: 1; }
+  .gl-tag button:hover { color: var(--red); }
   .gl-goal-card { text-align: left; width: 100%; font-family: 'DM Sans', sans-serif; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 11px 13px; cursor: pointer; display: block; color: var(--ink); }
   .gl-goal-card:hover { box-shadow: 0 2px 8px var(--shadow-md); }
   .gl-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
@@ -2547,6 +2556,10 @@
   .gl-grip { border: none; background: none; cursor: grab; color: var(--ink-faint); font-size: 14px; letter-spacing: -2px; width: 20px; height: 28px; padding: 0; touch-action: none; user-select: none; -webkit-user-select: none; }
   .gl-grip:hover { color: var(--ink-light); }
   .gl-ms.dragging { opacity: 0.45; }
+  .gl-tgrip { position: absolute; left: 14px; top: 5px; }
+  .gl-task.has-grip.dragging { opacity: 0.45; }
+  .gl-sec-toggle { display: inline-flex; align-items: center; gap: 8px; border: none; background: none; cursor: pointer; padding: 2px 4px 2px 0; margin: 0; color: inherit; font: inherit; text-align: left; }
+  .gl-sec-toggle .gl-sec-caret { font-size: 20px; line-height: 1; color: var(--ink-light); width: 22px; }
   .gl-ms-drop { height: 3px; border-radius: 2px; background: var(--accent); margin: -2px 0; }
   .gl-caret { border: none; background: none; cursor: pointer; color: var(--ink-light); font-size: 11px; width: 22px; height: 28px; padding: 0; }
   .gl-task { display: flex; align-items: center; gap: 8px; min-height: 38px; border-top: 1px solid var(--neutral-line); padding: 2px 10px 2px 40px; position: relative; }
@@ -2635,6 +2648,8 @@
     .gl-pop { position: fixed; left: 12px; right: 12px; top: auto; bottom: 72px; width: auto; }
     .gl-wtask-menu { position: fixed; left: 12px; right: 12px; top: auto; bottom: 72px; width: auto; padding: 12px; }
     .gl-task { padding-left: 14px; }
+    .gl-task.has-grip { padding-left: 30px; }
+    .gl-tgrip { left: 6px; }
     .gl-ms-head > input.gl-inline { flex-basis: calc(100% - 70px) !important; }
     .gl-input, .gl-inline { font-size: 16px; } /* 16px prevents iOS auto-zoom */
   }
@@ -3773,8 +3788,10 @@ const GL_RULE_MEASURES = {
   // v5.13.0 — measures for rules that read the Habit Tracker instead of the Fitness log (rule.source === 'habits')
   'h-days':     { label: 'Days completed',              unit: 'days', day: null,        agg: 'days', src: 'habits' },
   'h-qty':      { label: 'Total of the Qty field',      unit: 'total', day: 'qty',      agg: 'sum',  src: 'habits' },
+  // v5.61.0 — a task rule that reads the Reading log (rule.source === 'reading'); computed by glReadingTaskRule, not by ruleAgg
+  'r-pages':    { label: 'Pages read',                  unit: 'pp',   day: null,        agg: 'sum',  src: 'reading' },
 };
-function ruleSource(rule) { return rule && rule.source === 'habits' ? 'habits' : 'fitness'; }
+function ruleSource(rule) { return rule && rule.source === 'habits' ? 'habits' : rule && rule.source === 'reading' ? 'reading' : 'fitness'; }
 // A day of the fitness log as a flat list of exercise entries (handles the older workout-shaped days too)
 function flDayExs(raw) {
   const r = raw || [];
@@ -3811,6 +3828,8 @@ function fgGoalName(exerciseId, library) {
 function glNewRule(source) {
   return source === 'habits'
     ? { source: 'habits', src: { habitIds: [] }, measure: 'h-days', target: '', window: 'since' }
+    : source === 'reading'
+    ? { source: 'reading', src: {}, measure: 'r-pages', target: '', window: 'since' }
     : { source: 'fitness', src: { exerciseIds: [], subs: [] }, measure: 'dist-sum', target: '', window: 'since' };
 }
 // Habits a habit rule counts (ids that still exist). A day counts for 'Days completed' when ANY chosen habit is checked
@@ -3896,6 +3915,7 @@ function ruleBase(rule, fctx) {
   const target = ruleTarget(rule);
   const base = { spec, target, unit: spec ? spec.unit : '', value: 0, met: false, pct: 0, ready: false, metOn: null };
   if (!spec || target === null) return { ...base, why: 'Set a target' };
+  if (ruleSource(rule) === 'reading') return { ...base, why: 'Reading rules work on tasks' };
   if (ruleSource(rule) === 'habits') {
     const have = new Set(((fctx && fctx.habitGoals) || []).map(h => h.id));
     const ids = (((rule.src || {}).habitIds) || []).filter(id => have.has(id));
@@ -3906,10 +3926,68 @@ function ruleBase(rule, fctx) {
   if (!match.size) return { ...base, why: 'Pick what counts' };
   return { ...base, match, why: '' };
 }
-// Where a task's rule stands (its scheduled day only). null when the task has no rule.
-function glTaskRule(task, fctx) {
+// ── READING-LOG RULES FOR TASKS (v5.61.0) ──
+// A project task can check itself off from the Reading log. All reading tasks of one project share ONE running total of
+// the pages logged for the project's linked book (goal.bookId):
+//   order  = scheduled tasks by day (same day: milestone order, then task order), then unscheduled tasks in milestone order
+//   a task is met when pages logged >= the sum of the targets of every task up to and including it
+// So reading ahead or catching up needs no rescheduling, and a task's place only moves when tasks are rescheduled, added or
+// removed. Pages count from the project's start date (else the earliest milestone start; else every entry) through today.
+// Done state never changes the order or the sums, so checking a task by hand does not move anyone else's threshold.
+// Rule shape: { source:'reading', src:{}, measure:'r-pages', target:'25', window:'since' }. One book per project (the linked book).
+const _glRpCache = new WeakMap();   // goal object -> { log, day, pool } (goals are replaced, never mutated, so identity is a safe key)
+function glReadingPool(goal, fctx) {
+  const todayKey = (fctx && fctx.todayKey) || glToday();
+  const log = (fctx && fctx.targetLog) || null;
+  const hit = goal && _glRpCache.get(goal);
+  if (hit && hit.log === log && hit.day === todayKey) return hit.pool;
+  const L = Array.isArray(log) ? log : [];
+  const book = goal && goal.bookId ? L.find(b => b && b.id === goal.bookId && b.kind === 'reading') || null : null;
+  const items = [];
+  ((goal && goal.milestones) || []).forEach((m, mi) => (m.tasks || []).forEach((t, ti) => {
+    if (t.rule && ruleSource(t.rule) === 'reading') items.push({ t, mi, ti });
+  }));
+  const starts = ((goal && goal.milestones) || []).map(m => m.startDate).filter(Boolean).sort();
+  const from = (goal && goal.startDate) || starts[0] || '';
+  const entries = book
+    ? (book.updates || []).filter(u => u && u.date && Number(u.pages) > 0 && (!from || u.date >= from) && u.date <= todayKey)
+        .map(u => ({ date: u.date, pages: Number(u.pages) })).sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0)
+    : [];
+  const total = entries.reduce((a, u) => a + u.pages, 0);
+  const reachedOn = th => { let c = 0; for (const u of entries) { c += u.pages; if (c >= th) return u.date; } return null; };
+  const valid = items.filter(x => ruleTarget(x.t.rule) !== null);
+  const dated = valid.filter(x => x.t.scheduledDate).sort((a, b) =>
+    a.t.scheduledDate < b.t.scheduledDate ? -1 : a.t.scheduledDate > b.t.scheduledDate ? 1 : (a.mi - b.mi) || (a.ti - b.ti));
+  const undated = valid.filter(x => !x.t.scheduledDate).sort((a, b) => (a.mi - b.mi) || (a.ti - b.ti));
+  const byId = {};
+  let cum = 0;
+  [...dated, ...undated].forEach(x => {
+    const target = ruleTarget(x.t.rule);
+    const prev = cum; cum += target;
+    const met = total >= cum;
+    byId[x.t.id] = { ready: true, reading: true, spec: GL_RULE_MEASURES['r-pages'], unit: 'pp', target: cum, own: target, prev, value: Math.min(total, cum), total,
+      need: Math.max(0, cum - total), met, metOn: met ? reachedOn(cum) : null, pct: Math.max(0, Math.min(1, (total - prev) / target)),
+      from, unscheduled: !x.t.scheduledDate, why: '' };
+  });
+  const pool = { book, from, total, byId };
+  if (goal) _glRpCache.set(goal, { log, day: todayKey, pool });
+  return pool;
+}
+function glReadingTaskRule(task, goal, fctx) {
+  const rule = task.rule;
+  const base = { spec: GL_RULE_MEASURES['r-pages'], target: ruleTarget(rule), unit: 'pp', value: 0, met: false, pct: 0, ready: false, metOn: null, reading: true };
+  if (base.target === null) return { ...base, why: 'Set a target' };
+  if (!goal) return { ...base, why: 'Open this from its project' };
+  const pool = glReadingPool(goal, fctx);
+  if (!pool.book) return { ...base, why: 'Link a book to this project' };
+  return pool.byId[task.id] || { ...base, why: 'Set a target' };
+}
+// Where a task's rule stands (fitness / habits: its scheduled day only; reading: the project's running total). null when the task has no rule.
+// `goal` is the project the task belongs to; only reading rules need it.
+function glTaskRule(task, fctx, goal) {
   const rule = task && task.rule;
   if (!rule) return null;
+  if (ruleSource(rule) === 'reading') return glReadingTaskRule(task, goal, fctx);
   const b = ruleBase(rule, fctx);
   if (!b.match) return b;
   if (!task.scheduledDate) return { ...b, why: 'Schedule it to use this' };
@@ -3952,7 +4030,7 @@ function glAutoComplete(goals, mctx, asOf) {
   const reached = [];
   let changed = false;
   const todayKey = fmtLocal(asOf);
-  const fctx = { fitnessLog: mctx.fitnessLog, fitnessExercises: mctx.fitnessExercises, habitGoals: mctx.habitGoals, habitCompletions: mctx.habitCompletions, habitQty: mctx.habitQty };
+  const fctx = { fitnessLog: mctx.fitnessLog, fitnessExercises: mctx.fitnessExercises, habitGoals: mctx.habitGoals, habitCompletions: mctx.habitCompletions, habitQty: mctx.habitQty, targetLog: mctx.targetLog, todayKey };
   const out = (goals || []).map(g => {
     if (g.status === 'done' || g.status === 'parked') return g;
     let touched = false;
@@ -3962,11 +4040,11 @@ function glAutoComplete(goals, mctx, asOf) {
         let anyTask = false;
         const tasks = m.tasks.map(t => {
           if (!t.rule || t.done || t.ruleHold) return t;
-          const s = glTaskRule(t, fctx);
+          const s = glTaskRule(t, fctx, g);
           if (!s || !s.met) return t;
           anyTask = true;
           reached.push({ kind: 'task', gid: g.id, mid: m.id, tid: t.id, title: t.title, goal: g.title });
-          return { ...t, done: true, completedAt: glNoon(t.scheduledDate), autoDone: true };
+          return { ...t, done: true, completedAt: glNoon(s.metOn || t.scheduledDate), autoDone: true };
         });
         if (anyTask) mm = { ...mm, tasks };
       }
@@ -6800,7 +6878,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
       const ref = {goalId: goal.id, msId: ms.id, taskId: task.id};
       return (
         <GlWeekTask key={'gt-'+task.id} item={{goal, ms, task}}
-          rule={task.rule ? glTaskRule(task, {fitnessLog, fitnessExercises}) : null}
+          rule={task.rule ? glTaskRule(task, {fitnessLog, fitnessExercises, targetLog: mctx && mctx.targetLog}, goal) : null}
           onToggle={()=>setGoalTask(ref, {done: !task.done})}
           onMove={d=>setGoalTask(ref, {scheduledDate: d})}
           onOpen={()=>onOpenGoal && onOpenGoal(goal.id)}
@@ -11875,6 +11953,48 @@ function glNewGoal(goals) {
   return { id: glId('gl'), title: '', why: '', color, status: 'active', startDate: t, targetDate: glAddDays(t, 90),
     notesPageId: null, showCountdown: false, retro: '', createdAt: Date.now(), completedAt: null, milestones: [] };
 }
+// v5.60.0 — project tags: plain strings on goal.tags, matched ignoring case/spaces (same idea as exercise subcategories)
+function glTagKey(s) { return String(s || '').trim().toLowerCase(); }
+function glTags(g) { return Array.isArray(g && g.tags) ? g.tags : []; }
+function glAllTags(goals) {
+  const seen = {}, out = [];
+  (goals || []).forEach(g => glTags(g).forEach(t => { const k = glTagKey(t); if (k && !seen[k]) { seen[k] = 1; out.push(String(t).trim()); } }));
+  return out.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+}
+function GlTagEditor({ tags, all, onChange }) {
+  const [txt, setTxt] = useState('');
+  const listId = React.useMemo(() => 'gl-tags-' + Math.random().toString(36).slice(2, 8), []);
+  const cur = Array.isArray(tags) ? tags : [];
+  const used = new Set(cur.map(glTagKey));
+  function add(raw) {
+    const parts = String(raw || '').split(',').map(x => x.trim()).filter(Boolean);
+    if (!parts.length) { setTxt(''); return; }
+    const have = new Set(used), next = [...cur];
+    parts.forEach(pt => {
+      const k = glTagKey(pt);
+      if (have.has(k)) return;
+      have.add(k);
+      next.push((all || []).find(a => glTagKey(a) === k) || pt);   // reuse the existing spelling/capitals
+    });
+    if (next.length !== cur.length) onChange(next);
+    setTxt('');
+  }
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginTop: 6 }}>
+      {cur.map(t => (
+        <span key={t} className="gl-tag">{t}
+          <button type="button" aria-label={'Remove tag ' + t} onClick={() => onChange(cur.filter(x => x !== t))}>✕</button>
+        </span>
+      ))}
+      <input className="gl-inline" list={listId} value={txt} placeholder={cur.length ? '+ tag' : '+ Add tags (e.g. Home, Writing)'}
+        style={{ fontSize: 13, width: cur.length ? 90 : 210, minWidth: 0 }}
+        onChange={e => { const v = e.target.value; if (v.includes(',')) add(v); else setTxt(v); }}
+        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add(txt); } else if (e.key === 'Backspace' && !txt && cur.length) onChange(cur.slice(0, -1)); }}
+        onBlur={() => add(txt)} />
+      <datalist id={listId}>{(all || []).filter(a => !used.has(glTagKey(a))).map(a => <option key={a} value={a} />)}</datalist>
+    </div>
+  );
+}
 function glNewMilestone(g) {
   const ms = g.milestones || [];
   const last = ms[ms.length - 1];
@@ -12115,7 +12235,7 @@ function GlWeekTask({ item, rule, onToggle, onMove, onOpen, onDragStart, onDragE
       <span className="gl-wtask-pill" style={{ color: glInk(c), background: glTint(c, 0.18) }}>◆ {goal.title || 'Goal'}</span>
       {rule && (
         <span className="gl-wtask-rule" style={{ color: rule.ready ? glInk(c) : 'var(--ink-light)' }}
-          title={task.ruleHold ? 'Auto-check is paused because you unchecked this' : 'Checks itself off from your Fitness log'}>
+          title={task.ruleHold ? 'Auto-check is paused because you unchecked this' : rule.reading ? 'Checks itself off from your Reading log' : 'Checks itself off from your Fitness log'}>
           {rule.ready
             ? <>↻ {mRound(rule.value)} / {mRound(rule.target)} {rule.unit}{task.done && task.autoDone ? ' · auto' : ''}{task.ruleHold ? ' · paused' : ''}</>
             : <>↻ {rule.why}</>}
@@ -12200,6 +12320,7 @@ function GlTimeline({ goals, onOpenGoal, onChangeGoal }) {
   const [zoom, setZoom] = useState(() => sessionStorage.getItem('lp_glZoom') || 'month');
   const [offset, setOffset] = useState(0);
   const [show, setShow] = useState('active');   // 'active' | 'all' | <goalId>
+  const [tagSel, setTagSel] = useState(() => { try { const v = JSON.parse(sessionStorage.getItem('lp_glTags') || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; } });   // v5.60.0 — selected tag keys (any match)
   const [opened, setOpened] = useState({});   // v5.29.0 — goal ids whose milestones are showing (collapsed by default)
   const [msOpen, setMsOpen] = useState({});   // v5.15.0 — milestone ids whose tasks are showing (collapsed by default)
   const range = glRange(zoom, offset);
@@ -12287,7 +12408,16 @@ function GlTimeline({ goals, onOpenGoal, onChangeGoal }) {
   const pct = (s, endOfDay) => { const d = parseLocal(s); if (!d) return null; if (endOfDay) d.setDate(d.getDate() + 1); return (d - range.start) / total * 100; };
   const clip = (a, b) => { if (a == null || b == null) return null; const l = Math.max(0, a), r = Math.min(100, b); return r > l ? { left: l, width: r - l } : null; };
 
-  const shown = goals.filter(g => show === 'active' ? g.status === 'active' : show === 'all' ? g.status !== 'done' : g.id === show);
+  const allTags = glAllTags(goals);
+  const tagKeys = tagSel.filter(k => allTags.some(t => glTagKey(t) === k));   // ignore tags nobody uses any more
+  const tagFilterOn = tagKeys.length > 0 && (show === 'active' || show === 'all');   // picking one specific project ignores the tag filter
+  function toggleTag(t) {
+    const k = glTagKey(t);
+    setTagSel(cur => { const n = cur.includes(k) ? cur.filter(x => x !== k) : [...cur, k]; try { sessionStorage.setItem('lp_glTags', JSON.stringify(n)); } catch (e) {} return n; });
+  }
+  function clearTags() { setTagSel([]); try { sessionStorage.removeItem('lp_glTags'); } catch (e) {} }
+  const shown = goals.filter(g => show === 'active' ? g.status === 'active' : show === 'all' ? g.status !== 'done' : g.id === show)
+    .filter(g => !tagFilterOn || glTags(g).some(t => tagKeys.includes(glTagKey(t))));
   const rows = [];
   shown.forEach(g => {
     rows.push({ type: 'goal', g });
@@ -12336,6 +12466,17 @@ function GlTimeline({ goals, onOpenGoal, onChangeGoal }) {
           </div>
         </div>
       </div>
+      {allTags.length > 0 && (
+        <div role="group" aria-label="Filter by tag" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, padding: '8px 16px', borderBottom: '1px solid var(--border)' }}>
+          <span className="gl-label" style={{ marginRight: 2 }}>Tags</span>
+          {allTags.map(t => {
+            const on = tagKeys.includes(glTagKey(t));
+            return <button key={t} type="button" className={`gl-chip ${on ? 'on' : ''}`} aria-pressed={on} onClick={() => toggleTag(t)}>{t}</button>;
+          })}
+          {tagKeys.length > 0 && <button type="button" className="gl-btn ghost" onClick={clearTags}>Clear</button>}
+          {tagKeys.length > 0 && show !== 'active' && show !== 'all' && <span style={{ fontSize: 12, color: 'var(--ink-faint)' }}>(not applied while one project is selected)</span>}
+        </div>
+      )}
       {!rows.length ? (
         <div style={{ padding: '28px 16px', fontSize: 13, color: 'var(--ink-light)', textAlign: 'center' }}>
           {goals.length ? 'No projects match this filter.' : 'Create a project to see it on the timeline.'}
@@ -12489,6 +12630,7 @@ function GlRuleEditor({ rule, scope, status, held, done, auto, fctx, onPatch, on
   const toggleSub = name => onPatch({ src: { ...src, subs: subOn(name) ? (src.subs || []).filter(x => ruleSubKey(x) !== ruleSubKey(name)) : [...(src.subs || []), name] } });
   const toggleEx = id => { const cur = src.exerciseIds || []; onPatch({ src: { ...src, exerciseIds: cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id] } }); };
   const isHab = ruleSource(rule) === 'habits';
+  const isRead = ruleSource(rule) === 'reading';
   const habs = (fctx && fctx.habitGoals) || [];
   const habIds = (src.habitIds || []);
   const toggleHab = id => onPatch({ src: { ...src, habitIds: habIds.includes(id) ? habIds.filter(x => x !== id) : [...habIds, id] } });
@@ -12501,7 +12643,7 @@ function GlRuleEditor({ rule, scope, status, held, done, auto, fctx, onPatch, on
   const distLike = spec.day === 'dist' || spec.day === 'distMax' || spec.day === 'mins';
   const strengthLike = spec.day === 'reps' || spec.day === 'weightMax';
   let warn = '';
-  if (isHab) warn = '';
+  if (isHab || isRead) warn = '';
   else if (distLike && noCardio) warn = "None of these are Cardio exercises, so they don't log miles or minutes.";
   else if (strengthLike && cardioOnly) warn = "Cardio exercises don't log reps or weight.";
   let note = '';
@@ -12509,20 +12651,30 @@ function GlRuleEditor({ rule, scope, status, held, done, auto, fctx, onPatch, on
   else if (done && auto) note = `Completed automatically${status && status.metOn ? ' · ' + glShortDay(status.metOn) : ''}.`;
   else if (status) {
     if (!status.ready) note = status.why + '.';
+    else if (status.reading) note = `Book total ${mRound(status.total)} pp${status.from ? ' since ' + glShort(status.from) : ''}. Checks off at ${mRound(status.target)} pp${status.need > 0 ? ' (' + mRound(status.need) + ' to go)' : ''}.${status.unscheduled ? ' Not scheduled, so it counts after all scheduled tasks.' : ''}`;
     else if (status.notStarted) note = `Starts counting ${glShort(status.from)}.`;
     else if (status.weekly) note = `This week ${mRound(status.value)} of ${mRound(status.target)} ${status.unit}. Best week so far ${mRound(status.best)}.`;
     else note = `Now ${mRound(status.value)} of ${mRound(status.target)} ${status.unit}.`;
   }
   return (
     <div className="gl-rule">
-      {scope === 'ms' && (
+      {(scope === 'ms' || scope === 'task') && (
         <div className="gl-rule-row">
           <span className="gl-rule-label" style={{ minWidth: 62 }}>Reads from</span>
-          <button className={`gl-chip ${!isHab ? 'on' : ''}`} aria-pressed={!isHab} onClick={() => setSource('fitness')}>Fitness log</button>
-          <button className={`gl-chip ${isHab ? 'on' : ''}`} aria-pressed={isHab} onClick={() => setSource('habits')}>Habits</button>
+          <button className={`gl-chip ${!isHab && !isRead ? 'on' : ''}`} aria-pressed={!isHab && !isRead} onClick={() => setSource('fitness')}>Fitness log</button>
+          {scope === 'ms'
+            ? <button className={`gl-chip ${isHab ? 'on' : ''}`} aria-pressed={isHab} onClick={() => setSource('habits')}>Habits</button>
+            : <button className={`gl-chip ${isRead ? 'on' : ''}`} aria-pressed={isRead} onClick={() => setSource('reading')}>Reading log</button>}
         </div>
       )}
-      {isHab ? (
+      {isRead ? (
+      <div className="gl-rule-row">
+        <span style={{ fontSize: 12, color: 'var(--ink-light)' }}>Read</span>
+        <input type="number" min="1" step="1" inputMode="numeric" className="gl-input" style={{ padding: '4px 6px', fontSize: 12, width: 70 }}
+          aria-label="Pages for this task" placeholder="pages" value={rule.target} onChange={e => onPatch({ target: e.target.value })} />
+        <span style={{ fontSize: 12, color: 'var(--ink-light)' }}>pages, counted from this project's linked book</span>
+      </div>
+      ) : isHab ? (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
         <span className="gl-rule-label">What counts</span>
         <div className="gl-rule-row">
@@ -12549,10 +12701,10 @@ function GlRuleEditor({ rule, scope, status, held, done, auto, fctx, onPatch, on
         )}
       </div>
       )}
-      <div className="gl-rule-row">
+      {!isRead && <div className="gl-rule-row">
         <select className="gl-input" style={{ padding: '4px 6px', fontSize: 12 }} aria-label="What to measure" value={rule.measure}
           onChange={e => onPatch({ measure: e.target.value })}>
-          {Object.entries(GL_RULE_MEASURES).filter(([k, v]) => (v.src === 'habits') === isHab).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+          {Object.entries(GL_RULE_MEASURES).filter(([k, v]) => (v.src || 'fitness') === (isHab ? 'habits' : 'fitness')).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
         </select>
         <span style={{ fontSize: 12, color: 'var(--ink-light)' }}>at least</span>
         <input type="number" min="0" step="0.1" inputMode="decimal" className="gl-input" style={{ padding: '4px 6px', fontSize: 12, width: 70 }}
@@ -12565,11 +12717,11 @@ function GlRuleEditor({ rule, scope, status, held, done, auto, fctx, onPatch, on
               <option value="week">in a single Sun–Sat week</option>
             </select>
           : <span style={{ fontSize: 12, color: 'var(--ink-light)' }}>on this task's day</span>}
-      </div>
+      </div>}
       {note && <span style={{ fontSize: 11.5, color: 'var(--ink-light)' }}>{note}</span>}
       {warn && <span style={{ fontSize: 11.5, color: '#b03a2e' }}>{warn}</span>}
       <div className="gl-rule-row" style={{ justifyContent: 'space-between' }}>
-        <span style={{ fontSize: 11, color: 'var(--ink-faint)' }}>{isHab ? 'A day counts when any chosen habit is checked off. Checking or unchecking by hand always wins.' : 'Counts completed sets only. Checking or unchecking by hand always wins.'}</span>
+        <span style={{ fontSize: 11, color: 'var(--ink-faint)' }}>{isRead ? "Pages add up across this project's reading tasks, scheduled ones first by day, then unscheduled ones. Checking or unchecking by hand always wins." : isHab ? 'A day counts when any chosen habit is checked off. Checking or unchecking by hand always wins.' : 'Counts completed sets only. Checking or unchecking by hand always wins.'}</span>
         <button className="gl-btn ghost" style={{ fontSize: 12 }} onClick={onRemove}>Remove auto-check</button>
       </div>
     </div>
@@ -12596,8 +12748,39 @@ function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange,
   const setMsRuleShut = v => setMsRuleShutRaw(prev => { const next = typeof v === 'function' ? v(prev) : v; glRuleShutSet(m.id, next); return next; });
   const [ruleOpen, setRuleOpen] = useState(null);   // task id whose auto-check rule editor is open (v5.11.0)
   const tasks = m.tasks || [];
+  // v5.62.0 — drag a task by its grip to reorder it inside this milestone (pointer events: finger, Pencil or mouse)
+  const taskListRef = useRef(null);
+  const [taskDrag, setTaskDrag] = useState(null);   // { id, idx } idx = insertion slot among the current list
+  function beginTaskDrag(e, id) {
+    if (e.button !== undefined && e.button !== 0) return;
+    e.preventDefault(); e.stopPropagation();
+    const slotAt = y => {
+      const els = [...(taskListRef.current ? taskListRef.current.querySelectorAll('[data-tid]') : [])];
+      for (let i = 0; i < els.length; i++) { const r = els[i].getBoundingClientRect(); if (y < r.top + r.height / 2) return i; }
+      return els.length;
+    };
+    let idx = slotAt(e.clientY);
+    setTaskDrag({ id, idx });
+    const move = ev => { idx = slotAt(ev.clientY); setTaskDrag({ id, idx }); };
+    const end = cancel => {
+      window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', cn);
+      setTaskDrag(null);
+      if (cancel) return;
+      onChange(mm => {
+        const list = [...(mm.tasks || [])];
+        const from = list.findIndex(x => x.id === id);
+        if (from < 0) return mm;
+        const to = idx > from ? idx - 1 : idx;
+        if (to === from) return mm;
+        const [it] = list.splice(from, 1); list.splice(Math.max(0, Math.min(list.length, to)), 0, it);
+        return { ...mm, tasks: list };
+      });
+    };
+    const up = () => end(false), cn = () => end(true);
+    window.addEventListener('pointermove', move); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', cn);
+  }
   const late = glMsOverdue(m, today);
-  const fctx = { fitnessLog: mctx && mctx.fitnessLog, fitnessExercises: mctx && mctx.fitnessExercises, habitGoals: mctx && mctx.habitGoals, habitCompletions: mctx && mctx.habitCompletions, habitQty: mctx && mctx.habitQty };
+  const fctx = { fitnessLog: mctx && mctx.fitnessLog, fitnessExercises: mctx && mctx.fitnessExercises, habitGoals: mctx && mctx.habitGoals, habitCompletions: mctx && mctx.habitCompletions, habitQty: mctx && mctx.habitQty, targetLog: mctx && mctx.targetLog };
   function setTask(tid, patch) {
     onChange(mm => ({ ...mm, tasks: (mm.tasks || []).map(t => t.id === tid ? { ...t, ...patch, ...(('done' in patch) ? glDoneExtra(t, patch.done) : {}) } : t) }));
   }
@@ -12668,7 +12851,7 @@ function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange,
         </div>
       </div>
       {open && (
-        <div>
+        <div ref={taskListRef}>
           {/* v4.8.0 — complete this milestone from my weight. v5.7.0: only offered when the goal links Weight
               (Links → Measurements) or this milestone already uses it */}
           {m.metric && (() => {
@@ -12722,8 +12905,11 @@ function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange,
                 onRemove={() => { setMsRuleShut(false); onChange(dropRule); }} />}
             </div>
           )}
-          {tasks.map(t => { const tst = t.rule ? glTaskRule(t, fctx) : null; return (
-            <div key={t.id} className="gl-task" style={ruleOpen === t.id ? { flexWrap: 'wrap', rowGap: 6 } : undefined}>
+          {tasks.map((t, ti) => { const tst = t.rule ? glTaskRule(t, fctx, goal) : null; return (
+            <React.Fragment key={t.id}>
+            {taskDrag && taskDrag.idx === ti && <div className="gl-ms-drop" data-testid="task-drop" />}
+            <div data-tid={t.id} className={`gl-task${tasks.length > 1 ? ' has-grip' : ''}${taskDrag && taskDrag.id === t.id ? ' dragging' : ''}`} style={ruleOpen === t.id ? { flexWrap: 'wrap', rowGap: 6 } : undefined}>
+              {tasks.length > 1 && <button className="gl-grip gl-tgrip" aria-label="Drag to reorder task" title="Drag to reorder" onPointerDown={e => beginTaskDrag(e, t.id)}>⋮⋮</button>}
               <button className={`gl-check ${t.done ? 'on' : ''}`} aria-label={t.done ? 'Mark task not done' : 'Mark task done'}
                 onClick={() => setTask(t.id, { done: !t.done })}>{t.done ? '✓' : ''}</button>
               <input className="gl-inline" style={{ flex: 1, fontSize: 14, textDecoration: t.done ? 'line-through' : 'none', color: t.done ? 'var(--ink-light)' : 'var(--ink)' }}
@@ -12737,8 +12923,8 @@ function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange,
                 {t.scheduledDate ? glShortDay(t.scheduledDate) : '+ Schedule'}
               </button>
               {(
-                <button className={`gl-sched ${t.rule ? 'set' : ''}`} aria-expanded={ruleOpen === t.id} aria-label="Check off automatically from my Fitness log"
-                  title="Check this off automatically from my Fitness log"
+                <button className={`gl-sched ${t.rule ? 'set' : ''}`} aria-expanded={ruleOpen === t.id} aria-label="Check off automatically from my Fitness or Reading log"
+                  title="Check this off automatically from my Fitness or Reading log"
                   style={t.rule ? { background: glTint(color, 0.14), color: glInk(color) } : undefined}
                   onClick={() => { if (!t.rule) setTask(t.id, { rule: glNewRule() }); setRuleOpen(p => p === t.id ? null : t.id); }}>
                   {t.rule ? `↻ ${tst && tst.ready ? mRound(tst.value) + '/' + mRound(tst.target) : 'auto'}` : '↻'}
@@ -12749,7 +12935,9 @@ function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange,
               {ruleOpen === t.id && t.rule && <GlRuleEditor rule={t.rule} scope="task" status={tst} held={!!t.ruleHold} done={!!t.done} auto={!!t.autoDone}
                 fctx={fctx} onPatch={p => setTaskRule(t.id, p)} onRemove={() => removeTaskRule(t.id)} />}
             </div>
+            </React.Fragment>
           ); })}
+          {taskDrag && taskDrag.idx === tasks.length && <div className="gl-ms-drop" data-testid="task-drop" />}
           <div className="gl-task" style={{ flexWrap: 'wrap', rowGap: 4 }}>
             <span style={{ width: 18, textAlign: 'center', color: 'var(--ink-faint)' }}>+</span>
             <input className="gl-inline" style={{ flex: '1 1 160px', fontSize: 14 }} placeholder="Add a task — press Enter" value={newTask}
@@ -12770,7 +12958,7 @@ function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange,
   );
 }
 
-function GlDetail({ books, goal, onChange, onDelete, onBack, pagesData, onOpenPage, habitGoals, fitnessExercises, habitCompletions, fitnessLog, mctx }) {
+function GlDetail({ allTags, books, goal, onChange, onDelete, onBack, pagesData, onOpenPage, habitGoals, fitnessExercises, habitCompletions, fitnessLog, mctx }) {
   const today = glToday();
   const linkWeekStart = getWeekStart(new Date());
   const [openMs, setOpenMs] = useState(() => { const n = glNextMilestone(goal); return n ? { [n.id]: true } : {}; });
@@ -12850,6 +13038,7 @@ function GlDetail({ books, goal, onChange, onDelete, onBack, pagesData, onOpenPa
             <textarea className="gl-inline" rows={2} placeholder="Why does this matter? (optional)" value={goal.why || ''}
               style={{ width: '100%', resize: 'vertical', fontSize: 14, fontStyle: 'italic', color: 'var(--ink-light)', marginTop: 4, boxSizing: 'border-box' }}
               onChange={e => onChange(g => ({ ...g, why: e.target.value }))} />
+            <GlTagEditor tags={goal.tags} all={allTags} onChange={t => onChange(g => ({ ...g, tags: t }))} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 8 }}>
               <div className="gl-bar" style={{ flex: 1, height: 8, background: glTint(c, 0.15) }}><div style={{ width: Math.round(glProgress(goal) * 100) + '%', background: c }} /></div>
               <span className="gl-mono" style={{ fontSize: 12, color: 'var(--ink-light)' }}>{Math.round(glProgress(goal) * 100)}% · {counts.done} of {counts.total} tasks</span>
@@ -13356,6 +13545,12 @@ function TargetsView({ targets, setTargets, targetLog, setTargetLog }) {   // th
   const [bookForm, setBookForm] = useState(null);
   const [rview, setRviewRaw] = useState(() => lsGet('glReadView') === 'chart' ? 'chart' : 'log'); // v5.53.0 — Log | Chart, per device
   const setRview = v => { lsSet('glReadView', v); setRviewRaw(v); };
+  // v5.62.0 — Goals and Reading log sections can be collapsed; remembered per device
+  const [secShut, setSecShutRaw] = useState(() => { try { const o = JSON.parse(lsGet('glSecShut') || '{}'); return { goals: !!o.goals, reading: !!o.reading }; } catch { return { goals: false, reading: false }; } });
+  const toggleSec = k => setSecShutRaw(prev => { const next = { ...prev, [k]: !prev[k] }; lsSet('glSecShut', JSON.stringify(next)); return next; });
+  // v5.63.0 — Reading log filter: active | toread | parked | finished | all (remembered per device)
+  const [rfilter, setRfilterRaw] = useState(() => { const v = lsGet('glReadFilter'); return ['active', 'toread', 'parked', 'finished', 'all'].includes(v) ? v : 'active'; });
+  const setRfilter = v => { lsSet('glReadFilter', v); setRfilterRaw(v); };
   const [openId, setOpenId] = useState(null);
   const [pageIn, setPageIn] = useState({});
   const [logDate, setLogDate] = useState({});
@@ -13363,7 +13558,10 @@ function TargetsView({ targets, setTargets, targetLog, setTargetLog }) {   // th
   const [finishDate, setFinishDate] = useState(today);
   const accent = 'var(--accent)';
   const books = L.filter(x => x.kind === 'reading');
-  const reading = books.filter(x => !x.finishedDate);
+  const reading = books.filter(x => !x.finishedDate && !x.status);
+  const toRead = books.filter(x => !x.finishedDate && x.status === 'toread');
+  const parkedBooks = books.filter(x => !x.finishedDate && x.status === 'parked');
+  const setShelf = (x, v) => patchBook(x.id, b => { const { status, ...rest } = b; return v ? { ...rest, status: v } : rest; });
   const finished = books.filter(x => x.finishedDate).sort((a, b) => b.finishedDate.localeCompare(a.finishedDate));
   const patchBook = (id, fn) => setTargetLog(l => (Array.isArray(l) ? l : []).map(x => x.id === id ? fn(x) : x));
 
@@ -13371,7 +13569,8 @@ function TargetsView({ targets, setTargets, targetLog, setTargetLog }) {   // th
     if (!bookForm || !(bookForm.title || '').trim()) return;
     const read = parseInt(bookForm.read, 10) || 0;
     setTargetLog(l => [...(Array.isArray(l) ? l : []), { id: tgUid(), kind: 'reading', title: bookForm.title.trim(), author: (bookForm.author || '').trim(),
-      total: parseInt(bookForm.total, 10) || 0, updates: read > 0 ? [{ date: today, pages: read }] : [], finishedDate: null, notes: '', ...(bookForm.start ? { startDate: bookForm.start } : {}) }]);
+      total: parseInt(bookForm.total, 10) || 0, updates: read > 0 ? [{ date: today, pages: read }] : [], finishedDate: null, notes: '', ...(bookForm.shelf ? { status: bookForm.shelf } : {}), ...(bookForm.start ? { startDate: bookForm.start } : {}) }]);
+    setRfilter(bookForm.shelf === 'toread' ? 'toread' : 'active');
     setBookForm(null);
   }
   function logPages(x) {
@@ -13429,6 +13628,24 @@ function TargetsView({ targets, setTargets, targetLog, setTargetLog }) {   // th
       </div>
     );
   }
+  // v5.63.0 — compact row for a book that is on the To read shelf or parked
+  function shelfRow(x, kind) {
+    const rd = tgRead(x);
+    return (
+      <div key={x.id} style={{ borderTop: '1px solid var(--border)', padding: '10px 0' }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, cursor: 'pointer' }} onClick={() => setOpenId(openId === x.id ? null : x.id)}>
+          <span style={{ fontWeight: 600, fontSize: 14, flex: 1, minWidth: 0 }}>{x.title}{x.author ? <span style={{ fontWeight: 400, color: 'var(--ink-light)' }}> · {x.author}</span> : null}</span>
+          <span className="gl-mono" style={{ ...lab, whiteSpace: 'nowrap' }}>{rd > 0 ? `${rd}${x.total ? ` / ${x.total}` : ''} pp` : x.total ? `${x.total} pp` : ''}</span>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6 }}>
+          {kind === 'toread'
+            ? <><button className="gl-btn primary" onClick={() => setShelf(x, null)}>Start reading</button><button className="gl-btn" onClick={() => setShelf(x, 'parked')}>Park</button></>
+            : <><button className="gl-btn primary" onClick={() => setShelf(x, null)}>Resume</button><button className="gl-btn" onClick={() => setShelf(x, 'toread')}>Move to To read</button></>}
+        </div>
+        {openId === x.id && bookEditor(x)}
+      </div>
+    );
+  }
   function bookEditor(x) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '10px 0 4px' }}>
@@ -13477,16 +13694,19 @@ function TargetsView({ targets, setTargets, targetLog, setTargetLog }) {   // th
       <main className="gl-main">
         <section className="gl-card" style={{ padding: '14px 16px', flexShrink: 0, flexDirection: 'column' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
-            <span className="gl-h2" style={{ fontSize: 20 }}>Goals</span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <button type="button" className="gl-sec-toggle" aria-expanded={!secShut.goals} aria-label={secShut.goals ? 'Expand Goals' : 'Collapse Goals'} onClick={() => toggleSec('goals')}>
+              <span className="gl-sec-caret" aria-hidden="true">{secShut.goals ? '▸' : '▾'}</span><span className="gl-h2" style={{ fontSize: 20 }}>Goals</span>
+            </button>
+            {!secShut.goals && <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <div role="group" aria-label="Show" style={{ display: 'flex', gap: 6 }}>
                 {[['active', 'Active'], ['completed', 'Completed'], ['all', 'All']].map(([k, lbl]) => (
                   <button key={k} className={`gl-chip ${filter === k ? 'on' : ''}`} aria-pressed={filter === k} onClick={() => setFilter(k)}>{lbl}</button>
                 ))}
               </div>
               <button className="gl-btn primary" onClick={() => setAdding(a => !a)}>{adding ? 'Cancel' : '+ New goal'}</button>
-            </div>
+            </div>}
           </div>
+          {!secShut.goals && <>
           {adding && (
             <div style={{ marginBottom: 12, padding: 10, background: 'var(--cream)', borderRadius: 10 }}>
               <TgNewForm defaultYear={year} targetLog={targetLog} setTargets={setTargets} onDone={() => setAdding(false)} />
@@ -13520,19 +13740,23 @@ function TargetsView({ targets, setTargets, targetLog, setTargetLog }) {   // th
               </div>
             );
           })}
+          </>}
         </section>
 
         <section className="gl-card" style={{ padding: '14px 16px', flexShrink: 0, flexDirection: 'column' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-            <span className="gl-h2" style={{ fontSize: 20 }}>Reading log</span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: secShut.reading ? 0 : 8 }}>
+            <button type="button" className="gl-sec-toggle" aria-expanded={!secShut.reading} aria-label={secShut.reading ? 'Expand Reading log' : 'Collapse Reading log'} onClick={() => toggleSec('reading')}>
+              <span className="gl-sec-caret" aria-hidden="true">{secShut.reading ? '▸' : '▾'}</span><span className="gl-h2" style={{ fontSize: 20 }}>Reading log</span>
+            </button>
+            {!secShut.reading && <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <div className="gl-seg" role="tablist" aria-label="Reading log view">
                 <button role="tab" aria-selected={rview === 'log'} className={rview === 'log' ? 'on' : ''} onClick={() => setRview('log')}>Log</button>
                 <button role="tab" aria-selected={rview === 'chart'} className={rview === 'chart' ? 'on' : ''} onClick={() => setRview('chart')}>Chart</button>
               </div>
               {rview === 'log' && <button className="gl-btn primary" onClick={() => setBookForm(bookForm ? null : { title: '', author: '', total: '', read: '', start: '' })}>{bookForm ? 'Cancel' : '+ Add book'}</button>}
-            </div>
+            </div>}
           </div>
+          {!secShut.reading && <>
           {rview === 'chart' ? <TgPagesChart books={books} /> : <>
           {bookForm && (
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12, padding: 10, background: 'var(--cream)', borderRadius: 10 }}>
@@ -13542,12 +13766,24 @@ function TargetsView({ targets, setTargets, targetLog, setTargetLog }) {   // th
               <input className="gl-input" style={{ width: 110 }} type="number" min="0" placeholder="Read so far" value={bookForm.read} onChange={e => setBookForm(f => ({ ...f, read: e.target.value }))} />
               <label style={{ ...lab, display: 'flex', alignItems: 'center', gap: 6 }}>Started
                 <input className="gl-input" type="date" max={today} value={bookForm.start || ''} onChange={e => setBookForm(f => ({ ...f, start: e.target.value }))} /></label>
+              <select className="gl-input" aria-label="Add to" value={bookForm.shelf || ''} onChange={e => setBookForm(f => ({ ...f, shelf: e.target.value }))}>
+                <option value="">Reading now</option><option value="toread">To read</option>
+              </select>
               <button className="gl-btn primary" onClick={addBook}>Add</button>
             </div>
           )}
           {!books.length && !bookForm && <div style={{ fontSize: 13, color: 'var(--ink-light)' }}>No books logged yet.</div>}
-          {reading.length > 0 && <div className="gl-label" style={{ margin: '4px 0' }}>Reading now</div>}
-          {reading.map(x => {
+          {books.length > 0 && (
+            <div role="group" aria-label="Show books" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', margin: '0 0 6px' }}>
+              {[['active', 'Active', reading.length], ['toread', 'To read', toRead.length], ['parked', 'Parked', parkedBooks.length], ['finished', 'Finished', finished.length], ['all', 'All', books.length]].map(([k, lbl, n]) => (
+                <button key={k} className={`gl-chip ${rfilter === k ? 'on' : ''}`} aria-pressed={rfilter === k} onClick={() => setRfilter(k)}>{lbl}{k === 'all' ? '' : ' ' + n}</button>
+              ))}
+            </div>
+          )}
+          {books.length > 0 && (() => { const n = { active: reading, toread: toRead, parked: parkedBooks, finished, all: books }[rfilter].length; return n === 0 ? (
+            <div style={{ fontSize: 13, color: 'var(--ink-light)', padding: '6px 0' }}>{{ active: 'Nothing in progress right now.', toread: 'Nothing on your To read shelf.', parked: 'Nothing parked.', finished: 'No finished books yet.', all: '' }[rfilter]}</div>) : null; })()}
+          {(rfilter === 'active' || rfilter === 'all') && reading.length > 0 && <div className="gl-label" style={{ margin: '4px 0' }}>Reading now</div>}
+          {(rfilter === 'active' || rfilter === 'all') && reading.map(x => {
             const rd = tgRead(x), p = x.total ? Math.min(1, rd / x.total) : 0;
             return (
               <div key={x.id} style={{ borderTop: '1px solid var(--border)', padding: '10px 0' }}>
@@ -13569,14 +13805,19 @@ function TargetsView({ targets, setTargets, targetLog, setTargetLog }) {   // th
                       <button className="gl-btn primary" onClick={() => finishBook(x)}>Confirm finished</button>
                       <button className="gl-btn ghost" onClick={() => setFinishId(null)}>Cancel</button>
                     </>
-                  ) : <button className="gl-btn" onClick={() => { setFinishId(x.id); setFinishDate(today); }}>Mark finished</button>}
+                  ) : <><button className="gl-btn" onClick={() => { setFinishId(x.id); setFinishDate(today); }}>Mark finished</button>
+                    <button className="gl-btn" title="Set this book aside without losing your place" onClick={() => setShelf(x, 'parked')}>Park</button></>}
                 </div>
                 {openId === x.id && bookEditor(x)}
               </div>
             );
           })}
-          {finished.length > 0 && <div className="gl-label" style={{ margin: '10px 0 4px' }}>Finished · {finished.length}</div>}
-          {finished.map(x => (
+          {(rfilter === 'toread' || rfilter === 'all') && toRead.length > 0 && <div className="gl-label" style={{ margin: '10px 0 4px' }}>To read · {toRead.length}</div>}
+          {(rfilter === 'toread' || rfilter === 'all') && toRead.map(x => shelfRow(x, 'toread'))}
+          {(rfilter === 'parked' || rfilter === 'all') && parkedBooks.length > 0 && <div className="gl-label" style={{ margin: '10px 0 4px' }}>Parked · {parkedBooks.length}</div>}
+          {(rfilter === 'parked' || rfilter === 'all') && parkedBooks.map(x => shelfRow(x, 'parked'))}
+          {(rfilter === 'finished' || rfilter === 'all') && finished.length > 0 && <div className="gl-label" style={{ margin: '10px 0 4px' }}>Finished · {finished.length}</div>}
+          {(rfilter === 'finished' || rfilter === 'all') && finished.map(x => (
             <div key={x.id} style={{ borderTop: '1px solid var(--border)', padding: '8px 0' }}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, cursor: 'pointer' }} onClick={() => setOpenId(openId === x.id ? null : x.id)}>
                 <span style={{ color: 'var(--accent)' }}>✓</span>
@@ -13587,6 +13828,7 @@ function TargetsView({ targets, setTargets, targetLog, setTargetLog }) {   // th
               {openId === x.id && bookEditor(x)}
             </div>
           ))}
+          </>}
           </>}
         </section>
 
@@ -13700,6 +13942,11 @@ function GoalsMain({ targetLog, goals, setGoals, pagesData, countdowns, setCount
                 <span>{Math.round(h.p * 100)}% · {doneMs} of {(g.milestones || []).length} milestones</span>
                 <span className="gl-mono">{glShort(g.targetDate)}</span>
               </div>
+              {glTags(g).length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
+                  {glTags(g).map(t => <span key={t} className="gl-tag">{t}</span>)}
+                </div>
+              )}
               {g.status === 'active' && m && (
                 <div style={{ marginTop: 6, fontSize: 12, color: late ? '#b03a2e' : 'var(--ink)', fontWeight: late ? 600 : 400 }}>
                   {late ? `${m.title || 'Milestone'} · ${glDays(m.dueDate, today)} days overdue`
@@ -13723,7 +13970,7 @@ function GoalsMain({ targetLog, goals, setGoals, pagesData, countdowns, setCount
 
       <main className="gl-main">
         {sel ? (
-          <GlDetail key={sel.id} books={(Array.isArray(targetLog) ? targetLog : []).filter(x => x.kind === 'reading')} goal={sel} pagesData={pagesData} onOpenPage={onOpenPage}
+          <GlDetail key={sel.id} allTags={glAllTags(list)} books={(Array.isArray(targetLog) ? targetLog : []).filter(x => x.kind === 'reading')} goal={sel} pagesData={pagesData} onOpenPage={onOpenPage}
             habitGoals={habitGoals} fitnessExercises={fitnessExercises} mctx={mctx}
             habitCompletions={habitCompletions} fitnessLog={fitnessLog}
             onChange={fn => changeGoal(sel.id, fn)}
@@ -13891,14 +14138,14 @@ function App() {
   }, [goals]);
   // Weight / calorie readings and their targets, bundled for the goal views (v4.8.0)
   // v5.11.0: the fitness log and exercise library ride along so goal rules can read them
-  const mctx = { metrics: habitMetrics, weightTarget, calsTarget, fitnessLog, fitnessExercises, habitGoals, habitCompletions, habitQty };
+  const mctx = { metrics: habitMetrics, weightTarget, calsTarget, fitnessLog, fitnessExercises, habitGoals, habitCompletions, habitQty, targetLog };
   // Complete weight milestones whose condition is met (7-day average, 3+ readings since the goal began) and
   // tasks / milestones whose training rule is met by the Fitness log (v5.11.0).
   // Debounced; writes only when something changed. The Undo toast reopens it and holds auto-complete.
   useEffect(() => {
     const t = setTimeout(() => {
       const asOf = new Date(); asOf.setHours(0, 0, 0, 0);
-      const ctx = { metrics: habitMetrics, weightTarget, calsTarget, fitnessLog, fitnessExercises, habitGoals, habitCompletions, habitQty };
+      const ctx = { metrics: habitMetrics, weightTarget, calsTarget, fitnessLog, fitnessExercises, habitGoals, habitCompletions, habitQty, targetLog };
       const r = glAutoComplete(goals, ctx, asOf);
       if (r.goals === goals) return;
       setGoals(gs => glAutoComplete(gs, ctx, asOf).goals);
@@ -13908,7 +14155,7 @@ function App() {
             glPatchMs(g, x.mid, m => ({ ...m, done: false, completedAt: null, autoDone: false, metricHold: true, ruleHold: true }))))));
     }, 2500);
     return () => clearTimeout(t);
-  }, [goals, habitMetrics, weightTarget, fitnessLog, fitnessExercises, habitGoals, habitCompletions, habitQty]);
+  }, [goals, habitMetrics, weightTarget, fitnessLog, fitnessExercises, habitGoals, habitCompletions, habitQty, targetLog]);
   // Keep "never ends" repeating tasks topped up as time passes (v4.6.0). Debounced; only writes when something was added.
   useEffect(() => {
     const t = setTimeout(() => {
@@ -14379,7 +14626,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.59.4</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.63.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
