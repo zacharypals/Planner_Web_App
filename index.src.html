@@ -1,5 +1,10 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.72.2 -->
+<!-- LP Planner v5.77.0 -->
+<!-- v5.77.0 — Check-in Trends: tags and counters now appear on the Mood & energy chart as lanes beneath it, on the same date axis — a bar on each day a tag was on, and bars sized to the amount (scaled to its own max, shown beside the name) for counters. Pick which ones to show with the pills under the chart (first three by default, up to five drawn). -->
+<!-- v5.76.0 — Check-in counters: tap the number to type an amount by hand (up to 99,999, decimals allowed), and each counter has a Step setting (what + and − add, default 1) in its edit sheet — e.g. step 50 for milligrams of caffeine. -->
+<!-- v5.75.0 — Check-in: Tags & counters. A new Tags card lets you create your own tags (on/off for the day) and counters (a number, − / +) — nothing is pre-named. Tap a tag or counter to log it for the viewed day; Edit renames, deletes or lets you add more. Definitions sync as `checkinTags`; each day stores `tg`. Trends gets a Tag effects card: mood same day, mood next day and energy next day, with vs without the chosen tag (needs 3+ days each side). -->
+<!-- v5.74.0 — Check-in: three more always-visible lines under "One win" — Grateful for today, Looking forward to, and Do differently (stored as grat / look / diff on the day's entry; an entry with only these still counts as a check-in). -->
+<!-- v5.73.0 — Fitness tab: the left sidebar can be collapsed on desktop and iPad with a slim toggle strip (‹ / ›) on its edge, like the Weekly sidebar; the choice is remembered on each device. Phones unchanged. -->
 <!-- v5.72.2 — Fitness Day view: the ⏱ interval-timer button on exercise tiles is now a modern line-style stopwatch icon, a bit bigger. -->
 <!-- v5.72.1 — Fitness Day view: the collapse/expand arrow on exercise tiles is now the same rounded chevron button as milestones. -->
 <!-- v5.72.0 — Check-in: bedtime / wake-up use a custom time picker instead of the browser's — rounded pill buttons for hour, minute (5-minute steps) and AM/PM in a bottom sheet (centered on desktop), so there is nothing to scroll. Times are still stored as 24-hour HH:MM; an old time that isn't on a 5-minute mark still shows and can be reselected. -->
@@ -550,6 +555,12 @@
     background: var(--paper); border-right: 1px solid var(--border);
     overflow-y: auto; padding: 16px 12px;
   }
+  /* v5.73.0 — collapsible Fitness sidebar: wrapper holds the sidebar + a slim toggle strip (same pattern as the Weekly sidebar) */
+  .fitness-side-wrap { display: flex; flex-direction: row; flex-shrink: 0; width: 252px; transition: width 0.25s ease; } /* 220px sidebar + 32px strip */
+  .fitness-side-wrap.collapsed { width: 32px; }
+  .fitness-side-wrap > .fitness-sidebar { min-width: 220px; transition: opacity 0.2s, width 0.25s, padding 0.25s; }
+  .fitness-side-wrap.collapsed > .fitness-sidebar { opacity: 0; pointer-events: none; width: 0; min-width: 0; padding: 0; overflow: hidden; }
+  .fitness-side-wrap.collapsed .sidebar-collapsed-label { opacity: 1; }
   .fitness-main {
     flex: 1; overflow-y: auto; padding: 20px 24px;
     display: flex; flex-direction: column; gap: 16px;
@@ -734,7 +745,7 @@
   @media (max-width: 767px) { .fc-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   /* Mobile fitness */
   @media (max-width: 767px) {
-    .fitness-sidebar { display: none; }
+    .fitness-side-wrap { display: none; }
     .fitness-main { padding: 10px 12px 80px; }
     .fitness-view-tabs { width: 100%; }
     .fitness-view-tab { padding: 5px 8px; font-size: 11px; }
@@ -2368,7 +2379,7 @@
     .main-content, .fitness-layout { padding: 16px; gap: 16px; }
 
     /* Sidebars become cards (toggle strip lives inside the card) */
-    .sidebar-wrap, .pages-sidebar-wrap, .fitness-sidebar {
+    .sidebar-wrap, .pages-sidebar-wrap, .fitness-side-wrap {
       background: var(--paper); border: var(--card-border);
       border-radius: var(--radius-lg); box-shadow: var(--card-shadow); overflow: hidden;
     }
@@ -2377,7 +2388,7 @@
       border-right: none; border-left: 1px solid var(--border); background: var(--paper);
     }
     .pages-sidebar-wrap > .pages-sidebar { border-right: none; }
-    .fitness-sidebar { border-right: var(--card-border); }
+    .fitness-side-wrap > .fitness-sidebar { border-right: none; }
 
     /* Weekly planner: calendar + review as two stacked cards */
     .weekly-main-panel { gap: 16px; }
@@ -3026,8 +3037,8 @@
 
 
   /* ═══ v5.69.0 DAILY CHECK-IN ═══ */
-  :root { --ci-energy:#b07a0c; }
-  :root[data-theme="dark"] { --ci-energy:#e0b04a; }
+  :root { --ci-energy:#b07a0c; --ci-lane:#7a63b8; }
+  :root[data-theme="dark"] { --ci-energy:#e0b04a; --ci-lane:#b6a4f2; }
   .ci-page { flex:1; overflow-y:auto; overflow-x:hidden; background:var(--cream); }
   .ci-inner { max-width:560px; margin:0 auto; padding:14px 16px 40px; display:flex; flex-direction:column; gap:12px; }
   .ci-top { display:flex; align-items:center; gap:10px; }
@@ -3098,6 +3109,29 @@
   .ci-tp-foot { display:flex; align-items:center; gap:10px; margin-top:8px; }
   .ci-tp-foot > :first-child { margin-right:auto; }
   @media (min-width:768px) { .ci-tp-overlay { align-items:center; } .ci-tp { border-radius:24px; padding-bottom:18px; } .ci-tp-handle { display:none; } }
+  /* v5.75.0 tags & counters */
+  .ci-tags-head { display:flex; align-items:center; justify-content:space-between; }
+  .ci-tags-head .ci-link { min-height:32px; }
+  .ci-tagwrap { display:flex; flex-wrap:wrap; gap:8px; }
+  .ci-tag { min-height:44px; padding:0 18px; border-radius:999px; border:1px solid var(--border); background:var(--cream); color:var(--ink); font-family:'DM Sans',sans-serif; font-size:14px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:6px; transition:background .15s, border-color .15s; }
+  .ci-tag.on { background:var(--accent); border-color:var(--accent); color:#fff; }
+  [data-theme="dark"] .ci-tag.on { color:#14121b; }
+  .ci-tag.add { background:transparent; border:1.5px dashed var(--ink-faint); color:var(--accent); }
+  .ci-ctr { display:inline-flex; align-items:center; gap:2px; min-height:44px; padding:0 4px; border-radius:999px; border:1px solid var(--border); background:var(--cream); font-family:'DM Sans',sans-serif; color:var(--ink); }
+  .ci-ctr.has { background:var(--surface); border-color:var(--accent); }
+  .ci-ctr button { width:36px; height:36px; border-radius:50%; border:0; background:transparent; color:var(--accent); font-size:20px; line-height:1; cursor:pointer; }
+  .ci-ctr button:disabled { opacity:.3; cursor:default; }
+  .ci-ctr .nm { font-size:14px; font-weight:600; padding:0 4px; }
+  .ci-ctr b, .ci-num { min-width:22px; text-align:center; font-size:15px; font-weight:700; color:var(--accent); }
+  .ci-ctr button.ci-num { width:auto; height:36px; padding:0 6px; border-radius:18px; font-size:15px; }
+  .ci-ctr button.ci-num:hover { background:var(--cream); }
+  .ci-num-in { box-sizing:border-box; height:34px; margin:0 2px; padding:0 6px; border-radius:17px; border:1.5px solid var(--accent); background:var(--paper); color:var(--ink); font-family:'DM Sans',sans-serif; font-size:16px; font-weight:700; text-align:center; -moz-appearance:textfield; }
+  .ci-num-in::-webkit-outer-spin-button, .ci-num-in::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
+  .ci-step { max-width:140px; }
+  .ci-ctr.edit { padding:0 16px; gap:6px; cursor:pointer; }
+  .ci-edit .ci-tag:not(.add), .ci-edit .ci-ctr { outline:1.5px dashed var(--ink-faint); outline-offset:1px; }
+  .ci-pen { font-size:12px; color:var(--ink-light); }
+  .ci-tag-err { font-size:13px; font-weight:700; color:var(--up-late-fg); }
   @media (max-width: 767px) { .ci-page { overflow:visible; } }
   /* v5.71.0 — Check-in entry points: desktop top-bar pill (set apart from the tabs) and a pill in the mobile day header */
   .nav-tabs .nav-pill { margin-left:14px; display:inline-flex; align-items:center; gap:7px; padding:0 16px; min-height:34px; border-radius:999px; border:1.5px solid rgba(255,255,255,0.55); background:transparent; color:#fff; font-family:'DM Sans',sans-serif; font-size:13px; font-weight:700; letter-spacing:0.01em; cursor:pointer; align-self:center; transition:background .15s, border-color .15s; }
@@ -14537,6 +14571,7 @@ function App() {
   const [targetLog, setTargetLog] = useSynced('targetLog', []); // v5.30.0 [{id,kind,title,author,total,updates:[{date,pages}],finishedDate,notes}]
   const [countdowns, setCountdowns] = useSynced('countdowns', []); // [{id, title, startDate, endDate, color}]
   const [checkins, setCheckins] = useSynced('checkins', {}); // v5.69.0 Daily check-in — see DAILY CHECK-IN section
+  const [checkinTags, setCheckinTags] = useSynced('checkinTags', []); // v5.75.0 check-in tag & counter definitions
   const [checkinFrom, setCheckinFrom] = useState('planner'); // v5.71.0 — page the check-in was opened from (Back / Done return there)
   const openCheckin = from => { setCheckinFrom(from); setPage('checkin'); };
   const checkinDoneToday = ciHasData((checkins || {})[glToday()]);
@@ -15059,7 +15094,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.72.2</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.77.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
@@ -15142,7 +15177,7 @@ function App() {
           pullActive.current = false;
         }}>
       {page==='planner' && <WeeklyPlanner weekData={weekData} setWeekData={setWeekData} pagesData={pagesData} setPagesData={setPagesData} onGoToHabit={()=>setPage('habit')} calHeaderColor={calHeaderColor} setCalHeaderColor={setCalHeaderColor} habitGoals={habitGoals} habitCompletions={habitCompletions} setHabitCompletions={setHabitCompletions} habitQty={habitQty} setHabitQty={setHabitQty} habitNotes={habitNotes} setHabitNotes={setHabitNotes} peopleDirectory={peopleDirectory} setPeopleDirectory={setPeopleDirectory} goals={goals} setGoals={setGoals} onOpenGoal={openGoal} fitnessLog={fitnessLog} fitnessExercises={fitnessExercises} mctx={mctx} reviewOpen={reviewOpen} setReviewOpen={setReviewOpen} repeatSeries={repeatSeries} seriesRun={seriesRun} upkeep={upkeep} setUpkeep={setUpkeep} onOpenUpkeep={()=>setPage('upkeep')} onOpenCheckin={()=>openCheckin('planner')} checkinDone={checkinDoneToday} />}
-      {page==='checkin' && <CheckinView checkins={checkins} setCheckins={setCheckins} habitGoals={habitGoals} habitCompletions={habitCompletions} fitnessLog={fitnessLog} backLabel={checkinFrom==='habit'?'Habits':'Week'} onBack={()=>setPage(checkinFrom)} />}
+      {page==='checkin' && <CheckinView checkins={checkins} setCheckins={setCheckins} habitGoals={habitGoals} habitCompletions={habitCompletions} fitnessLog={fitnessLog} tagDefs={checkinTags} setTagDefs={setCheckinTags} backLabel={checkinFrom==='habit'?'Habits':'Week'} onBack={()=>setPage(checkinFrom)} />}
       {page==='upkeep' && <UpkeepView upkeep={upkeep} setUpkeep={setUpkeep} onBack={()=>setPage('planner')} />}
       {page==='monthly' && <MonthlyCalendar weekData={weekData} setWeekData={setWeekData} monthlyGoals={monthlyGoals} setMonthlyGoals={setMonthlyGoals} upkeep={upkeep} onOpenUpkeep={()=>setPage('upkeep')} />}
       {page==='habit' && <HabitTracker
@@ -15653,7 +15688,7 @@ const CI_SLEEP = ['Poor', 'Light', 'Okay', 'Solid', 'Great'];
 const CI_MIN_GROUP = 3;   // a comparison in Trends needs at least this many days on each side
 
 function ciHasData(e) {
-  return !!e && (e.mood > 0 || e.energy > 0 || e.sleepQ > 0 || !!e.bed || !!e.wake || !!(e.line || '').trim() || !!(e.win || '').trim());
+  return !!e && (e.mood > 0 || e.energy > 0 || e.sleepQ > 0 || !!e.bed || !!e.wake || !!(e.line || '').trim() || !!(e.win || '').trim() || !!(e.grat || '').trim() || !!(e.look || '').trim() || !!(e.diff || '').trim() || Object.keys(e.tg || {}).length > 0);
 }
 function ciSleepMins(bed, wake) {   // minutes in bed; wake is the next morning when it is earlier than bed
   if (!bed || !wake) return null;
@@ -15781,12 +15816,18 @@ function CiScale({ label, words, value, onPick }) {
   );
 }
 
-function CiChart({ days, mood, energy }) {
-  const W = 326, H = 160, L = 28, R = 8, T = 24, B = 24;
-  const m = ciSegments(days, mood, W, H, L, R, T, B), e = ciSegments(days, energy, W, H, L, R, T, B);
+function CiChart({ days, mood, energy, lanes }) {
+  const W = 326, PH = 160, L = 28, R = 8, T = 24, B = 24;
+  const LANE_TOP = 144, LANE_H = 30, LANE_BAR = 16;
+  const ln = lanes || [];
+  const H = ln.length ? LANE_TOP + ln.length * LANE_H + 22 : PH;
+  const m = ciSegments(days, mood, W, PH, L, R, T, B), e = ciSegments(days, energy, W, PH, L, R, T, B);
+  const innerW = W - L - R, nD = days.length;
+  const xOf = i => L + (nD === 1 ? innerW / 2 : (i / (nD - 1)) * innerW);
+  const bw = Math.max(2.5, Math.min(10, (innerW / Math.max(nD, 1)) * 0.7));
   const tickIdx = days.length > 1 ? [0, Math.floor((days.length - 1) / 2), days.length - 1] : [0];
   return (
-    <svg role="img" aria-label="Line chart of daily mood and energy ratings on a scale of 1 to 5" width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display: 'block' }}>
+    <svg role="img" aria-label={`Line chart of daily mood and energy ratings on a scale of 1 to 5${ln.length ? ', with a bar lane for ' + ln.map(x => x.name).join(', ') : ''}`} width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display: 'block' }}>
       {[1, 2, 3, 4, 5].map(v => (
         <g key={v}>
           <line x1={L} x2={W - R} y1={m.yOf(v)} y2={m.yOf(v)} stroke="var(--border)" strokeWidth="1" />
@@ -15797,6 +15838,23 @@ function CiChart({ days, mood, energy }) {
       {m.segs.map((p, i) => <polyline key={'m' + i} points={p} fill="none" stroke="var(--accent)" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />)}
       {e.dots.map((p, i) => <circle key={'ed' + i} cx={p[0]} cy={p[1]} r="2.5" fill="var(--ci-energy)" />)}
       {m.dots.map((p, i) => <circle key={'md' + i} cx={p[0]} cy={p[1]} r="2.5" fill="var(--accent)" />)}
+      {ln.map((l, li) => {
+        const y0 = LANE_TOP + li * LANE_H;
+        const vals = Object.values(l.vals);
+        const mx = l.kind === 'count' ? Math.max(1, ...vals) : 1;
+        return (
+          <g key={l.id}>
+            <text x={L} y={y0 + 9} fontSize="10" fontWeight="600" fill="var(--ink-light)">{l.name}{l.kind === 'count' && vals.length ? ` · max ${ciRound(mx)}` : ''}</text>
+            <line x1={L} x2={W - R} y1={y0 + LANE_H - 2} y2={y0 + LANE_H - 2} stroke="var(--border)" strokeWidth="1" />
+            {days.map((dk, i) => {
+              const v = l.vals[dk];
+              if (!v) return null;
+              const h = l.kind === 'count' ? Math.max(2, (v / mx) * LANE_BAR) : LANE_BAR;
+              return <rect key={dk} x={xOf(i) - bw / 2} y={y0 + LANE_H - 2 - h} width={bw} height={h} rx="1.5" fill="var(--ci-lane)"><title>{`${parseLocal(dk).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}: ${l.name}${l.kind === 'count' ? ' ' + ciRound(v) : ''}`}</title></rect>;
+            })}
+          </g>
+        );
+      })}
       {tickIdx.map((idx, k) => (
         <text key={idx} x={L + (days.length === 1 ? (W - L - R) / 2 : (idx / (days.length - 1)) * (W - L - R))} y={H - 6} fontSize="10" fill="var(--ink-light)" textAnchor={k === 0 && days.length > 1 ? 'start' : k === tickIdx.length - 1 && days.length > 1 ? 'end' : 'middle'}>
           {parseLocal(days[idx]).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
@@ -15825,8 +15883,165 @@ function CiCompare({ title, rows }) {   // rows: [{label, vals}] — bar per row
   );
 }
 
-function CheckinView({ checkins, setCheckins, habitGoals, habitCompletions, fitnessLog, onBack, backLabel }) {
+// v5.75.0 — Tags & counters. `checkinTags` (synced whole doc) = [{ id, name, kind:'tag'|'count' }]; a day's entry stores `tg: { [id]: true | number }`.
+// Deleting a tag only removes its definition (past entries keep their data). Trends compares mood/energy with vs without a tag, same day and next day.
+function ciTagCount(e, id) { const v = e && e.tg && e.tg[id]; return v === true ? 1 : (typeof v === 'number' ? v : 0); }
+function ciTagEffect(all, id, days) {
+  const mk = () => ({ wm: [], om: [], we: [], oe: [] });
+  const out = { same: mk(), next: mk() };
+  let used = 0, total = 0, seen = 0;
+  days.forEach(dk => {
+    const e = all[dk];
+    if (!e) return;
+    seen++;
+    const n = ciTagCount(e, id), had = n > 0;
+    if (had) { used++; total += n; }
+    if (e.mood > 0) (had ? out.same.wm : out.same.om).push(e.mood);
+    if (e.energy > 0) (had ? out.same.we : out.same.oe).push(e.energy);
+    const nx = all[fmtLocal(addDays(parseLocal(dk), 1))];
+    if (nx) {
+      if (nx.mood > 0) (had ? out.next.wm : out.next.om).push(nx.mood);
+      if (nx.energy > 0) (had ? out.next.we : out.next.oe).push(nx.energy);
+    }
+  });
+  return { ...out, used, total, seen };
+}
+
+function CiTagSheet({ def, defs, onSave, onDelete, onClose }) {
+  const isNew = !def;
+  const [name, setName] = useState(def ? def.name : '');
+  const [kind, setKind] = useState(def ? def.kind : 'tag');
+  const [step, setStep] = useState(def && def.step ? String(def.step) : '1');
+  const [err, setErr] = useState('');
+  const [confirmDel, setConfirmDel] = useState(false);
+  useEffect(() => {
+    const k = ev => { if (ev.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', k);
+    return () => window.removeEventListener('keydown', k);
+  }, []);
+  function save() {
+    const nm = name.trim();
+    if (!nm) { setErr('Give it a name.'); return; }
+    if ((defs || []).some(d => d.id !== (def && def.id) && d.name.toLowerCase() === nm.toLowerCase())) { setErr('You already have one with that name.'); return; }
+    const st = parseFloat(step);
+    const out = { id: def ? def.id : 'tg' + Date.now().toString(36) + Math.random().toString(36).slice(2, 4), name: nm, kind };
+    if (kind === 'count') out.step = isFinite(st) && st > 0 ? Math.min(Math.round(st * 100) / 100, 99999) : 1;
+    onSave(out);
+  }
+  return (
+    <div className="ci-tp-overlay" onClick={onClose}>
+      <div className="ci-tp" role="dialog" aria-modal="true" aria-label={isNew ? 'New tag' : 'Edit tag'} onClick={ev => ev.stopPropagation()}>
+        <div className="ci-tp-handle" />
+        <div className="ci-tp-head"><span>{isNew ? 'New tag' : 'Edit tag'}</span></div>
+        <label className="ci-tp-lbl" htmlFor="ci-tag-name">Name</label>
+        <input id="ci-tag-name" className="ci-input" type="text" maxLength={24} autoFocus={isNew} value={name} placeholder="Anything you want to track"
+          onChange={ev => { setErr(''); setName(ev.target.value); }} onKeyDown={ev => { if (ev.key === 'Enter') save(); }} />
+        {err && <div className="ci-tag-err" role="alert">{err}</div>}
+        <div className="ci-tp-lbl">Type</div>
+        <div className="ci-tp-ampm" role="group" aria-label="Type" style={{ marginTop: 0 }}>
+          {[['tag', 'Tag'], ['count', 'Counter']].map(([k, t]) => (
+            <button key={k} type="button" aria-pressed={kind === k} disabled={!isNew && kind !== k} className={kind === k ? 'on' : ''} onClick={() => setKind(k)}>{t}</button>
+          ))}
+        </div>
+        <div className="ci-hint">{kind === 'tag' ? 'A tag is on or off for the day.' : 'A counter keeps a number for the day, like cups or drinks.'}{!isNew ? ' The type can’t change after it is created.' : ''}</div>
+        {kind === 'count' && (
+          <>
+            <label className="ci-tp-lbl" htmlFor="ci-tag-step">Step <span style={{ fontWeight: 400 }}>(what + and − add)</span></label>
+            <input id="ci-tag-step" className="ci-input ci-step" type="number" inputMode="decimal" min="0.01" step="any" value={step} onChange={ev => setStep(ev.target.value)} />
+            <div className="ci-hint">Use 1 for cups or drinks, or something like 50 for milligrams. You can also tap the number and type it.</div>
+          </>
+        )}
+        {!isNew && <div className="ci-hint">Deleting only removes it from the list; days you already logged keep their data.</div>}
+        <div className="ci-tp-foot">
+          {!isNew ? (confirmDel
+            ? <button type="button" className="ci-link" style={{ color: 'var(--up-late-fg)' }} onClick={() => onDelete(def.id)}>Tap again to delete</button>
+            : <button type="button" className="ci-link" onClick={() => setConfirmDel(true)}>Delete</button>) : <span />}
+          <button type="button" className="ci-btn" onClick={onClose}>Cancel</button>
+          <button type="button" className="ci-primary" onClick={save}>{isNew ? 'Add' : 'Save'}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ciRound(n) { return Math.round(n * 100) / 100; }
+function CiTags({ defs, tg, onSet, onOpenSheet }) {
+  const [editing, setEditing] = useState(false);
+  const [numEdit, setNumEdit] = useState(null);   // { id, draft } while typing a counter value by hand
+  const list = defs || [];
+  function commitNum() {
+    if (!numEdit) return;
+    const v = parseFloat(numEdit.draft);
+    if (isFinite(v) && v >= 0) onSet(numEdit.id, Math.min(ciRound(v), 99999));
+    setNumEdit(null);
+  }
+  return (
+    <div className={`ci-card ci-tags ${editing ? 'ci-edit' : ''}`}>
+      <div className="ci-tags-head">
+        <div className="ci-card-title">Tags</div>
+        {list.length > 0 && <button type="button" className="ci-link" onClick={() => setEditing(v => !v)}>{editing ? 'Done' : 'Edit'}</button>}
+      </div>
+      {list.length === 0 && <div className="ci-hint">Track anything you like. A tag is on or off for the day; a counter keeps a number.</div>}
+      <div className="ci-tagwrap">
+        {list.map(d => {
+          const n = ciTagCount({ tg }, d.id);
+          if (d.kind === 'count') {
+            return editing ? (
+              <button key={d.id} type="button" className="ci-ctr edit" aria-label={`Edit ${d.name}`} onClick={() => onOpenSheet(d)}><span className="nm">{d.name}</span><span className="ci-pen" aria-hidden="true">✎</span></button>
+            ) : (
+              <span key={d.id} className={`ci-ctr ${n > 0 ? 'has' : ''}`} role="group" aria-label={`${d.name} counter`}>
+                <button type="button" aria-label={`Decrease ${d.name}`} disabled={n <= 0} onClick={() => onSet(d.id, Math.max(0, ciRound(n - (d.step || 1))))}>−</button>
+                <span className="nm">{d.name}</span>
+                {numEdit && numEdit.id === d.id ? (
+                  <input className="ci-num-in" type="number" inputMode="decimal" min="0" step="any" autoFocus aria-label={`${d.name} amount`} value={numEdit.draft}
+                    style={{ width: Math.max(3, String(numEdit.draft).length + 2) + 'ch' }}
+                    onFocus={ev => ev.target.select()} onChange={ev => setNumEdit({ id: d.id, draft: ev.target.value })} onBlur={commitNum}
+                    onKeyDown={ev => { if (ev.key === 'Enter') ev.target.blur(); else if (ev.key === 'Escape') setNumEdit(null); }} />
+                ) : (
+                  <button type="button" className="ci-num" aria-label={`${d.name}: ${n}. Tap to type an amount`} onClick={() => setNumEdit({ id: d.id, draft: String(n) })}>{n}</button>
+                )}
+                <button type="button" aria-label={`Increase ${d.name}`} disabled={n >= 99999} onClick={() => onSet(d.id, Math.min(99999, ciRound(n + (d.step || 1))))}>+</button>
+              </span>
+            );
+          }
+          return (
+            <button key={d.id} type="button" aria-pressed={editing ? undefined : n > 0} className={`ci-tag ${n > 0 && !editing ? 'on' : ''}`}
+              aria-label={editing ? `Edit ${d.name}` : undefined} onClick={() => editing ? onOpenSheet(d) : onSet(d.id, n > 0 ? 0 : true)}>
+              {d.name}{editing && <span className="ci-pen" aria-hidden="true">✎</span>}
+            </button>
+          );
+        })}
+        <button type="button" className="ci-tag add" onClick={() => onOpenSheet(null)}>+ New</button>
+      </div>
+    </div>
+  );
+}
+
+function CiTagTrends({ defs, all, days, pick, setPick }) {
+  const list = defs || [];
+  if (!list.length) return null;
+  const d = list.find(x => x.id === pick) || list[0];
+  const fx = ciTagEffect(all, d.id, days);
+  const w = 'With ' + d.name, wo = 'Without';
+  return (
+    <div className="ci-card">
+      <div className="ci-card-title">Tag effects</div>
+      <div className="ci-pills" role="tablist" aria-label="Tag" style={{ flexWrap: 'wrap' }}>
+        {list.map(x => <button key={x.id} type="button" role="tab" aria-selected={x.id === d.id} className={x.id === d.id ? 'on' : ''} onClick={() => setPick(x.id)}>{x.name}</button>)}
+      </div>
+      <div className="ci-hint">{fx.used} of {fx.seen} check-in days{d.kind === 'count' ? ` · ${ciRound(fx.total)} total` : ''}</div>
+      <CiCompare title="Mood the same day" rows={[{ label: w, vals: fx.same.wm }, { label: wo, vals: fx.same.om, alt: true }]} />
+      <CiCompare title="Mood the next day" rows={[{ label: w, vals: fx.next.wm }, { label: wo, vals: fx.next.om, alt: true }]} />
+      <CiCompare title="Energy the next day" rows={[{ label: w, vals: fx.next.we }, { label: wo, vals: fx.next.oe, alt: true }]} />
+    </div>
+  );
+}
+
+function CheckinView({ checkins, setCheckins, habitGoals, habitCompletions, fitnessLog, onBack, backLabel, tagDefs, setTagDefs }) {
   const todayKey = glToday();
+  const [tagSheet, setTagSheet] = useState(undefined);   // undefined = closed · null = new · def = edit
+  const [trendTag, setTrendTag] = useState('');
+  const [laneIds, setLaneIds] = useState(null);   // null = first three tags; otherwise the ids picked for the chart lanes
   const [day, setDay] = useState(todayKey);
   const [sub, setSub] = useState('today');
   const [range, setRange] = useState(30);
@@ -15842,6 +16057,16 @@ function CheckinView({ checkins, setCheckins, habitGoals, habitCompletions, fitn
       return out;
     });
   }
+  function setTag(id, val) {
+    const cur = { ...((e && e.tg) || {}) };
+    if (!val) delete cur[id]; else cur[id] = val;
+    patch({ tg: cur });
+  }
+  function saveTagDef(def) {
+    setTagDefs(l => (l || []).some(x => x.id === def.id) ? l.map(x => x.id === def.id ? def : x) : [...(l || []), def]);
+    setTagSheet(undefined);
+  }
+  function deleteTagDef(id) { setTagDefs(l => (l || []).filter(x => x.id !== id)); setTagSheet(undefined); }
   function shift(n) { setDay(d => { const nd = fmtLocal(addDays(parseLocal(d), n)); return nd > todayKey ? d : nd; }); }
 
   if (sub === 'trends') {
@@ -15850,6 +16075,12 @@ function CheckinView({ checkins, setCheckins, habitGoals, habitCompletions, fitn
     const moodMap = {}, energyMap = {};
     days.forEach(dk => { if (all[dk]) { moodMap[dk] = all[dk].mood; energyMap[dk] = all[dk].energy; } });
     const g = ciPatterns(all, fitnessLog, days);
+    const laneDefs = laneIds === null ? (tagDefs || []).slice(0, 3) : (tagDefs || []).filter(d => laneIds.includes(d.id));
+    const lanes = laneDefs.slice(0, 5).map(d => {
+      const vals = {};
+      days.forEach(dk => { const n = ciTagCount(all[dk], d.id); if (n > 0) vals[dk] = n; });
+      return { id: d.id, name: d.name, kind: d.kind, vals };
+    });
     const recent = Object.keys(all).filter(dk => ciHasData(all[dk])).sort().reverse().slice(0, 5);
     return (
       <div className="main-content">
@@ -15867,17 +16098,30 @@ function CheckinView({ checkins, setCheckins, habitGoals, habitCompletions, fitn
             <>
               <div className="ci-card">
                 <div className="ci-card-title">Mood &amp; energy</div>
-                <CiChart days={days} mood={moodMap} energy={energyMap} />
+                <CiChart days={days} mood={moodMap} energy={energyMap} lanes={lanes} />
                 <div className="ci-legend">
                   <span><svg aria-hidden="true" width="22" height="6"><line x1="0" y1="3" x2="22" y2="3" stroke="var(--accent)" strokeWidth="3" /></svg>Mood</span>
                   <span><svg aria-hidden="true" width="22" height="6"><line x1="0" y1="3" x2="22" y2="3" stroke="var(--ci-energy)" strokeWidth="3" strokeDasharray="5 3" /></svg>Energy</span>
                 </div>
+                {(tagDefs || []).length > 0 && (
+                  <>
+                    <div className="ci-hint" style={{ marginTop: 4 }}>Show on chart (bars mark the days a tag was on or a counter&rsquo;s amount)</div>
+                    <div className="ci-pills" role="group" aria-label="Tags to show on the chart" style={{ flexWrap: 'wrap' }}>
+                      {tagDefs.map(d => {
+                        const on = laneDefs.some(x => x.id === d.id);
+                        return <button key={d.id} type="button" aria-pressed={on} className={on ? 'on' : ''}
+                          onClick={() => setLaneIds(on ? laneDefs.filter(x => x.id !== d.id).map(x => x.id) : [...laneDefs.map(x => x.id), d.id])}>{d.name}</button>;
+                      })}
+                    </div>
+                  </>
+                )}
               </div>
               <div className="ci-card">
                 <div className="ci-card-title">Patterns</div>
                 <CiCompare title="Average mood" rows={[{ label: 'Workout days', vals: g.workMood }, { label: 'Rest days', vals: g.restMood, alt: true }]} />
                 <CiCompare title="Energy by time in bed" rows={[{ label: '7h or more', vals: g.longSleepEnergy }, { label: 'Under 6h', vals: g.shortSleepEnergy, alt: true }]} />
               </div>
+              <CiTagTrends defs={tagDefs} all={all} days={days} pick={trendTag} setPick={setTrendTag} />
               <div className="ci-card">
                 <div className="ci-card-title">Recent entries</div>
                 {recent.map(dk => {
@@ -15938,7 +16182,16 @@ function CheckinView({ checkins, setCheckins, habitGoals, habitCompletions, fitn
           <input id="ci-line" className="ci-input" type="text" value={e.line || ''} placeholder="Slow morning, good afternoon…" onChange={ev => patch({ line: ev.target.value })} />
           <label className="ci-card-title" htmlFor="ci-win" style={{ marginTop: 6 }}>One win</label>
           <input id="ci-win" className="ci-input" type="text" value={e.win || ''} placeholder="Something that went right" onChange={ev => patch({ win: ev.target.value })} />
+          <label className="ci-card-title" htmlFor="ci-grat" style={{ marginTop: 6 }}>Grateful for today</label>
+          <input id="ci-grat" className="ci-input" type="text" value={e.grat || ''} placeholder="Someone or something you appreciated" onChange={ev => patch({ grat: ev.target.value })} />
+          <label className="ci-card-title" htmlFor="ci-look" style={{ marginTop: 6 }}>Looking forward to</label>
+          <input id="ci-look" className="ci-input" type="text" value={e.look || ''} placeholder="Something coming up, big or small" onChange={ev => patch({ look: ev.target.value })} />
+          <label className="ci-card-title" htmlFor="ci-diff" style={{ marginTop: 6 }}>Do differently</label>
+          <input id="ci-diff" className="ci-input" type="text" value={e.diff || ''} placeholder="One thing you would change next time" onChange={ev => patch({ diff: ev.target.value })} />
         </div>
+
+        <CiTags defs={tagDefs} tg={e.tg} onSet={setTag} onOpenSheet={d => setTagSheet(d)} />
+        {tagSheet !== undefined && <CiTagSheet def={tagSheet} defs={tagDefs} onSave={saveTagDef} onDelete={deleteTagDef} onClose={() => setTagSheet(undefined)} />}
 
         <div className="ci-chips">
           <span className="ci-hint">From your other tabs:</span>
@@ -16684,6 +16937,8 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
   const [showGoalManager, setShowGoalManager] = useState(false);
   const [goalFocus, setGoalFocus] = useState(null); // v5.39.0: 'exerciseId|period' of the goal whose pencil opened the manager
   const [goalsCollapsed, setGoalsCollapsed] = useState(false);
+  const [fitSideCollapsed, setFitSideCollapsedRaw] = useState(() => lsGet('fitSideCollapsed') === '1'); // v5.73.0 — desktop/iPad only; remembered per device
+  const setFitSideCollapsed = (v) => { lsSet('fitSideCollapsed', v ? '1' : '0'); setFitSideCollapsedRaw(v); };
   const prIndex = React.useMemo(() => prBuildIndex(fitnessLog), [fitnessLog]); // v5.17.0 PR history, derived
   // Collapsed/expanded state for Day-view exercise tiles is stored on the exercise
   // itself (ex.collapsed in fitnessLog) so it survives tab switches, reloads, and
@@ -17301,7 +17556,8 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
 
   return (
     <div className="fitness-layout">
-      {/* SIDEBAR */}
+      {/* SIDEBAR (collapsible on desktop/iPad, v5.73.0) */}
+      <div className={`fitness-side-wrap${fitSideCollapsed ? ' collapsed' : ''}`}>
       <div className="fitness-sidebar">
         <div className="fitness-day-nav" style={{marginBottom:12}}>
           <button className="nav-arrow" onClick={()=>{
@@ -17417,6 +17673,12 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
             </div>
           ))}
         </div>
+      </div>
+      <div className="sidebar-toggle-strip fitness-toggle-strip" onClick={()=>setFitSideCollapsed(!fitSideCollapsed)}
+        title={fitSideCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
+        <div className="sidebar-toggle-btn">{fitSideCollapsed ? '›' : '‹'}</div>
+        <span className="sidebar-collapsed-label">Fitness</span>
+      </div>
       </div>
 
       {/* MAIN */}
