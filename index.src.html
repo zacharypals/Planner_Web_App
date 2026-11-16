@@ -1,5 +1,8 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.84.0 -->
+<!-- LP Planner v5.86.1 -->
+<!-- v5.86.1 — Home upkeep: corrected how "Show ahead" places a task. It now sits ON ITS DUE DATE in the Weekly and Monthly calendars (so you can look at a week or month and see what is coming), and "Show ahead" (1 week / 2 weeks / 30 days) only decides how early it starts appearing there — a task is hidden until its due date is within that window of today. Once the due date has passed and it is not done, it moves to today and stays on today until you mark it done. (v5.86.0 wrongly put it on today as soon as the window opened.) -->
+<!-- v5.86.0 — Home upkeep: tasks now show on the Weekly and Monthly calendars well before they are due. Each task has a "Show ahead" choice (1 week, 2 weeks or 30 days; 30 days is the default, including for tasks that were already set to show). The card appears that many days before the due date and then stays on today's list every day until you mark it done, so it is visible as an upcoming job as well as an overdue one. Placement is still identical in Weekly and Monthly. -->
+<!-- v5.85.0 — Home upkeep: the fixed Area (Condo / HOA / Appliances) is replaced by free-form Tags. A task can carry several tags, typed in the editor (suggestions come from tags already in use, matched ignoring case; comma or Enter adds one, ✕ removes it). The filter row on the Home upkeep page now lists the tags actually in use (and hides itself when there are none); tags also show under each task. Existing tasks keep their old area as a tag automatically, so nothing is lost and no data is rewritten until you edit a task. -->
 <!-- v5.84.0 — Home upkeep now shows on the Monthly calendar too, placed on exactly the same day as in the Weekly planner (7 days before due, or today once that has passed, so an overdue task keeps moving forward day by day until it is done). Only tasks with "Show in Week view" on appear. Desktop/iPad: a house chip with a tick-to-done circle; three or more on one day collapse into a single "N upkeep" chip (red if any is overdue) that opens Home upkeep. Phone portrait: one house-coloured dot per day and rows with a done tick in the selected-day panel. Read from `upkeep`, never copied; no new stored data. -->
 <!-- v5.83.0 — Check-in: the five text lines (Today in one line, One win, Grateful, Looking forward to, Do differently) now wrap instead of scrolling sideways. At rest each shows at most two lines (a faint … when there is more); while you are typing it grows to six lines, then scrolls inside the field. Return finishes the line. No data change, no new synced key. -->
 <!-- v5.82.0 — Goals: a milestone with an auto-complete rule now shows where it stands right on its header: a progress ring around its checkbox and a ↻ chip (for example "↻ 6.5/10 mi", or "↻ 65%" on a phone) beside the title, so you no longer have to open the milestone and press Show rule. The chip also opens and closes the rule editor, which replaces the old "Completes automatically from my training or habits" row and its Show rule / Hide rule / Remove buttons (Remove auto-check is still at the bottom of the editor). The editor now starts closed and remembers open/closed per milestone on this device (new local key msRuleOpen; the old msRuleShut is no longer read). No data change, no new synced key. -->
@@ -3375,6 +3378,7 @@
   .up-hist-x { width:36px; height:36px; margin:-6px -8px -6px 0; border:0; background:transparent; color:var(--ink-light); font-size:15px; cursor:pointer; border-radius:50%; flex:none; }
   .up-hist-x:hover { color:var(--up-late-fg); }
   .up-inv { max-width:140px; }
+  .up-row-tags { display:inline-flex; flex-wrap:wrap; gap:4px; }
   .up-row-sub { display:flex; flex-wrap:wrap; gap:4px 12px; font-size:13px; color:var(--ink-light); }
   .up-row-sub .none { color:var(--up-late-fg); font-weight:700; }
   .up-sheet-foot { display:flex; align-items:center; gap:8px; padding:10px 16px calc(10px + env(safe-area-inset-bottom)); border-top:1px solid var(--border); }
@@ -7302,7 +7306,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
   // Goal tasks (v4.2.0): read from `goals`, never copied into weekData. Keys are local dates.
   const [dragGoal, setDragGoal] = useState(null); // {goalId, msId, taskId} while dragging a goal task
   const goalTasksByDay = React.useMemo(() => glTasksByDay(goals), [goals]);
-  // Home upkeep (v5.68.0): items with "Show in Week view" appear 7 days before due (or today if that has passed). Read from `upkeep`, never copied.
+  // Home upkeep (v5.68.0): items with "Show in Week view" sit on their due date once it is within `lead` days (default 30), or on today once overdue. Read from `upkeep`, never copied.
   const upkeepByDay = React.useMemo(() => upWeekMap(upkeep, glToday()), [upkeep]);
   function renderUpkeepTasks(localKey) {
     const list = upkeepByDay[localKey] || [];
@@ -12595,7 +12599,7 @@ function glAllTags(goals) {
   (goals || []).forEach(g => glTags(g).forEach(t => { const k = glTagKey(t); if (k && !seen[k]) { seen[k] = 1; out.push(String(t).trim()); } }));
   return out.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
 }
-function GlTagEditor({ tags, all, onChange }) {
+function GlTagEditor({ tags, all, onChange, placeholder }) {
   const [txt, setTxt] = useState('');
   const listId = React.useMemo(() => 'gl-tags-' + Math.random().toString(36).slice(2, 8), []);
   const cur = Array.isArray(tags) ? tags : [];
@@ -12620,7 +12624,7 @@ function GlTagEditor({ tags, all, onChange }) {
           <button type="button" aria-label={'Remove tag ' + t} onClick={() => onChange(cur.filter(x => x !== t))}>✕</button>
         </span>
       ))}
-      <input className="gl-inline" list={listId} value={txt} placeholder={cur.length ? '+ tag' : '+ Add tags (e.g. Home, Writing)'}
+      <input className="gl-inline" list={listId} value={txt} placeholder={cur.length ? '+ tag' : (placeholder || '+ Add tags (e.g. Home, Writing)')}
         style={{ fontSize: 13, width: cur.length ? 90 : 210, minWidth: 0 }}
         onChange={e => { const v = e.target.value; if (v.includes(',')) add(v); else setTxt(v); }}
         onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add(txt); } else if (e.key === 'Backspace' && !txt && cur.length) onChange(cur.slice(0, -1)); }}
@@ -15430,7 +15434,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.84.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.86.1</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
@@ -15598,12 +15602,18 @@ function App() {
 // HOME UPKEEP (v5.68.0)
 // Recurring maintenance that repeats N weeks/months/years after it was last DONE (not on a fixed calendar day).
 // One small synced collection `upkeep` (whole document, so no SYNC_SPLITS / backup.js entry is needed):
-//   [{ id, name, area:'Condo'|'HOA'|'Appliances', every:{n, unit:'weeks'|'months'|'years'},
+//   [{ id, name, tags:[string] (v5.85.0; older items carry area:'Condo'|'HOA'|'Appliances', read as one tag), every:{n, unit:'weeks'|'months'|'years'},
 //      dueDate:'YYYY-MM-DD', lastDone:'YYYY-MM-DD'|'', history:[{date}] newest first, notes, weekView:bool, createdAt }]
 // `dueDate` is always stored; marking done sets lastDone = newest history date and dueDate = lastDone + every.
 // With weekView on, the task also shows in the Weekly planner on (dueDate − 7 days) — or today, if that has passed.
 // ─────────────────────────────────────────────
-const UP_AREAS = ['Condo', 'HOA', 'Appliances'];
+// v5.85.0 — tags replace the fixed area. Older items have no `tags`: their `area` counts as a single tag until the task is next edited.
+function upTags(it) { return Array.isArray(it && it.tags) ? it.tags : (it && it.area ? [it.area] : []); }
+function upAllTags(list) {
+  const seen = {}, out = [];
+  (list || []).forEach(i => upTags(i).forEach(t => { const k = glTagKey(t); if (k && !seen[k]) { seen[k] = 1; out.push(String(t).trim()); } }));
+  return out.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+}
 const UP_UNITS = [['weeks', 'Weeks'], ['months', 'Months'], ['years', 'Years']];
 
 function upAddInterval(dateStr, n, unit) {
@@ -15693,13 +15703,17 @@ function upSort(list, todayKey) {   // most overdue first, then soonest due; und
     return da === db ? (a.name || '').localeCompare(b.name || '') : da < db ? -1 : 1;
   });
 }
-// Weekly-planner placement: dueDate − 7 days, or today when that day has already passed (so overdue items stay visible).
+// Weekly/Monthly placement (v5.86.1): the task sits ON ITS DUE DATE once that date is within `lead` days of today (1 week / 2 weeks / 30 days,
+// default 30); before that it is hidden. When the due date has passed and it is not done, it shows on today until it is marked done.
+const UP_LEADS = [[7, '1 week'], [14, '2 weeks'], [30, '30 days']];
+function upLead(it) { const n = Number(it && it.lead); return n > 0 ? Math.round(n) : 30; }
 function upWeekMap(list, todayKey) {
   const map = {};
   (list || []).forEach(it => {
     if (!it.weekView || !it.dueDate) return;
-    let show = fmtLocal(addDays(parseLocal(it.dueDate), -7));
-    if (show < todayKey) show = todayKey;
+    let show = it.dueDate;
+    if (show < todayKey) show = todayKey;                                   // overdue → today
+    else if (upDays(todayKey, show) > upLead(it)) return;                   // not inside the "show ahead" window yet
     (map[show] = map[show] || []).push(it);
   });
   return map;
@@ -15753,11 +15767,14 @@ function UpWeekTask({ item, todayKey, onDone, onOpen }) {
 
 // ── The Home upkeep page ──
 function UpkeepView({ upkeep, setUpkeep, onBack }) {
-  const [area, setArea] = useState('all');
+  const [tagSel, setTagSel] = useState('all');   // 'all' or a tag key (v5.85.0)
   const [editId, setEditId] = useState(null);   // null | 'new' | item id
   const today = glToday();
   const all = upkeep || [];
-  const shown = upSort(all.filter(i => area === 'all' || i.area === area), today);
+  const allTags = upAllTags(all);
+  const tagOn = tagSel !== 'all' && allTags.some(t => glTagKey(t) === tagSel);   // a tag nobody uses any more falls back to All
+  const tagName = tagOn ? allTags.find(t => glTagKey(t) === tagSel) : '';
+  const shown = upSort(all.filter(i => !tagOn || upTags(i).some(t => glTagKey(t) === tagSel)), today);
   const late = shown.filter(i => upStatus(i, today).kind === 'late');
   const soon = shown.filter(i => upStatus(i, today).kind === 'soon');
   const later = shown.filter(i => ['later', 'none'].includes(upStatus(i, today).kind));
@@ -15782,8 +15799,9 @@ function UpkeepView({ upkeep, setUpkeep, onBack }) {
             <span className={`up-chip ${st.kind}`}>{upDueLabel(it, today)}</span>
             <span className="up-row-every">{upEveryLabel(it.every)}</span>
           </span>
-          {(it.location || upInvLabel(it)) && (
+          {(it.location || upInvLabel(it) || upTags(it).length > 0) && (
             <span className="up-row-sub">
+              {upTags(it).length > 0 && <span className="up-row-tags">{upTags(it).map(t => <span key={t} className="gl-tag">{t}</span>)}</span>}
               {it.location && <span>{it.location}</span>}
               {upInvLabel(it) && <span className={Number(it.inventory) === 0 ? 'none' : ''}>{upInvLabel(it)}</span>}
             </span>
@@ -15814,11 +15832,14 @@ function UpkeepView({ upkeep, setUpkeep, onBack }) {
             <div className="up-title"><h1>Home upkeep</h1><span>Maintenance &amp; upkeep</span></div>
             <button type="button" className="up-add" onClick={() => setEditId('new')}>+ Add</button>
           </div>
-          <div className="up-filters" role="tablist" aria-label="Filter by area">
-            {['all', ...UP_AREAS].map(a => (
-              <button key={a} type="button" role="tab" aria-selected={area === a} className={area === a ? 'on' : ''} onClick={() => setArea(a)}>{a === 'all' ? 'All' : a}</button>
-            ))}
-          </div>
+          {allTags.length > 0 && (
+            <div className="up-filters" role="tablist" aria-label="Filter by tag">
+              {['all', ...allTags].map(a => {
+                const k = a === 'all' ? 'all' : glTagKey(a), on = a === 'all' ? !tagOn : tagSel === k;
+                return <button key={k} type="button" role="tab" aria-selected={on} className={on ? 'on' : ''} onClick={() => setTagSel(k)}>{a === 'all' ? 'All' : a}</button>;
+              })}
+            </div>
+          )}
           {all.length > 0 && (
             <div className="up-tiles">
               <div className="up-tile late"><b>{late.length}</b><span>Overdue</span></div>
@@ -15833,24 +15854,24 @@ function UpkeepView({ upkeep, setUpkeep, onBack }) {
               <button type="button" className="up-add" onClick={() => setEditId('new')}>+ Add your first task</button>
             </div>
           )}
-          {all.length > 0 && shown.length === 0 && <div className="up-empty"><span>Nothing in {area} yet.</span></div>}
+          {all.length > 0 && shown.length === 0 && <div className="up-empty"><span>Nothing tagged “{tagName}” yet.</span></div>}
           <Section kind="late" title="Overdue" items={late} />
           <Section kind="soon" title="Due in the next 30 days" items={soon} />
           <Section kind="ok" title="Later" items={later} />
         </div>
       </div>
       {editId && (editId === 'new' || editing) && (
-        <UpkeepEditor key={editId} item={editing} locations={locOptions} defaultArea={area === 'all' ? 'Condo' : area} onSave={saveItem} onDelete={removeItem} onClose={() => setEditId(null)} />
+        <UpkeepEditor key={editId} item={editing} locations={locOptions} allTags={allTags} defaultTags={tagOn ? [tagName] : []} onSave={saveItem} onDelete={removeItem} onClose={() => setEditId(null)} />
       )}
     </div>
   );
 }
 
-function UpkeepEditor({ item, locations, defaultArea, onSave, onDelete, onClose }) {
+function UpkeepEditor({ item, locations, allTags, defaultTags, onSave, onDelete, onClose }) {
   const today = glToday();
   const isNew = !item;
-  const [d, setD] = useState(() => item ? { ...item, every: { ...item.every }, history: [...(item.history || [])] } : {
-    id: 'up' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), name: '', area: defaultArea || 'Condo',
+  const [d, setD] = useState(() => item ? { ...item, tags: [...upTags(item)], every: { ...item.every }, history: [...(item.history || [])] } : {
+    id: 'up' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), name: '', tags: [...(defaultTags || [])],
     every: { n: 3, unit: 'months' }, dueDate: '', lastDone: '', history: [], notes: '', weekView: false, createdAt: today, inventory: '', location: '',
   });
   const [dueTouched, setDueTouched] = useState(false);
@@ -15915,10 +15936,8 @@ function UpkeepEditor({ item, locations, defaultArea, onSave, onDelete, onClose 
             onChange={e => { setErr(''); setD(x => ({ ...x, name: e.target.value })); }} />
           {err && <div className="up-err">{err}</div>}
 
-          <div className="up-lbl">Area</div>
-          <div className="up-pills">
-            {UP_AREAS.map(a => <button key={a} type="button" aria-pressed={d.area === a} className={d.area === a ? 'on' : ''} onClick={() => setD(x => ({ ...x, area: a }))}>{a}</button>)}
-          </div>
+          <div className="up-lbl">Tags <span className="up-opt">(optional)</span></div>
+          <GlTagEditor tags={d.tags} all={allTags} onChange={t => setD(x => ({ ...x, tags: t }))} placeholder="+ Add tags (e.g. Condo, HOA)" />
 
 
           <label className="up-lbl" htmlFor="up-inv">Inventory <span className="up-opt">(spares on hand)</span></label>
@@ -15980,9 +15999,18 @@ function UpkeepEditor({ item, locations, defaultArea, onSave, onDelete, onClose 
           )}
 
           <div className="up-toggle-row">
-            <div><b>Show in Week view</b><span>Adds it as a task 7 days before it is due</span></div>
+            <div><b>Show in Week view</b><span>Shows on the Weekly and Monthly calendars ahead of its due date</span></div>
             <button type="button" role="switch" aria-checked={!!d.weekView} aria-label="Show in Week view" className={`up-switch ${d.weekView ? 'on' : ''}`} onClick={() => setD(x => ({ ...x, weekView: !x.weekView }))}><i /></button>
           </div>
+          {d.weekView && (
+            <>
+              <div className="up-lbl">Show ahead</div>
+              <div className="up-pills" role="group" aria-label="How far ahead to show it">
+                {UP_LEADS.map(([n, label]) => <button key={n} type="button" aria-pressed={upLead(d) === n} className={upLead(d) === n ? 'on' : ''} onClick={() => setD(x => ({ ...x, lead: n }))}>{label}</button>)}
+              </div>
+              <div className="up-hint">It shows on its due date once it is this close, then moves to today if it goes overdue, until you mark it done.</div>
+            </>
+          )}
 
           <label className="up-lbl" htmlFor="up-notes">Notes</label>
           <textarea id="up-notes" className="up-input" rows={3} value={d.notes || ''} placeholder="Filter size, where the spare is, who to call…" onChange={e => setD(x => ({ ...x, notes: e.target.value }))} />
